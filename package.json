@@ -1,0 +1,50 @@
+{
+  "name": "skystride",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Skystride \u2014 rooftop parkour time trials",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pkafr0911/skystride.git"
+  },
+  "scripts": {
+    "dev": "max dev",
+    "start": "max dev",
+    "postinstall": "max setup",
+    "build": "max build",
+    "build-pre": "cross-env REACT_APP_ENV=pre max build",
+    "preview": "umi-serve ./dist --port 8000",
+    "tsc": "tsc --noEmit",
+    "lint": "eslint src config --ext .ts,.tsx",
+    "test": "ts-node --project src/pages/Skystride/tsconfig.test.json src/pages/Skystride/model.test.ts",
+    "test:skystride": "npm test",
+    "deploy": "npm run build-pre && node scripts/prepare-pages.cjs && gh-pages -d dist"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "antd": "^5.29.1",
+    "framer-motion": "^12.23.24",
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@types/three": "^0.183.1",
+    "@umijs/lint": "^4.4.6",
+    "@umijs/max": "^4.4.6",
+    "cross-env": "^7.0.3",
+    "eslint": "^8.57.1",
+    "gh-pages": "^6.1.1",
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3",
+    "umi-serve": "^1.9.11"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "browserslist": [
+    "defaults"
+  ]
+}

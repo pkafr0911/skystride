@@ -1,0 +1,5 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": { "module": "CommonJS", "jsx": "react" },
+  "include": ["./model.test.ts"]
+}
