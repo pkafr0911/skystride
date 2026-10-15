@@ -131,6 +131,13 @@ export type Frame = {
   grounded: boolean;
   vault: Vault;
   contact: Contact | null;
+  /** Visual-only event data. Optional so existing v2 ghosts remain readable. */
+  launchX?: number;
+  launchY?: number;
+  landX?: number;
+  impact?: number;
+  landingAge?: number;
+  lead?: number;
 };
 export type Sample = { time: number; frame: Frame };
 export type Input = { tick: number; action: Action };
@@ -219,6 +226,9 @@ export function readRecord(raw: string | null): RecordRun | null {
           f.progress >= 0 &&
           f.progress <= 1 &&
           typeof f.grounded === "boolean" &&
+          [f.launchX, f.launchY, f.landX, f.impact, f.landingAge, f.lead].every(
+            (value) => value === undefined || Number.isFinite(value),
+          ) &&
           moves.includes(f.move) &&
           vaults.includes(f.vault) &&
           (f.contact === null ||
@@ -294,6 +304,12 @@ export class Run {
   private jumpIntent = -1;
   private actionDuration = 0;
   private dropFrom = 0;
+  private launchX = 0;
+  private launchY = 0;
+  private landX = 0;
+  private impact = 0;
+  private landedAt = -10;
+  private lead = 0;
   start(sector = 0, practice = false) {
     this.phase = "running";
     this.startSector = sector;
@@ -325,6 +341,12 @@ export class Run {
     this.jumpIntent = -1;
     this.actionDuration = 0;
     this.dropFrom = 0;
+    this.launchX = this.x;
+    this.launchY = 0;
+    this.landX = this.x;
+    this.impact = 0;
+    this.landedAt = -10;
+    this.lead = 0;
     this.handled = new Set(
       obstacles.flatMap((o, i) => (o.x + o.width < this.x ? [i] : [])),
     );
@@ -468,6 +490,9 @@ export class Run {
       this.traverse(o, "wall", 3.3, 0.8, true);
       this.upper = true;
     } else {
+      this.launchX = this.x;
+      this.launchY = this.y;
+      this.lead = (this.x / 4.4) % 1 < 0.5 ? 1 : 0;
       this.vy = JUMP_SPEED + (action === "forward" ? 0.5 : 0);
       if (action === "forward") this.speed = Math.min(14, this.speed + 0.6);
       this.grounded = false;
@@ -479,6 +504,9 @@ export class Run {
   }
   private land(y: number) {
     const impact = -this.vy;
+    this.impact = impact;
+    this.landX = this.x;
+    this.landedAt = this.time;
     this.y = y;
     this.vy = 0;
     this.grounded = true;
@@ -511,6 +539,8 @@ export class Run {
         this.x >= s.start && this.x < s.end && Math.abs(s.y - this.y) < 0.025,
     );
     if (this.grounded && !support) {
+      this.launchX = oldX;
+      this.launchY = this.y;
       this.grounded = false;
       this.dropFrom = this.y;
       this.vy = 0;
@@ -718,6 +748,9 @@ export class Run {
           this.setMove("climb");
         } else {
           this.traversal = null;
+          this.impact = t.move === "vault" ? 7 : 5;
+          this.landX = this.x;
+          this.landedAt = this.time;
           this.y = t.y1;
           this.grounded = true;
           this.lastGround = this.time;
@@ -761,6 +794,12 @@ export class Run {
       grounded: this.grounded,
       vault: this.traversal?.vault || this.vault,
       contact: this.traversal?.contact || null,
+      launchX: this.launchX,
+      launchY: this.launchY,
+      landX: this.landX,
+      impact: this.impact,
+      landingAge: Math.min(1, this.time - (this.landedAt ?? -10)),
+      lead: this.lead,
     };
   }
   record(): RecordRun {

@@ -238,6 +238,30 @@ test("practice begins at sector boundary and is never record eligible", () => {
 test("versioned replay validation rejects malformed input and frame data", () => {
   const r = complete().record();
   assert.deepEqual(readRecord(JSON.stringify(r)), r);
+  const legacy = structuredClone(r);
+  for (const sample of legacy.samples)
+    for (const key of [
+      "launchX",
+      "launchY",
+      "landX",
+      "impact",
+      "landingAge",
+      "lead",
+    ] as const)
+      delete sample.frame[key];
+  assert.deepEqual(readRecord(JSON.stringify(legacy)), legacy);
+  assert.equal(
+    readRecord(
+      JSON.stringify({
+        ...r,
+        samples: r.samples.map((s) => ({
+          ...s,
+          frame: { ...s.frame, impact: "invalid" },
+        })),
+      }),
+    ),
+    null,
+  );
   assert.equal(readRecord("{"), null);
   assert.equal(readRecord(JSON.stringify({ ...r, version: "old" })), null);
   assert.equal(

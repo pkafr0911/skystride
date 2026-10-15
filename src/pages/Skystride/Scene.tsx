@@ -12,6 +12,7 @@ import {
   STEP,
 } from "./model";
 import { makeRunner } from "./runner";
+import { interpolateFrame } from "./motion";
 
 export default function Scene({
   game,
@@ -306,11 +307,7 @@ export default function Scene({
       const alpha =
         game.phase === "running" && !game.paused ? accumulator / STEP : 1;
       const current = game.frame();
-      const visual: Frame = {
-        ...current,
-        x: THREE.MathUtils.lerp(game.previous.x, current.x, alpha),
-        y: THREE.MathUtils.lerp(game.previous.y, current.y, alpha),
-      };
+      const visual: Frame = interpolateFrame(game.previous, current, alpha);
       const x = visual.x;
       const next = game.next();
       const anticipate = next?.kind === "branch" && next.x - x < 17 ? 0.5 : 0;
@@ -356,15 +353,7 @@ export default function Scene({
             : 0;
         rival.group.visible = true;
         rival.pose(
-          {
-            ...a.frame,
-            x: THREE.MathUtils.lerp(a.frame.x, b.frame.x, p),
-            y: THREE.MathUtils.lerp(a.frame.y, b.frame.y, p),
-            progress:
-              a.frame.move === b.frame.move
-                ? THREE.MathUtils.lerp(a.frame.progress, b.frame.progress, p)
-                : a.frame.progress,
-          },
+          interpolateFrame(a.frame, b.frame, p),
           game.time,
           animationDt,
         );

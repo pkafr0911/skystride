@@ -16,7 +16,7 @@
     "preview": "umi-serve ./dist --port 8000",
     "tsc": "tsc --noEmit",
     "lint": "eslint src config --ext .ts,.tsx",
-    "test": "ts-node --project src/pages/Skystride/tsconfig.test.json src/pages/Skystride/model.test.ts",
+    "test": "ts-node --project src/pages/Skystride/tsconfig.test.json src/pages/Skystride/model.test.ts && ts-node --project src/pages/Skystride/tsconfig.test.json src/pages/Skystride/motion.test.ts",
     "test:skystride": "npm test",
     "deploy": "npm run build-pre && node scripts/prepare-pages.cjs && gh-pages -d dist"
   },
