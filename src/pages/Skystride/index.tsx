@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import {
   FINISH,
+  SECTOR,
   formatTime,
   readRecord,
   RecordRun,
@@ -162,9 +163,17 @@ export default function Skystride() {
             )
               return;
             if (
-              ["ArrowUp", "ArrowDown", " ", "w", "s", "r", "Escape"].includes(
-                e.key,
-              )
+              [
+                "ArrowUp",
+                "ArrowDown",
+                "ArrowRight",
+                " ",
+                "w",
+                "s",
+                "d",
+                "r",
+                "Escape",
+              ].includes(e.key)
             )
               e.preventDefault();
             if (e.repeat) return;
@@ -172,6 +181,8 @@ export default function Skystride() {
             else if (e.key === "Escape") game.pause();
             else if (["ArrowUp", " ", "w"].includes(e.key)) game.action("up");
             else if (["ArrowDown", "s"].includes(e.key)) game.action("down");
+            else if (["ArrowRight", "d"].includes(e.key))
+              game.action("forward");
           }}
           onPointerDown={(e) => {
             if (
@@ -244,22 +255,25 @@ export default function Skystride() {
           {game.phase === "running" && !game.paused && (
             <>
               <div className={styles.route}>
-                {game.upper ? "↗ UPPER LINE" : "→ ROOFTOP LINE"}
+                {game.upper ? "↗ HIGH LINE" : "→ ROOFTOP LINE"}
                 <span>
-                  SECTOR {Math.min(3, Math.floor(game.x / 108) + 1)} / 03
+                  SECTOR {Math.min(3, Math.floor(game.x / SECTOR) + 1)} / 03
+                </span>
+                <span className={styles.flow}>
+                  {game.speed.toFixed(1)} M/S · {game.flow} FLOW
                 </span>
               </div>
-              {next && distance < 19 && !game.traversal && (
+              {next && distance < 23 && !game.traversal && (
                 <div
-                  className={`${styles.cue} ${distance >= 1.4 && distance <= 3.1 ? styles.clean : ""}`}
+                  className={`${styles.cue} ${distance >= 0.55 && distance <= 2.65 ? styles.clean : ""}`}
                 >
                   {cue}
                   <small>
-                    {distance > 3.1
+                    {distance > 2.65
                       ? "READ THE APPROACH"
-                      : distance >= 1.4
-                        ? "NOW · CLEAN WINDOW"
-                        : "LATE · RECOVER"}
+                      : distance >= 0.55
+                        ? "FLOW WINDOW"
+                        : "COMMIT"}
                   </small>
                 </div>
               )}
@@ -306,12 +320,12 @@ export default function Skystride() {
                 </h2>
                 <p>
                   {finished
-                    ? `${game.clean} clean moves · ${game.recoveries} recoveries${!game.eligible ? " · Practice / paused run — not saved" : " · Local time trial"}`
+                    ? `${game.clean} clean moves · ${game.bestFlow} best flow · ${game.recoveries} recoveries${!game.eligible ? " · Practice / paused run — not saved" : " · Local time trial"}`
                     : game.phase === "failed"
-                      ? "Jump before the roof ends. The amber floor marks show the clean takeoff zone."
+                      ? "Jump near the edge to carry across. Press R or tap below to go again."
                       : game.paused
                         ? "Paused runs remain playable, but cannot set a personal best."
-                        : "Swipe up to jump or vault. Swipe down to slide or roll. Take the high line for a faster, harder route."}
+                        : "Jump whenever you want. Swipe up near a barrier to vault. Down to slide; down before a drop landing to roll. Keep your momentum. Find your line."}
                 </p>
                 {finished && (
                   <div className={styles.splits}>
@@ -342,6 +356,22 @@ export default function Skystride() {
                     ]}
                     style={{ width: "100%", marginBottom: 16 }}
                   />
+                )}
+                {game.phase === "ready" && (
+                  <label className={styles.sensitivity}>
+                    Swipe sensitivity
+                    <input
+                      aria-label="Swipe sensitivity"
+                      type="range"
+                      min="10"
+                      max="32"
+                      defaultValue={gesture.threshold}
+                      onChange={(e) => {
+                        gesture.threshold = Number(e.target.value);
+                      }}
+                    />
+                    <small>Short ← → Deliberate</small>
+                  </label>
                 )}
                 <div className={styles.buttons}>
                   {game.paused && (
@@ -380,8 +410,8 @@ export default function Skystride() {
                 </div>
                 {storageNotice && <p role="status">{storageNotice}</p>}
                 <small className={styles.panelNote}>
-                  UP / SPACE · JUMP & VAULT &nbsp; DOWN · SLIDE & ROLL &nbsp; R
-                  · RETRY
+                  UP / SPACE · JUMP & VAULT &nbsp; DOWN · SLIDE & ROLL &nbsp; →
+                  · LONG JUMP &nbsp; R · RETRY
                 </small>
               </div>
             </div>

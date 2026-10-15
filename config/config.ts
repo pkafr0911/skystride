@@ -6,7 +6,14 @@ export default defineConfig({
   hash: true,
   base: pages ? "/skystride/" : "/",
   publicPath: pages ? "/skystride/" : "/",
-  routes: [{ path: "/", component: "./Skystride", layout: false }],
+  routes: [
+    { path: "/", component: "./Skystride", layout: false },
+    {
+      path: "/movement-lab",
+      component: "./Skystride/MovementLab",
+      layout: false,
+    },
+  ],
   antd: {},
   fastRefresh: true,
   mako: {},

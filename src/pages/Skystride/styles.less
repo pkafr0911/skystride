@@ -463,3 +463,77 @@
   letter-spacing: 0.28em;
   margin-bottom: 18px;
 }
+.flow {
+  color: #ffc881;
+  opacity: 1 !important;
+}
+.lab {
+  button,
+  select {
+    background: #26384f;
+    color: #fff0d7;
+    border: 1px solid #758095;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font: inherit;
+  }
+  input {
+    accent-color: #ffbe83;
+  }
+  canvas {
+    display: block;
+  }
+}
+.sensitivity {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  color: #c5bdba;
+  margin: 0 0 20px;
+  input {
+    accent-color: #ffbe83;
+    width: 100px;
+  }
+  small {
+    opacity: 0.65;
+    font-size: 9px;
+  }
+}
+.resultDelta {
+  color: #bce6d5 !important;
+  font-variant-numeric: tabular-nums;
+}
+.stage {
+  background: linear-gradient(
+    #f8ad8d 0%,
+    #ffbd94 38%,
+    #b49fb6 72%,
+    #66718e 100%
+  );
+}
+.grain {
+  background: linear-gradient(
+    180deg,
+    #18243c12,
+    transparent 35%,
+    transparent 70%,
+    #101e3440
+  );
+}
+@media (max-width: 700px) {
+  .hud {
+    top: max(18px, env(safe-area-inset-top));
+    left: max(15px, env(safe-area-inset-left));
+    right: max(15px, env(safe-area-inset-right));
+  }
+  .feedback {
+    bottom: max(34px, env(safe-area-inset-bottom));
+  }
+}
+@media (orientation: landscape) {
+  .rotate {
+    display: none;
+  }
+}

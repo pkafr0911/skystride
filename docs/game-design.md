@@ -1,34 +1,62 @@
-# Skystride — first playable
+# Skystride — movement pass
 
-Route: `/` locally; `/skystride/` on GitHub Pages. This is a standalone, viewport-filling game project.
+## Visual reference
 
-## Art direction
+The supplied Skystride / Urban Silhouette concept is the visual direction: peach sunset, a pale warm sun, layered mauve skyline, navy roof silhouettes, thin amber roof edges, cream shirt and warm shoe accents. The scene uses original procedural geometry, including towers, vents, bridge silhouettes and pipework. This pass keeps that palette and composition; it is not a pixel-exact reproduction.
 
-Based on the supplied Skystride concept: apricot sunset, layered mauve skyline, navy rooftop architecture, amber roof edges, and a dark runner with a cream shirt and red shoes/wrist accents. All scene assets are procedural Three.js geometry. The runner is an articulated primitive rig with action-specific poses, not a finished skinned character or a reproduction of the illustration. No downloaded assets, new dependencies, or effects pipeline.
+## Movement and timing
 
-## Sunset Relay
+The character now has horizontal velocity, acceleration, vertical velocity, gravity and grounded state. Up jumps anywhere on a roof, with no obstacle required. Jump input is consumed on the next 120 Hz simulation tick. A 120 ms buffer accepts presses just before landing or traversal exit; 90 ms of coyote time permits a slightly late edge jump. There is no double jump. Holding a key does not auto-repeat actions.
 
-A 324-meter authored course with three sectors and two elevated route choices. Auto-run at 7.8 units/second. Up triggers a contextual jump, vault, wall step, or late ledge catch. Down triggers a slide or landing roll. Amber markings indicate a clean timing band 1.4–3.1 units ahead of an obstacle. Inputs within 5.5 units can start traversal; early execution takes longer. Clean traversal uses 8.8 units/second, recovery 6.1 with additional catch/stumble delays. Upper routes bypass lower obstacles but introduce gap jumps and drops. Missed gaps end the attempt; missed barriers and slides recover with a time cost.
+Cruising speed is 12 units/s, up from 7.8. Clean actions build flow and retain extra momentum; running targets up to 13.5 and action boosts cap at 14. Stumbles and heavy landings remove speed, followed by acceleration. Gravity is 30 units/s² and the standard launch speed is 12.4 units/s. These are arcade tuning values, not measurements of human performance or device latency.
 
-Traversal uses authored paths, with a below-ledge hang/climb for catches. This is a deterministic contextual traversal prototype, not a general-purpose rigid-body collision system or production contact-IK animation. Physical contacts and gesture windows need visual/device tuning before expanding the course library.
+Movement remains on a 2D plane. Roof tops, gaps, upper-route undersides and roof facades use shared authored geometry and fixed-step swept crossing checks. An impossible jump falls physically before failure; it cannot pass through the next roof facade. Lower-route jumps hit the underside of upper platforms. Obstacles use body-height checks and recoverable contact responses.
 
-## Controls and competition
+## Contextual parkour
 
-- Desktop: Up / W / Space for jump; Down / S for slide; R to retry; Escape to pause.
-- Mobile: vertical swipes anywhere on the course, fired at a 22px threshold before release. One action per contact. No on-screen gameplay button pad.
-- Fullscreen requests native fullscreen and landscape orientation from a user gesture. A fixed edge-to-edge layout remains when the browser declines. Portrait stays playable and recommends landscape. Rotation, tab hiding, or focus loss pauses.
-- Time trial, practice from each sector, immediate retry, cumulative sector splits, and best-run ghost.
-- Best time/replay stored locally under a course-versioned key. Paused and practice runs cannot replace a best. Storage failure retains this visit's record in memory.
-- No online leaderboard, shared ghosts, trusted submissions, or pursuer in this first playable. Local storage is not cheat resistant.
+Up within 2.65 units of a barrier selects its authored vault. Inputs within 0.55 units choose a slower safety recovery. An earlier up input is a normal ballistic jump. The special movement does not absorb arbitrary early inputs into a perfect vault.
 
-## Engineering
+Eight vault profiles have distinct body, knee, foot and arm poses:
 
-The React page owns controls and HUD; the lazy Three.js scene owns rendering and advances a 120Hz simulation. Actions mutate the model directly, without React state or key-release delay. HUD updates at 10Hz. Ghosts sample every six ticks and interpolate between samples. Native key repeats are ignored. Long frame stalls over 200ms pause and disqualify the run rather than silently discarding elapsed simulation time.
+- Step-over: low obstacle, running step and raised leading foot.
+- Hurdle: no hand support, split legs and forward lean.
+- Speed vault: low torso, trailing legs and a support hand.
+- One-hand vault: asymmetric leg tuck and free-arm counterbalance.
+- Safety vault: more upright, supported step-through and a time penalty when late.
+- Lazy vault: reclined torso, legs leading over the obstacle.
+- Kong: forward dive, two-hand support and compact knee tuck.
+- Step-on leap: raised support foot and a higher outgoing arc.
 
-DPR capped at 1.5. Shared geometry/materials, no shadows or postprocessing; frame loop, ResizeObserver, listeners, geometries, materials, renderer disposed on unmount. WebGL failure/context loss gives a readable error. Reduced-motion removes UI entrance/transition motion; essential running motion remains. The game is the sole route and fills the viewport; native fullscreen is optional.
+Vault paths rise before the obstacle, retain clearance across its full width and descend after the trailing edge. Their poses have entry, contact, tuck and release phases. Hands aim at world-space obstacle anchors while within anatomical reach. Two-bone inverse kinematics keeps arms and legs consistent in length. Contact releases as the shoulder passes beyond reach.
+
+Up at a branch performs a wall step onto the high line. A fresh up input near a reachable lip while falling catches it, hangs briefly, then climbs. Up during the hang commits the climb sooner; down releases. Unreachable ledges do not rescue the player.
+
+Down on the roof starts a 0.62 second slide, extending the low stance until the overhead obstacle is clear. Down in the air arms a landing roll for 0.55 seconds. Drops over two units or impact speeds over 14 require a roll to preserve momentum; otherwise a compressed heavy landing costs speed. The roll rotates the tucked body through a full cycle. Jumping can interrupt ground recovery, while non-interruptible vault contacts accept buffered exit input.
+
+Right / D / swipe right performs a slightly longer jump. Up/down remain the essential controls. Swipe recognition uses an adjustable 10–32 pixel threshold (18 default), before release, with one action per contact.
+
+## Sunset Relay v2
+
+The course is now 480 units long with boundaries at 160, 320 and 480. The extended spacing supports the faster pace. Two upper routes add wall steps, gaps, vaults and drops; the lower line uses barriers and ducts. Both clean routes and early vault-jump attempts are exercised end-to-end by simulation tests. Tests verify that the clean upper route beats the clean lower route and that early vault jumps cost time.
+
+Practice starts from a sector boundary and continues to the end; it does not yet loop isolated sectors or select upper-route entry states. There is one course. Pursuit, collectibles, online rankings, controller support and sound are not implemented in this pass.
+
+## Presentation and competition
+
+The camera renders interpolated player positions between simulation ticks, looks ahead and eases vertically with elevated routes. A branch approach adds a small upward anticipation. No shake or dramatic zoom. Touch keeps the full play area as its gesture surface. Native fullscreen and landscape locking are requested where supported; edge-to-edge browser play remains available. Rotation, focus loss and long frame stalls pause the run and remove personal-best eligibility.
+
+The HUD shows time, personal best, route, current speed and flow. Results include sector times and difference against the previous best. The new course key is skystride.sunset-relay-v2.best, keeping incompatible v1 records separate.
+
+Records now contain tick-stamped inputs and sampled animation frames. Tests reconstruct a complete upper-route run from its recorded inputs and compare its entire resulting record. This is local reproducibility testing; no server validation or cross-device determinism certification is claimed. Local saved data is not trusted competition data.
+
+## Movement study
+
+Open /movement-lab to inspect the actual runner and simulated movements. Choose a move, slow it down, freeze it or scrub the pose slider. This is an animation review tool, separate from the minimal gameplay HUD. It uses the same procedural runner and controller as the course. No purchased character, mocap clips, GLB model or AnimationMixer is present yet.
 
 ## Verification
 
-`npm run test:skystride` covers full clean runs on both routes, shortcut advantage, early-input time cost, deterministic replays, gap failure, late catches, wrong actions, input repeat, pause/restart, practice isolation, replay validation, and swipe recognition.
+Run npm test, npm run tsc, npm run lint and npm run build-pre. The regression suite covers free jumping, no double jump, buffer expiry and landing buffers, coyote grace, full clean routes, momentum differences, all vault selections, complete obstacle clearance, vault-exit buffering, slides, roll timing, ledge catches, ceiling/facade collision, pause/restart, replay validation, exact input playback and gestures.
 
-TypeScript, scoped ESLint, and GitHub Pages production build are also required. Browser inspection was blocked by the earlier browser security restriction, so visual composition, animation contact quality, native fullscreen behavior, and real-device input latency remain unverified. No deployment performed.
+Windows x64 explicitly includes the matching optional Mako native dependency because the inherited lockfile omitted it. This remains optional on other operating systems.
+
+Browser review checks gameplay and the movement study. Real-phone latency, thermal behavior, native fullscreen/orientation support and sustained mobile frame pacing still require device playtesting. The runner is an improved procedural animation system, not finished character production art.

@@ -2,7 +2,7 @@
   "name": "skystride",
   "version": "0.1.0",
   "private": true,
-  "description": "Skystride \u2014 rooftop parkour time trials",
+  "description": "Skystride — rooftop parkour time trials",
   "repository": {
     "type": "git",
     "url": "https://github.com/pkafr0911/skystride.git"
@@ -21,10 +21,10 @@
     "deploy": "npm run build-pre && node scripts/prepare-pages.cjs && gh-pages -d dist"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
     "antd": "^5.29.1",
     "framer-motion": "^12.23.24",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "three": "^0.183.2"
   },
   "devDependencies": {
@@ -46,5 +46,8 @@
   },
   "browserslist": [
     "defaults"
-  ]
+  ],
+  "optionalDependencies": {
+    "@umijs/mako-win32-x64-msvc": "0.11.5"
+  }
 }

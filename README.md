@@ -38,14 +38,15 @@ This builds with `/skystride/` as both router base and asset path, creates a 404
 
 Expected URL after deployment: https://pkafr0911.github.io/skystride/
 
-`npm run build` instead targets `/` for root-domain hosting. This project has only the `/` game route. No deployment is triggered by local setup; `npm run deploy` is the explicit publishing step.
+`npm run build` instead targets `/` for root-domain hosting. The `/` route is the game; `/movement-lab` is the animation study with slow motion and pose scrubbing. No deployment is triggered by local setup; `npm run deploy` is the explicit publishing step.
 
 ## Controls
 
-- Up / W / Space: contextual jump, vault, or wall step.
-- Down / S: slide or landing roll.
+- Up / W / Space: jump anywhere; contextual vault or wall step near a suitable obstacle.
+- Down / S: slide; press before landing from a drop to roll.
+- Right / D: longer jump.
 - R: restart. Escape: pause.
-- Touch: swipe up/down; actions trigger before finger release.
+- Touch: swipe up/down/right; actions trigger before finger release. Swipe sensitivity is adjustable in the course menu.
 
 Best runs remain in local storage on the current origin. A best from the original app is not transferred across origins automatically. Paused runs and practice attempts do not replace a personal best. Online leaderboards are not implemented.
 

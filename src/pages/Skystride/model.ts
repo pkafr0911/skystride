@@ -1,43 +1,172 @@
 export const STEP = 1 / 120;
-export const FINISH = 324;
-export const VERSION = 'sunset-relay-v1';
-export type Action = 'up' | 'down';
-export type Move = 'run' | 'jump' | 'vault' | 'slide' | 'wall' | 'catch' | 'roll' | 'stumble';
+export const SECTOR = 160;
+export const FINISH = SECTOR * 3;
+export const VERSION = "sunset-relay-v2";
+export const RUN_SPEED = 12;
+export const GRAVITY = 30;
+export const JUMP_SPEED = 12.4;
+export const BUFFER = 0.12;
+export const COYOTE = 0.09;
+export type Action = "up" | "down" | "forward";
+export type Move =
+  | "run"
+  | "jump"
+  | "fall"
+  | "land"
+  | "vault"
+  | "slide"
+  | "wall"
+  | "catch"
+  | "climb"
+  | "roll"
+  | "stumble";
+export type Vault =
+  | "step"
+  | "hurdle"
+  | "speed"
+  | "one-hand"
+  | "safety"
+  | "lazy"
+  | "kong"
+  | "step-leap";
 export type Obstacle = {
   x: number;
   width: number;
-  kind: 'vault' | 'gap' | 'slide' | 'branch' | 'drop';
-  route?: 'upper' | 'lower';
-  branch?: number;
+  height?: number;
+  kind: "vault" | "gap" | "slide" | "branch" | "drop";
+  route?: "upper" | "lower";
+  vault?: Vault;
 };
 export const obstacles: Obstacle[] = [
-  { x: 22, width: 2, kind: 'vault' },
-  { x: 42, width: 5, kind: 'gap' },
-  { x: 65, width: 5, kind: 'slide' },
-  { x: 82, width: 6, kind: 'branch', branch: 1 },
-  { x: 99, width: 3, kind: 'vault', route: 'lower' },
-  { x: 112, width: 6, kind: 'slide', route: 'lower' },
-  { x: 108, width: 6, kind: 'gap', route: 'upper' },
-  { x: 134, width: 2, kind: 'vault', route: 'upper' },
-  { x: 145, width: 8, kind: 'drop', route: 'upper' },
-  { x: 164, width: 6, kind: 'gap' },
-  { x: 186, width: 5, kind: 'slide' },
-  { x: 207, width: 6, kind: 'branch', branch: 2 },
-  { x: 224, width: 3, kind: 'vault', route: 'lower' },
-  { x: 238, width: 5, kind: 'slide', route: 'lower' },
-  { x: 232, width: 7, kind: 'gap', route: 'upper' },
-  { x: 254, width: 8, kind: 'drop', route: 'upper' },
-  { x: 279, width: 3, kind: 'vault' },
-  { x: 300, width: 6, kind: 'gap' },
+  { x: 27, width: 0.7, height: 0.5, kind: "vault", vault: "step" },
+  { x: 46, width: 0.9, height: 0.8, kind: "vault", vault: "hurdle" },
+  { x: 67, width: 6.2, kind: "gap" },
+  { x: 91, width: 5.5, kind: "slide" },
+  { x: 115, width: 5, kind: "branch" },
+  {
+    x: 139,
+    width: 1.5,
+    height: 1.05,
+    kind: "vault",
+    vault: "speed",
+    route: "lower",
+  },
+  { x: 153, width: 6, kind: "slide", route: "lower" },
+  { x: 148, width: 6.5, kind: "gap", route: "upper" },
+  {
+    x: 176,
+    width: 1.5,
+    height: 1.1,
+    kind: "vault",
+    vault: "one-hand",
+    route: "upper",
+  },
+  { x: 195, width: 9, kind: "drop", route: "upper" },
+  { x: 217, width: 1.6, height: 1.15, kind: "vault", vault: "lazy" },
+  { x: 240, width: 7, kind: "gap" },
+  { x: 267, width: 6, kind: "slide" },
+  { x: 290, width: 5, kind: "branch" },
+  {
+    x: 312,
+    width: 2.8,
+    height: 1.1,
+    kind: "vault",
+    vault: "kong",
+    route: "lower",
+  },
+  { x: 335, width: 6, kind: "slide", route: "lower" },
+  { x: 325, width: 7, kind: "gap", route: "upper" },
+  {
+    x: 349,
+    width: 2.6,
+    height: 1.2,
+    kind: "vault",
+    vault: "step-leap",
+    route: "upper",
+  },
+  { x: 375, width: 9, kind: "drop", route: "upper" },
+  { x: 402, width: 1.1, height: 1.35, kind: "vault", vault: "safety" },
+  { x: 424, width: 0.9, height: 0.85, kind: "vault", vault: "speed" },
+  { x: 448, width: 7.2, kind: "gap" },
+];
+export const upperPlatforms = [
+  { start: 120, end: 195 },
+  { start: 295, end: 375 },
+];
+export type Surface = { start: number; end: number; y: number };
+function cut(start: number, end: number, y: number, upper: boolean): Surface[] {
+  const result: Surface[] = [];
+  let cursor = start;
+  for (const o of obstacles.filter(
+    (item) =>
+      item.kind === "gap" &&
+      (upper ? item.route === "upper" : !item.route) &&
+      item.x >= start &&
+      item.x < end,
+  )) {
+    result.push({ start: cursor, end: o.x, y });
+    cursor = o.x + o.width;
+  }
+  result.push({ start: cursor, end, y });
+  return result;
+}
+export const surfaces: Surface[] = [
+  ...cut(-30, FINISH + 25, 0, false),
+  ...upperPlatforms.flatMap((p) => cut(p.start, p.end, 3.3, true)),
 ];
 export function ground(x: number, upper: boolean) {
-  return upper && ((x >= 82 && x <= 153) || (x >= 207 && x <= 262)) ? 3.3 : 0;
+  return upper && upperPlatforms.some((p) => x >= p.start && x <= p.end)
+    ? 3.3
+    : 0;
 }
-export type Sample = [number, number, number, Move];
-export type RecordRun = { version: string; time: number; splits: number[]; samples: Sample[] };
+export type Contact = { x: number; y: number };
+export type Frame = {
+  x: number;
+  y: number;
+  speed: number;
+  vy: number;
+  move: Move;
+  moveTime: number;
+  progress: number;
+  grounded: boolean;
+  vault: Vault;
+  contact: Contact | null;
+};
+export type Sample = { time: number; frame: Frame };
+export type Input = { tick: number; action: Action };
+export type RecordRun = {
+  version: string;
+  time: number;
+  splits: number[];
+  samples: Sample[];
+  inputs: Input[];
+};
+const moves: Move[] = [
+  "run",
+  "jump",
+  "fall",
+  "land",
+  "vault",
+  "slide",
+  "wall",
+  "catch",
+  "climb",
+  "roll",
+  "stumble",
+];
+const vaults: Vault[] = [
+  "step",
+  "hurdle",
+  "speed",
+  "one-hand",
+  "safety",
+  "lazy",
+  "kong",
+  "step-leap",
+];
 export function readRecord(raw: string | null): RecordRun | null {
   try {
-    const r = JSON.parse(raw || 'null');
+    const r = JSON.parse(raw || "null") as RecordRun;
     if (
       !r ||
       r.version !== VERSION ||
@@ -46,40 +175,74 @@ export function readRecord(raw: string | null): RecordRun | null {
       r.time > 600 ||
       !Array.isArray(r.splits) ||
       r.splits.length !== 3 ||
-      !r.splits.every((n: number) => Number.isFinite(n) && n > 0) ||
+      !r.splits.every(
+        (n, i) =>
+          Number.isFinite(n) && n > (r.splits[i - 1] || 0) && n <= r.time,
+      ) ||
+      r.splits[2] !== r.time ||
       !Array.isArray(r.samples) ||
-      r.samples.length > 12001 ||
-      !r.samples.length
+      !r.samples.length ||
+      r.samples.length > 12002 ||
+      !Array.isArray(r.inputs) ||
+      r.inputs.length > 20000
     )
       return null;
     if (
-      !r.samples.every(
-        (s: Sample) =>
-          Array.isArray(s) &&
-          s.length === 4 &&
-          s.slice(0, 3).every(Number.isFinite) &&
-          s[0] >= 0 &&
-          s[0] <= 600 &&
-          s[1] >= 0 &&
-          s[1] <= FINISH &&
-          s[2] >= -10 &&
-          s[2] <= 20 &&
-          ['run', 'jump', 'vault', 'slide', 'wall', 'catch', 'roll', 'stumble'].includes(s[3]),
+      !r.inputs.every(
+        (input, i) =>
+          Number.isInteger(input.tick) &&
+          input.tick >= 1 &&
+          input.tick <= Math.ceil(r.time / STEP) &&
+          input.tick >= (r.inputs[i - 1]?.tick || 0) &&
+          ["up", "down", "forward"].includes(input.action),
       )
     )
       return null;
-    if (r.samples.some((s: Sample, i: number) => i > 0 && s[0] <= r.samples[i - 1][0])) return null;
+    if (
+      !r.samples.every((s, i) => {
+        const f = s.frame;
+        return (
+          Number.isFinite(s.time) &&
+          s.time >= 0 &&
+          s.time <= r.time &&
+          (i === 0 || s.time > r.samples[i - 1].time) &&
+          f &&
+          [f.x, f.y, f.speed, f.vy, f.moveTime, f.progress].every(
+            Number.isFinite,
+          ) &&
+          f.x >= 0 &&
+          f.x <= FINISH &&
+          f.y >= -9 &&
+          f.y <= 20 &&
+          f.speed >= 0 &&
+          f.speed <= 25 &&
+          f.progress >= 0 &&
+          f.progress <= 1 &&
+          typeof f.grounded === "boolean" &&
+          moves.includes(f.move) &&
+          vaults.includes(f.vault) &&
+          (f.contact === null ||
+            (Number.isFinite(f.contact?.x) && Number.isFinite(f.contact?.y)))
+        );
+      })
+    )
+      return null;
+    if (r.samples[r.samples.length - 1].frame.x !== FINISH) return null;
     return r;
   } catch {
     return null;
   }
 }
 export function formatTime(t: number) {
-  return `${Math.floor(t / 60)
+  const hundredths = Math.round(t * 100);
+  return `${Math.floor(hundredths / 6000)
     .toString()
-    .padStart(2, '0')}:${(t % 60).toFixed(2).padStart(5, '0')}`;
+    .padStart(
+      2,
+      "0",
+    )}:${((hundredths % 6000) / 100).toFixed(2).padStart(5, "0")}`;
 }
-type Traversal = {
+export type Traversal = {
   start: number;
   end: number;
   y0: number;
@@ -88,162 +251,517 @@ type Traversal = {
   duration: number;
   arc: number;
   move: Move;
+  contact: Contact | null;
+  vault: Vault;
+  obstacle?: { start: number; end: number };
 };
+const clamp = (n: number, lo: number, hi: number) =>
+  Math.max(lo, Math.min(hi, n));
 export class Run {
-  phase: 'ready' | 'running' | 'finished' | 'failed' = 'ready';
+  phase: "ready" | "running" | "finished" | "failed" = "ready";
   x = 0;
   y = 0;
   time = 0;
   ticks = 0;
-  speed = 7.8;
+  speed = RUN_SPEED;
+  vy = 0;
   upper = false;
-  move: Move = 'run';
+  grounded = true;
+  move: Move = "run";
+  moveTime = 0;
+  vault: Vault = "speed";
   paused = false;
   eligible = true;
   practice = false;
   startSector = 0;
   clean = 0;
   recoveries = 0;
+  flow = 0;
+  bestFlow = 0;
   splits: number[] = [];
   samples: Sample[] = [];
+  inputs: Input[] = [];
   handled = new Set<number>();
   traversal: Traversal | null = null;
-  message = 'Find your line. Own your time.';
+  message = "Find your line. Own your time.";
   messageUntil = 0;
   onChange = () => {};
+  previous: Frame = this.frame();
+  private pending: Action[] = [];
+  private buffered: { action: Action; until: number } | null = null;
+  private lastGround = 0;
+  private rollUntil = -1;
+  private jumpIntent = -1;
+  private actionDuration = 0;
+  private dropFrom = 0;
   start(sector = 0, practice = false) {
-    Object.assign(this, {
-      phase: 'running',
-      startSector: sector,
-      x: sector * 108,
-      y: 0,
-      time: 0,
-      ticks: 0,
-      speed: 7.8,
-      upper: false,
-      move: 'run',
-      paused: false,
-      eligible: !practice,
-      practice,
-      clean: 0,
-      recoveries: 0,
-      splits: [],
-      samples: [],
-      traversal: null,
-      message: practice ? 'Practice · no personal best recorded' : 'SUNSET RELAY / GO',
-      messageUntil: 2,
-    });
-    this.handled = new Set(obstacles.flatMap((o, i) => (o.x < this.x ? [i] : [])));
+    this.phase = "running";
+    this.startSector = sector;
+    this.x = sector * SECTOR;
+    this.y = 0;
+    this.time = 0;
+    this.ticks = 0;
+    this.speed = RUN_SPEED;
+    this.vy = 0;
+    this.upper = false;
+    this.grounded = true;
+    this.move = "run";
+    this.moveTime = 0;
+    this.paused = false;
+    this.eligible = !practice;
+    this.practice = practice;
+    this.clean = 0;
+    this.recoveries = 0;
+    this.flow = 0;
+    this.bestFlow = 0;
+    this.splits = [];
+    this.samples = [];
+    this.inputs = [];
+    this.traversal = null;
+    this.pending = [];
+    this.buffered = null;
+    this.lastGround = 0;
+    this.rollUntil = -1;
+    this.jumpIntent = -1;
+    this.actionDuration = 0;
+    this.dropFrom = 0;
+    this.handled = new Set(
+      obstacles.flatMap((o, i) => (o.x + o.width < this.x ? [i] : [])),
+    );
+    this.message = practice
+      ? "PRACTICE · FIND YOUR RHYTHM"
+      : "SUNSET RELAY / GO";
+    this.messageUntil = 1.6;
+    this.previous = this.frame();
+    this.samples.push({ time: 0, frame: this.frame() });
     this.onChange();
   }
   pause() {
-    if (this.phase !== 'running') return;
+    if (this.phase !== "running") return;
     this.paused = !this.paused;
     this.eligible = false;
+    this.pending = [];
+    this.buffered = null;
     this.onChange();
   }
   applicable(o: Obstacle) {
-    return !o.route || (o.route === 'upper') === this.upper;
+    return !o.route || (o.route === "upper") === this.upper;
   }
   next() {
     return obstacles.find(
-      (o, i) => !this.handled.has(i) && this.applicable(o) && o.x + o.width >= this.x,
+      (o, i) =>
+        !this.handled.has(i) &&
+        this.applicable(o) &&
+        o.x + o.width >= this.x - 0.25,
     );
   }
   say(text: string) {
     this.message = text;
-    this.messageUntil = this.time + 1.8;
+    this.messageUntil = this.time + 1.25;
     this.onChange();
   }
-  cross(o: Obstacle, move: Move, clean: boolean, y1 = this.y, arc = 0) {
-    this.handled.add(obstacles.indexOf(o));
-    const end = o.x + o.width + 0.8;
-    const distance = end - this.x;
-    const duration =
-      distance / (clean ? 8.8 : 6.1) + (move === 'catch' ? 0.8 : move === 'stumble' ? 0.65 : 0);
-    this.traversal = { start: this.x, end, y0: this.y, y1, elapsed: 0, duration, arc, move };
+  private setMove(move: Move, duration = 0) {
     this.move = move;
-    if (clean) this.clean++;
-    else this.recoveries++;
-    this.say(
-      clean
-        ? `CLEAN ${move === 'wall' ? 'WALL STEP · UPPER ROUTE' : move.toUpperCase()}`
-        : move === 'catch'
-          ? 'LEDGE CATCH · TIME LOST'
-          : 'RECOVERY · KEEP MOVING',
-    );
+    this.moveTime = 0;
+    this.actionDuration = duration;
+  }
+  private reward(label: string) {
+    this.clean++;
+    this.flow++;
+    this.bestFlow = Math.max(this.bestFlow, this.flow);
+    this.speed = Math.min(14, this.speed + 0.35);
+    this.say(label);
+  }
+  private recover(label: string, cost = 2.8) {
+    this.recoveries++;
+    this.flow = 0;
+    this.speed = Math.max(5.5, this.speed - cost);
+    this.say(label);
   }
   action(action: Action) {
-    if (this.phase !== 'running' || this.paused || this.traversal) return;
+    if (this.phase === "running" && !this.paused && this.pending.length < 4)
+      this.pending.push(action);
+  }
+  private traverse(
+    o: Obstacle,
+    move: Move,
+    y1: number,
+    arc: number,
+    clean: boolean,
+    vault: Vault = "speed",
+  ) {
+    this.handled.add(obstacles.indexOf(o));
+    const end = o.x + o.width + (move === "wall" ? 0.6 : 1.4);
+    const contact = {
+      x: o.x + Math.min(o.width * 0.4, 0.7),
+      y: (o.route === "upper" ? 3.3 : 0) + (o.height || 1.1),
+    };
+    if (move === "wall") {
+      contact.x = o.x + o.width;
+      contact.y = 3.3;
+    }
+    if (clean)
+      this.reward(
+        move === "wall"
+          ? "WALL STEP · HIGH LINE"
+          : `${vault.replace("-", " ").toUpperCase()} · FLOW`,
+      );
+    else this.recover("SAFETY VAULT · KEEP MOVING", 1.6);
+    this.traversal = {
+      start: this.x,
+      end,
+      y0: this.y,
+      y1,
+      elapsed: 0,
+      duration: (end - this.x) / Math.max(8, this.speed),
+      arc,
+      move,
+      contact,
+      vault,
+      obstacle: { start: o.x, end: o.x + o.width },
+    };
+    this.vault = vault;
+    this.grounded = false;
+    this.vy = 0;
+    this.setMove(move);
+  }
+  private tryAction(action: Action): boolean {
+    const t = this.traversal;
+    if (t) {
+      if (t.move === "catch" && action === "down") {
+        this.traversal = null;
+        this.speed = 6;
+        this.vy = -2;
+        this.setMove("fall");
+        return true;
+      }
+      if (t.move === "catch" && action === "up") {
+        t.elapsed = t.duration;
+        return true;
+      }
+      return false;
+    }
+    if (action === "down") {
+      if (!this.grounded) {
+        this.rollUntil = this.time + 0.55;
+        this.say("ROLL READY");
+        return true;
+      }
+      this.setMove("slide", 0.62);
+      return true;
+    }
+    if (!this.grounded && this.time - this.lastGround > COYOTE) return false;
     const o = this.next();
-    if (!o) return;
-    const d = o.x - this.x;
-    if (d > 5.5 || d < -0.6) return;
-    const clean = d >= 1.4 && d <= 3.1;
-    if (o.kind === 'branch' && action === 'up') {
+    const d = o ? o.x - this.x : Infinity;
+    if (o?.kind === "vault" && d >= -0.1 && d <= 2.65 && this.grounded) {
+      const clean = d >= 0.55;
+      const variant = clean ? o.vault || "speed" : "safety";
+      this.traverse(
+        o,
+        "vault",
+        this.y,
+        (o.height || 1) + (variant === "step-leap" ? 0.7 : 0.04),
+        clean,
+        variant,
+      );
+    } else if (o?.kind === "branch" && d >= -0.1 && d <= 2.8 && this.grounded) {
+      this.traverse(o, "wall", 3.3, 0.8, true);
       this.upper = true;
-      this.cross(o, 'wall', clean, 3.3, 0.8);
-    } else if (o.kind === 'drop' && action === 'down') {
-      this.upper = false;
-      this.cross(o, 'roll', clean, 0, 0.4);
-    } else if (o.kind === 'slide' && action === 'down') this.cross(o, 'slide', clean);
-    else if (o.kind === 'vault' && action === 'up')
-      this.cross(o, clean ? 'vault' : 'jump', clean, this.y, clean ? 0.95 : 1.8);
-    else if (o.kind === 'gap' && action === 'up')
-      this.cross(o, d < 1.4 ? 'catch' : 'jump', clean, this.y, 2.4);
+    } else {
+      this.vy = JUMP_SPEED + (action === "forward" ? 0.5 : 0);
+      if (action === "forward") this.speed = Math.min(14, this.speed + 0.6);
+      this.grounded = false;
+      this.lastGround = -1;
+      this.dropFrom = this.y;
+      this.setMove("jump");
+    }
+    return true;
+  }
+  private land(y: number) {
+    const impact = -this.vy;
+    this.y = y;
+    this.vy = 0;
+    this.grounded = true;
+    this.lastGround = this.time;
+    this.upper = y > 2;
+    if (impact > 14 || this.dropFrom - y > 2) {
+      if (this.rollUntil >= this.time) {
+        this.setMove("roll", 0.48);
+        this.reward("SOFT ROLL · MOMENTUM KEPT");
+      } else {
+        this.setMove("land", 0.27);
+        this.recover("HEAVY LANDING · SWIPE DOWN BEFORE CONTACT", 2.2);
+      }
+    } else this.setMove("land", 0.12);
+    this.rollUntil = -1;
+  }
+  private physics() {
+    const oldX = this.x,
+      oldY = this.y;
+    const target =
+      this.move === "stumble" ? 7 : RUN_SPEED + Math.min(1.5, this.flow * 0.12);
+    this.speed += clamp(target - this.speed, -STEP * 5, STEP * 19);
+    this.x += this.speed * STEP;
+    if (!this.grounded) {
+      this.vy -= GRAVITY * STEP;
+      this.y += this.vy * STEP;
+    }
+    const support = surfaces.find(
+      (s) =>
+        this.x >= s.start && this.x < s.end && Math.abs(s.y - this.y) < 0.025,
+    );
+    if (this.grounded && !support) {
+      this.grounded = false;
+      this.dropFrom = this.y;
+      this.vy = 0;
+      this.setMove("fall");
+    }
+    // The upper route is a real slab: an early jump underneath hits its underside.
+    if (!this.grounded && this.vy > 0) {
+      const ceiling = surfaces.find(
+        (s) =>
+          s.y > 0 &&
+          this.x >= s.start &&
+          this.x <= s.end &&
+          oldY + 1.85 <= s.y - 0.9 &&
+          this.y + 1.85 >= s.y - 0.9,
+      );
+      if (ceiling) {
+        this.y = ceiling.y - 0.9 - 1.85;
+        this.vy = 0;
+        this.setMove("fall");
+      }
+    }
+    if (!this.grounded && this.vy <= 0) {
+      const landing = surfaces
+        .filter(
+          (s) =>
+            this.x >= s.start && this.x < s.end && oldY >= s.y && this.y <= s.y,
+        )
+        .sort((a, b) => b.y - a.y)[0];
+      if (landing) this.land(landing.y);
+      else if (this.time - this.jumpIntent < 0.18) {
+        const lip = surfaces.find(
+          (s) =>
+            oldX < s.start &&
+            this.x + 0.3 >= s.start &&
+            this.y < s.y &&
+            this.y > s.y - 1.6,
+        );
+        if (lip) {
+          this.buffered = null;
+          this.x = lip.start - 0.35;
+          this.y = lip.y - 1.65;
+          this.vy = 0;
+          this.traversal = {
+            start: this.x,
+            end: this.x,
+            y0: this.y,
+            y1: this.y,
+            duration: 0.24,
+            elapsed: 0,
+            arc: 0,
+            move: "catch",
+            contact: { x: lip.start, y: lip.y },
+            vault: "safety",
+          };
+          this.setMove("catch");
+          this.recover("LEDGE SAVE · CLIMB", 3);
+        }
+      }
+    }
+    if (!this.grounded && !this.traversal) {
+      const wall = surfaces.find(
+        (s) =>
+          oldX < s.start &&
+          this.x + 0.22 >= s.start &&
+          this.y < s.y - 0.1 &&
+          (s.y === 0 ? this.y > -14 : this.y + 1.85 > s.y - 0.9),
+      );
+      if (wall) {
+        this.x = wall.start - 0.23;
+        this.speed = 0;
+      }
+    }
+    for (let i = 0; i < obstacles.length; i++) {
+      const o = obstacles[i];
+      if (this.handled.has(i) || !this.applicable(o)) continue;
+      const base = o.route === "upper" ? 3.3 : 0;
+      const height =
+        this.move === "slide" || this.move === "roll" ? 0.85 : 1.85;
+      const overlaps = this.x + 0.22 >= o.x && oldX - 0.22 <= o.x + o.width;
+      if (
+        overlaps &&
+        o.kind === "vault" &&
+        this.y < base + (o.height || 1) &&
+        this.y + height > base
+      ) {
+        this.handled.add(i);
+        this.recover("BARRIER CONTACT · SPEED LOST", 4);
+        // A recoverable hand-assisted crossing begins at actual contact, with a large time cost.
+        this.traversal = {
+          start: this.x,
+          end: o.x + o.width + 0.7,
+          y0: this.y,
+          y1: base,
+          duration: (o.width + 1.2) / 5.5,
+          elapsed: 0,
+          arc: (o.height || 1) + 0.25,
+          move: "vault",
+          contact: { x: o.x + 0.3, y: base + (o.height || 1) },
+          vault: "safety",
+        };
+        this.vault = "safety";
+        this.grounded = false;
+        this.vy = 0;
+        this.setMove("vault");
+      } else if (
+        overlaps &&
+        o.kind === "slide" &&
+        this.y + height > base + 1.22 &&
+        this.y < base + 2.5
+      ) {
+        this.handled.add(i);
+        this.recover("DUCT CONTACT · GET LOW", 4);
+        this.setMove("stumble", 0.55);
+        this.y = base;
+        this.vy = 0;
+        this.grounded = true;
+      } else if (this.x > o.x + o.width + 0.25) {
+        this.handled.add(i);
+        if (o.kind === "gap" || o.kind === "slide")
+          this.reward(
+            o.kind === "gap" ? "CLEAR · KEEP THE FLOW" : "LOW LINE · FLOW",
+          );
+      }
+    }
+    if (this.move === "slide" || this.move === "stumble") {
+      const ceiling = obstacles.some(
+        (o) =>
+          o.kind === "slide" &&
+          this.applicable(o) &&
+          this.x + 0.3 >= o.x &&
+          this.x - 0.3 <= o.x + o.width &&
+          this.y < (o.route === "upper" ? 3.3 : 0) + 1.22,
+      );
+      if (this.moveTime > this.actionDuration && !ceiling)
+        this.setMove(this.grounded ? "run" : "fall");
+    } else if (
+      (this.move === "land" || this.move === "roll") &&
+      this.moveTime > this.actionDuration
+    )
+      this.setMove("run");
+    if (!this.grounded && this.vy < 0 && this.move === "jump")
+      this.move = "fall";
+    if (this.grounded) this.lastGround = this.time;
+    if (this.y < -7.5) {
+      this.phase = "failed";
+      this.say("MISSED THE ROOF · R TO RETRY");
+    }
   }
   step() {
-    if (this.phase !== 'running' || this.paused) return;
+    if (this.phase !== "running" || this.paused) return;
+    this.previous = this.frame();
     this.ticks++;
     this.time = this.ticks * STEP;
+    this.moveTime += STEP;
+    for (const action of this.pending) {
+      this.inputs.push({ tick: this.ticks, action });
+      if (action === "up" || action === "forward") this.jumpIntent = this.time;
+      this.buffered = { action, until: this.time + BUFFER };
+      if (this.tryAction(action)) this.buffered = null;
+    }
+    this.pending = [];
+    if (this.buffered) {
+      if (this.buffered.until < this.time) this.buffered = null;
+      else if (this.tryAction(this.buffered.action)) this.buffered = null;
+    }
     if (this.traversal) {
       const t = this.traversal;
       t.elapsed += STEP;
-      const p = Math.min(1, t.elapsed / t.duration);
+      const p = clamp(t.elapsed / t.duration, 0, 1);
       this.x = t.start + (t.end - t.start) * p;
-      this.y = t.y0 + (t.y1 - t.y0) * p + Math.sin(Math.PI * p) * t.arc;
-      // A reachable late jump hangs below the lip before climbing onto the roof.
-      if (t.move === 'catch') {
-        const reach = Math.min(1, p / 0.55);
-        const climb = Math.max(0, (p - 0.78) / 0.22);
-        this.x = t.start + (t.end - 1.35 - t.start) * reach + 1.35 * climb;
-        this.y = t.y0 - 2.1 * reach + Math.sin(Math.PI * reach) * 2.4 + 2.1 * climb;
+      // Quick rise, supported contact, then an extended exit: feet clear the actual obstacle.
+      const lift = Math.sin(Math.PI * Math.pow(p, 0.78));
+      this.y = t.y0 + (t.y1 - t.y0) * p + lift * t.arc;
+      if (t.move === "vault" && t.obstacle) {
+        const rise = clamp(
+          (this.x - t.start) / Math.max(0.1, t.obstacle.start - 0.25 - t.start),
+          0,
+          1,
+        );
+        const release = clamp(
+          (t.end - this.x) / Math.max(0.1, t.end - t.obstacle.end - 0.3),
+          0,
+          1,
+        );
+        this.y =
+          t.y0 + t.arc * Math.sin((Math.PI / 2) * Math.min(rise, release));
       }
+      if (t.move === "wall")
+        this.y =
+          t.y0 +
+          (t.y1 - t.y0) * Math.min(1, p / 0.78) +
+          Math.sin(Math.PI * p) * t.arc;
       if (p === 1) {
-        this.traversal = null;
-        this.move = 'run';
+        if (t.move === "catch" && t.contact) {
+          this.traversal = {
+            ...t,
+            start: this.x,
+            end: t.contact.x + 0.7,
+            y0: this.y,
+            y1: t.contact.y,
+            elapsed: 0,
+            duration: 0.42,
+            move: "climb",
+          };
+          this.setMove("climb");
+        } else {
+          this.traversal = null;
+          this.y = t.y1;
+          this.grounded = true;
+          this.lastGround = this.time;
+          this.upper = this.y > 2;
+          this.vy = 0;
+          this.setMove("land", 0.09);
+        }
       }
-    } else {
-      this.x += this.speed * STEP;
-      this.y = ground(this.x, this.upper);
-      const o = this.next();
-      if (o && this.x >= o.x - 0.15) {
-        if (o.kind === 'branch') this.handled.add(obstacles.indexOf(o));
-        else if (o.kind === 'gap') {
-          this.phase = 'failed';
-          this.say('MISSED THE EDGE · TRY YOUR LINE AGAIN');
-        } else if (o.kind === 'drop') {
-          this.upper = false;
-          this.cross(o, 'roll', false, 0, 0.2);
-        } else this.cross(o, 'stumble', false, this.y, o.kind === 'vault' ? 1.5 : 0);
-      }
-    }
-    this.x = Math.min(FINISH, this.x);
-    for (const boundary of [108, 216, FINISH]) {
-      const index = boundary / 108 - 1;
+    } else this.physics();
+    this.x = Math.min(this.x, FINISH);
+    for (const boundary of [SECTOR, SECTOR * 2, FINISH]) {
+      const index = boundary / SECTOR - 1;
       if (
-        boundary > this.startSector * 108 &&
+        boundary > this.startSector * SECTOR &&
         this.x >= boundary &&
         this.splits[index] === undefined
       )
         this.splits[index] = this.time;
     }
-    if (this.ticks % 6 === 0) this.samples.push([this.time, this.x, this.y, this.move]);
+    if (this.ticks % 6 === 0 || this.x >= FINISH)
+      this.samples.push({ time: this.time, frame: this.frame() });
     if (this.x >= FINISH) {
-      this.phase = 'finished';
+      this.phase = "finished";
       this.onChange();
     }
-    if (this.ticks % 12 === 0) this.onChange();
+    if (this.ticks % 6 === 0) this.onChange();
+  }
+  frame(): Frame {
+    return {
+      x: this.x,
+      y: this.y,
+      speed: this.speed,
+      vy: this.vy,
+      move: this.move,
+      moveTime: this.moveTime,
+      progress: this.traversal
+        ? clamp(this.traversal.elapsed / this.traversal.duration, 0, 1)
+        : this.actionDuration
+          ? clamp(this.moveTime / this.actionDuration, 0, 1)
+          : 0,
+      grounded: this.grounded,
+      vault: this.traversal?.vault || this.vault,
+      contact: this.traversal?.contact || null,
+    };
   }
   record(): RecordRun {
     return {
@@ -251,14 +769,15 @@ export class Run {
       time: this.time,
       splits: [...this.splits],
       samples: [...this.samples],
+      inputs: [...this.inputs],
     };
   }
 }
-/** One gesture per contact; recognition happens at threshold crossing, never on release. */
 export class Swipe {
   x = 0;
   y = 0;
   active = false;
+  constructor(public threshold = 18) {}
   start(x: number, y: number) {
     this.x = x;
     this.y = y;
@@ -266,11 +785,17 @@ export class Swipe {
   }
   move(x: number, y: number): Action | null {
     if (!this.active) return null;
-    const dx = x - this.x;
-    const dy = y - this.y;
-    if (Math.hypot(dx, dy) < 22) return null;
-    if (Math.abs(dy) < Math.abs(dx) * 1.15) return null;
+    const dx = x - this.x,
+      dy = y - this.y;
+    if (Math.hypot(dx, dy) < this.threshold) return null;
+    if (Math.abs(dy) < Math.abs(dx) * 1.05) {
+      if (dx > this.threshold && Math.abs(dx) > Math.abs(dy) * 1.3) {
+        this.active = false;
+        return "forward";
+      }
+      return null;
+    }
     this.active = false;
-    return dy < 0 ? 'up' : 'down';
+    return dy < 0 ? "up" : "down";
   }
 }
