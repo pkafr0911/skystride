@@ -9,6 +9,9 @@ import React, {
 } from "react";
 import {
   FINISH,
+  timingRange,
+  timingWindow,
+  TECHNICAL,
   SECTOR,
   formatTime,
   readRecord,
@@ -117,9 +120,10 @@ export default function Skystride() {
   };
   const next = game.next();
   const distance = next ? next.x - game.x : Infinity;
+  const range = next ? timingRange(next, game.speed) : { near: 0, far: 0 };
   const cue =
     next?.kind === "branch"
-      ? "↑ UPPER SHORTCUT / RUN FOR LOWER"
+      ? "↑ HARD LINE / RUN FOR NORMAL"
       : next?.kind === "drop"
         ? "↓ LANDING ROLL"
         : next?.kind === "slide"
@@ -255,23 +259,31 @@ export default function Skystride() {
           {game.phase === "running" && !game.paused && (
             <>
               <div className={styles.route}>
-                {game.upper ? "↗ HIGH LINE" : "→ ROOFTOP LINE"}
+                {game.upper ? "↗ HARD LINE" : "→ NORMAL LINE"}
                 <span>
                   SECTOR {Math.min(3, Math.floor(game.x / SECTOR) + 1)} / 03
                 </span>
                 <span className={styles.flow}>
                   {game.speed.toFixed(1)} M/S · {game.flow} FLOW
+                  {game.x >= TECHNICAL.start && game.x <= TECHNICAL.end
+                    ? " · TECHNICAL DISTRICT"
+                    : ""}
                 </span>
               </div>
               {next && distance < 23 && !game.traversal && (
                 <div
-                  className={`${styles.cue} ${distance >= 0.55 && distance <= 2.65 ? styles.clean : ""}`}
+                  className={`${styles.cue} ${distance >= range.near && distance <= range.far ? styles.clean : ""}`}
                 >
                   {cue}
                   <small>
-                    {distance > 2.65
+                    {next
+                      ? `${Math.round(timingWindow(next) * 1000)} MS CLEAN WINDOW`
+                      : ""}
+                  </small>
+                  <small>
+                    {distance > range.far
                       ? "READ THE APPROACH"
-                      : distance >= 0.55
+                      : distance >= range.near
                         ? "FLOW WINDOW"
                         : "COMMIT"}
                   </small>
@@ -312,7 +324,7 @@ export default function Skystride() {
                     "Run paused."
                   ) : (
                     <>
-                      Above the streets.
+                      3 KM OF ROOFTOPS.
                       <br />
                       Against the clock.
                     </>

@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   FINISH,
+  timingWindow,
+  timingRange,
+  TECHNICAL,
   SECTOR,
   RUN_SPEED,
   readRecord,
@@ -18,7 +21,7 @@ function complete(upper = false, early = false) {
   const g = new Run();
   g.start();
   const pressed = new Set<number>();
-  for (let tick = 0; tick < 14000 && g.phase === "running"; tick++) {
+  for (let tick = 0; tick < 60000 && g.phase === "running"; tick++) {
     const o = g.next();
     if (o && !pressed.has(o.x) && !g.traversal) {
       const d = o.x - g.x;
@@ -30,7 +33,7 @@ function complete(upper = false, early = false) {
       } else if (
         (o.kind !== "branch" || upper) &&
         g.grounded &&
-        d <= (o.kind === "gap" ? 1.1 : early && o.kind === "vault" ? 4 : 1.9)
+        d <= (o.kind === "gap" ? 1.1 : early && o.kind === "vault" ? 6 : 1.9)
       ) {
         g.action(o.kind === "slide" ? "down" : "up");
         pressed.add(o.x);
@@ -106,7 +109,19 @@ test("both routes complete physically with clean contacts and three splits", () 
     assert.equal(g.splits.length, 3);
     assert.ok(g.splits[0] < g.splits[1] && g.splits[1] < g.splits[2]);
     assert.equal(g.recoveries, 0);
-    assert.ok(g.time > 30 && g.time < 50);
+    assert.ok(
+      g.inputs.length >= 350,
+      "Full course should demand roughly three times the former input count",
+    );
+    const intervals = g.inputs
+      .slice(1)
+      .map((input, i) => (input.tick - g.inputs[i].tick) * STEP)
+      .sort((a, b) => a - b);
+    assert.ok(
+      intervals[Math.floor(intervals.length / 2)] <= 0.65,
+      "Typical action cadence should be below 650 ms",
+    );
+    assert.ok(g.time >= 180 && g.time <= 300);
   }
 });
 test("route choice and early vault jumps produce measurable time differences", () => {
@@ -199,7 +214,7 @@ test("recorded tick inputs reproduce positions, actions and finish time exactly"
     replay = new Run();
   replay.start();
   let index = 0;
-  while (replay.phase === "running" && replay.ticks < 14000) {
+  while (replay.phase === "running" && replay.ticks < 60000) {
     while (original.inputs[index]?.tick === replay.ticks + 1)
       replay.action(original.inputs[index++].action);
     replay.step();
@@ -314,6 +329,10 @@ test("a jump buffered during vault release launches on its first grounded tick",
   const g = new Run();
   g.start();
   g.x = 25;
+  // Isolate free jumping from the newly added chained vault after the first obstacle.
+  obstacles.forEach((o, i) => {
+    if (o.x > 27 && o.x < 43) g.handled.add(i);
+  });
   g.action("up");
   g.step();
   while (g.traversal && g.traversal.duration - g.traversal.elapsed > 0.065)
@@ -342,6 +361,10 @@ test("an early jump beneath the upper route hits its underside", () => {
   const g = new Run();
   g.start();
   g.x = 125;
+  // Exercise slab collision without a nearby contextual vault taking over the jump.
+  obstacles.forEach((o, i) => {
+    if (o.x >= 125 && o.x < 139) g.handled.add(i);
+  });
   g.action("up");
   for (let i = 0; i < 40; i++) {
     g.step();
@@ -356,4 +379,60 @@ test("a missed landing cannot tunnel through the next roof facade", () => {
   advance(g, 1);
   assert.equal(g.phase, "failed");
   assert.ok(g.x < 73.2);
+});
+
+test("technical district sustains more than a minute at maximum flow with all eight vaults", () => {
+  assert.ok((TECHNICAL.end - TECHNICAL.start) / 14 >= 60);
+  for (const route of ["upper", "lower"]) {
+    const segment = obstacles.filter(
+      (o) => o.route === route && o.x >= TECHNICAL.start && o.x < TECHNICAL.end,
+    );
+    assert.ok(segment.length >= 45);
+    assert.equal(
+      new Set(segment.filter((o) => o.kind === "vault").map((o) => o.vault))
+        .size,
+      8,
+    );
+    assert.ok(segment.slice(1).every((o, i) => o.x - segment[i].x <= 20));
+  }
+});
+test("normal and hard timing windows retain their duration at different speeds", () => {
+  for (const o of obstacles)
+    for (const speed of [8, 12, 14]) {
+      const duration = timingWindow(o),
+        range = timingRange(o, speed);
+      assert.ok(
+        o.route === "upper"
+          ? duration >= 0.2 && duration <= 0.25
+          : duration >= 0.3 && duration <= 0.4,
+      );
+      assert.ok(Math.abs((range.far - range.near) / speed - duration) < 1e-10);
+    }
+});
+test("jump crests lose vertical speed then accelerate through descent", () => {
+  const g = new Run();
+  g.start();
+  g.action("up");
+  g.step();
+  const launch = Math.hypot(g.speed, g.vy);
+  while (g.vy > 0.25) g.step();
+  const crest = Math.hypot(g.speed, g.vy);
+  assert.ok(crest < launch);
+  while (g.vy > -10) g.step();
+  assert.ok(Math.hypot(g.speed, g.vy) > crest + 2);
+});
+test("vault slows over support and accelerates into release without changing collision clearance", () => {
+  const g = new Run();
+  g.start();
+  g.x = 44.1;
+  g.action("up");
+  g.step();
+  const rates: number[] = [];
+  while (g.traversal) {
+    const x = g.x;
+    g.step();
+    rates.push((g.x - x) / STEP);
+  }
+  assert.ok(rates[Math.floor(rates.length / 2)] < rates[2]);
+  assert.ok(rates[Math.floor(rates.length / 2)] < rates[rates.length - 3]);
 });

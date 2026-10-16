@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { limbSurface } from "../../assets/limb-surface";
+import { runnerGeometry } from "../../assets/runner-model";
 import { Frame } from "./model";
 import { clamp, Point, poseFor } from "./motion";
 export { poseFor } from "./motion";
@@ -34,86 +36,20 @@ export function solveJoint(
 
 export function makeRunner(scene: THREE.Scene, ghost = false) {
   const group = new THREE.Group();
+  group.name = "Skystride_Urban_Runner";
   scene.add(group);
-  const profile = (points: number[][], depth: number) => {
-    const shape = new THREE.Shape();
-    points.forEach(([x, y], i) =>
-      i ? shape.lineTo(x, y) : shape.moveTo(x, y),
-    );
-    shape.closePath();
-    const geometry = new THREE.ExtrudeGeometry(shape, {
-      depth,
-      bevelEnabled: false,
-      steps: 1,
-    });
-    geometry.translate(0, 0, -depth / 2);
-    return geometry;
-  };
-  const geometries = [
-    new THREE.CylinderGeometry(0.82, 1, 1, 9),
-    new THREE.SphereGeometry(1, 10, 8),
-    profile(
-      [
-        [-0.13, -0.13],
-        [-0.04, -0.19],
-        [0.07, -0.17],
-        [0.1, -0.08],
-        [0.16, -0.055],
-        [0.14, -0.015],
-        [0.2, 0.015],
-        [0.13, 0.065],
-        [0.12, 0.15],
-        [0.02, 0.2],
-        [-0.12, 0.17],
-        [-0.17, 0.06],
-      ],
-      0.24,
-    ),
-    profile(
-      [
-        [-0.19, 0.04],
-        [-0.22, 0.18],
-        [-0.28, 0.16],
-        [-0.18, 0.25],
-        [-0.01, 0.27],
-        [0.1, 0.2],
-        [0.15, 0.1],
-        [0.04, 0.14],
-        [-0.06, 0.11],
-        [-0.14, 0.02],
-      ],
-      0.27,
-    ),
-    profile(
-      [
-        [-0.12, -0.065],
-        [0.25, -0.065],
-        [0.29, -0.02],
-        [0.18, 0.03],
-        [0.04, 0.09],
-        [-0.1, 0.065],
-      ],
-      0.16,
-    ),
-    profile(
-      [
-        [-0.12, -0.075],
-        [0.25, -0.075],
-        [0.29, -0.045],
-        [-0.12, -0.04],
-      ],
-      0.165,
-    ),
-    new THREE.CircleGeometry(1, 5),
-    new THREE.CylinderGeometry(1, 0.65, 1, 9),
-  ];
+  const geometries = runnerGeometry();
   const colors = ghost
     ? [0xa4e2df, 0xa4e2df, 0xa4e2df, 0xa4e2df, 0xa4e2df]
     : [0x101c30, 0xf6dfac, 0xe8ab56, 0x0b1729, 0x29364b];
   const mats = colors.map(
     (color) =>
-      new THREE.MeshBasicMaterial({
+      new THREE.MeshStandardMaterial({
         color,
+        roughness: 0.92,
+        metalness: 0,
+        emissive: color,
+        emissiveIntensity: 0.16,
         transparent: ghost,
         opacity: ghost ? 0.25 : 1,
         depthWrite: !ghost,
@@ -125,19 +61,33 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
     return m;
   };
   const torso = mesh(7, 1),
+    collar = mesh(10, 3),
+    scarf = mesh(9, 2),
+    belt = mesh(0, 2),
     waist = mesh(0, 3),
     hips = mesh(1, 3),
     head = mesh(2, 0),
     hair = mesh(3, 3),
     neck = mesh(0, 0);
-  const limbs = Array.from({ length: 8 }, (_, i) => mesh(0, i % 4 < 2 ? 4 : 0));
-  const knees = [mesh(1, 4), mesh(1, 3)],
-    elbows = [mesh(1, 4), mesh(1, 0)];
+  const limbSkins = [
+    limbSurface(mats[4]),
+    limbSurface(mats[3]),
+    limbSurface(mats[4]),
+    limbSurface(mats[0]),
+  ];
+  limbSkins.forEach((surface, i) => {
+    surface.mesh.name = ["Far_Trouser", "Near_Trouser", "Far_Arm", "Near_Arm"][
+      i
+    ];
+    group.add(surface.mesh);
+  });
   const shoulders = [mesh(1, 1), mesh(1, 1)];
   const sleeves = [mesh(0, 1), mesh(0, 1)];
   const shoes = [mesh(4, 3), mesh(4, 3)],
     soles = [mesh(5, 2), mesh(5, 2)];
   const hands = [mesh(1, 4), mesh(1, 0)];
+  const thumbs = [mesh(1, 4), mesh(1, 0)];
+  const shoePanels = [mesh(4, 0), mesh(4, 0)];
   const axis = new THREE.Vector3(0, 1, 0),
     vec = (p: Point) => new THREE.Vector3(...p);
   const segment = (
@@ -205,6 +155,17 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
       );
       hips.position.copy(hip);
       hips.scale.set(0.19, 0.13, 0.19);
+      collar.position
+        .copy(chest)
+        .addScaledVector(chest.clone().sub(hip).normalize(), 0.015);
+      collar.quaternion.copy(torso.quaternion);
+      collar.rotateX(Math.PI / 2);
+      collar.scale.set(0.11, 0.1, 0.1);
+      scarf.position.copy(hip).add(new THREE.Vector3(-0.03, 0.1, 0.22));
+      scarf.scale.setScalar(0.72);
+      scarf.rotation.z = -0.15 - Math.min(0.45, f.speed / 35);
+      belt.position.copy(hip).add(new THREE.Vector3(0, 0.09, 0));
+      belt.scale.set(0.19, 0.06, 0.185);
       const headAxis = skull.clone().sub(chest).normalize();
       segment(
         neck,
@@ -213,6 +174,8 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
         0.065,
       );
       head.position.copy(skull);
+      head.scale.setScalar(0.84);
+      hair.scale.setScalar(0.84);
       hair.position.copy(skull);
       head.rotation.z = Math.atan2(headAxis.y, headAxis.x) - Math.PI / 2;
       hair.rotation.copy(head.rotation);
@@ -221,10 +184,7 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
         const root = hip.clone().add(new THREE.Vector3(0, -0.025, sign * 0.14));
         const foot = vec(p.feet[s]),
           knee = solveJoint(root, foot, vec(p.knees[s]), 0.51, 0.51);
-        segment(limbs[s * 2], root, knee, 0.115, 0.105);
-        segment(limbs[s * 2 + 1], knee, foot, 0.075, 0.075);
-        knees[s].position.copy(knee);
-        knees[s].scale.setScalar(0.087);
+        limbSkins[s].update(root, knee, foot, 0.14, 0.075, true);
         shoes[s].position.copy(foot);
         soles[s].position.copy(foot);
         shoes[s].rotation.z = p.footAngles[s];
@@ -236,8 +196,7 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
         shoulders[s].scale.set(0.11, 0.1, 0.105);
         const hand = vec(p.hands[s]),
           elbow = solveJoint(shoulder, hand, vec(p.elbows[s]), 0.34, 0.34);
-        segment(limbs[4 + s * 2], shoulder, elbow, 0.072, 0.068);
-        segment(limbs[5 + s * 2], elbow, hand, 0.053, 0.052);
+        limbSkins[2 + s].update(shoulder, elbow, hand, 0.073, 0.05, false);
         segment(
           sleeves[s],
           shoulder,
@@ -245,11 +204,20 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
           0.086,
           0.08,
         );
-        elbows[s].position.copy(elbow);
-        elbows[s].scale.setScalar(0.055);
+
         hands[s].position.copy(hand);
         hands[s].scale.set(0.075, 0.044, 0.055);
         hands[s].rotation.z = Math.atan2(hand.y - elbow.y, hand.x - elbow.x);
+        thumbs[s].position
+          .copy(hand)
+          .add(new THREE.Vector3(-0.015, -0.035, sign * 0.035));
+        thumbs[s].scale.set(0.038, 0.025, 0.028);
+        thumbs[s].rotation.copy(hands[s].rotation);
+        shoePanels[s].position
+          .copy(foot)
+          .add(new THREE.Vector3(0.01, 0.018, sign * 0.015));
+        shoePanels[s].rotation.copy(shoes[s].rotation);
+        shoePanels[s].scale.set(0.72, 0.75, 1.03);
       }
       if (time < previousTime || dt > 0.3) {
         dust.forEach((puff) => {
@@ -282,6 +250,7 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
       previousTime = time;
     },
     dispose() {
+      limbSkins.forEach((surface) => surface.geometry.dispose());
       geometries.forEach((g) => g.dispose());
       mats.forEach((m) => m.dispose());
       dust.forEach((p) => {

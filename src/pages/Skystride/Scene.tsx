@@ -70,8 +70,17 @@ export default function Scene({
       side = material(0x10203a),
       edge = material(0xf3ae65);
     const metal = material(0x344456),
-      black = material(0x101c2c),
-      windowMat = material(0xffce87);
+      black = material(0x101c2c);
+    const chunks = new Map<number, THREE.Group>();
+    const chunkFor = (x: number) => {
+      const key = Math.floor(x / 80);
+      if (!chunks.has(key)) {
+        const group = new THREE.Group();
+        scene.add(group);
+        chunks.set(key, group);
+      }
+      return chunks.get(key)!;
+    };
     const box = (
       parent: THREE.Object3D,
       x: number,
@@ -85,7 +94,7 @@ export default function Scene({
       const mesh = new THREE.Mesh(boxGeometry, mat);
       mesh.position.set(x, y, z);
       mesh.scale.set(w, h, d);
-      parent.add(mesh);
+      (parent === scene ? chunkFor(x) : parent).add(mesh);
       return mesh;
     };
     const skyline = new THREE.Group();
@@ -150,7 +159,7 @@ export default function Scene({
         side,
       );
       box(scene, x, slab.y - 0.1, 0, w, 0.2, 4.15, roof);
-      box(scene, x, slab.y + 0.025, 2.06, w, 0.055, 0.08, edge);
+      box(scene, x, slab.y + 0.025, 2.06, w, 0.055, 0.08, metal);
       for (let panel = slab.start + 2; panel < slab.end; panel += 6) {
         box(scene, panel, slab.y - 4.2, 2.015, 0.035, 7, 0.025, metal);
         if (!upper) box(scene, panel + 1, -3.5, 2.035, 0.7, 1.1, 0.03, black);
@@ -209,35 +218,39 @@ export default function Scene({
             roof,
           );
       }
-      if (o.kind !== "drop") {
-        box(scene, o.x - 2.25, y + 0.015, 0.8, 1.7, 0.025, 0.28, edge);
+      if (o.kind === "gap" || o.kind === "drop") {
+        box(scene, o.x - 0.12, y + 0.035, 0, 0.24, 0.06, 4.15, edge);
+        if (o.kind === "gap")
+          box(
+            scene,
+            o.x + o.width + 0.12,
+            y + 0.035,
+            0,
+            0.24,
+            0.06,
+            4.15,
+            edge,
+          );
       }
+      if (o.kind === "branch")
+        box(scene, o.x + o.width, 3.32, -0.8, 0.24, 0.06, 2.6, edge);
     });
     // Rooftop service details, kept behind the playable silhouette.
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < Math.ceil(FINISH / 22); i++) {
       const x = i * 22 - 10;
       box(scene, x, 1.1, -4, 0.12, 2.2, 0.12, metal);
       box(scene, x + 3, 1.1, -4, 0.12, 2.2, 0.12, metal);
-      box(scene, x + 1.5, 2.1, -4, 3, 0.1, 0.1, edge);
+      box(scene, x + 1.5, 2.1, -4, 3, 0.1, 0.1, metal);
       if (i % 3 === 0) {
         box(scene, x + 6, 2.4, -7, 3, 2.7, 3, metal);
         for (const offset of [-1, 1])
           box(scene, x + 6 + offset, 0.7, -7, 0.15, 1.4, 2, black);
-        box(scene, x + 6, 3.8, -7, 3.1, 0.1, 3.1, edge);
+        box(scene, x + 6, 3.8, -7, 3.1, 0.1, 3.1, metal);
       }
     }
     for (const x of [SECTOR, SECTOR * 2, FINISH]) {
-      box(scene, x, 2.5, -2, 0.12, 5, 0.12, edge);
-      box(
-        scene,
-        x + 1,
-        4.5,
-        -2,
-        2,
-        0.65,
-        0.08,
-        x === FINISH ? windowMat : metal,
-      );
+      box(scene, x, 2.5, -2, 0.12, 5, 0.12, metal);
+      box(scene, x + 1, 4.5, -2, 2, 0.65, 0.08, x === FINISH ? metal : roof);
     }
     // Water towers, pipework and a distant bridge echo the supplied silhouette concept.
     for (const x of [-10, 104, 280, 391]) {
@@ -271,6 +284,34 @@ export default function Scene({
       const brace = box(bridge, x + 4.5, -0.4, -47, 9, 0.13, 0.15, metal);
       brace.rotation.z = 0.3;
     }
+    // Batch static boxes by material inside spatial chunks. Distant districts are culled.
+    const batches: THREE.InstancedMesh[] = [];
+    const batch = (parent: THREE.Object3D) => {
+      const byMaterial = new Map<THREE.Material, THREE.Mesh[]>();
+      for (const child of [...parent.children]) {
+        if (child instanceof THREE.Mesh && child.geometry === boxGeometry) {
+          const mat = child.material as THREE.Material;
+          if (!byMaterial.has(mat)) byMaterial.set(mat, []);
+          byMaterial.get(mat)!.push(child);
+        } else batch(child);
+      }
+      byMaterial.forEach((meshes, mat) => {
+        const instances = new THREE.InstancedMesh(
+          boxGeometry,
+          mat,
+          meshes.length,
+        );
+        meshes.forEach((mesh, i) => {
+          mesh.updateMatrix();
+          instances.setMatrixAt(i, mesh.matrix);
+          parent.remove(mesh);
+        });
+        instances.computeBoundingSphere();
+        parent.add(instances);
+        batches.push(instances);
+      });
+    };
+    batch(scene);
     const player = makeRunner(scene);
     const rival = makeRunner(scene, true);
     rival.group.visible = false;
@@ -322,7 +363,7 @@ export default function Scene({
         (1 - Math.exp(-Math.min(dt, 0.05) * 4));
       camera.lookAt(camera.position.x, camera.position.y - 1.4, 0);
       skylineLayers.forEach((layer, i) => {
-        layer.position.x = x * (0.8 - i * 0.16);
+        layer.position.x = x - ((x * (0.2 + i * 0.16)) % 260);
       });
       bridge.position.x = x * 0.48;
       sun.position.x = 16 + x * 0.99;
@@ -372,6 +413,7 @@ export default function Scene({
       cancelAnimationFrame(frame);
       observer.disconnect();
       renderer.domElement.removeEventListener("webglcontextlost", lost);
+      batches.forEach((mesh) => mesh.dispose());
       boxGeometry.dispose();
       sphereGeometry.dispose();
       cylinderGeometry.dispose();

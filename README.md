@@ -1,6 +1,6 @@
 # Skystride
 
-A standalone, fullscreen rooftop parkour time-trial game. Sunset Relay has three sectors, two elevated shortcuts, contextual traversal, swipe controls, and a local personal-best ghost.
+A standalone, fullscreen rooftop parkour time-trial game. Sunset Relay is a 3 km course with three sectors, two elevated shortcuts, contextual traversal, swipe controls, and a local personal-best ghost.
 
 ## Development
 
@@ -51,3 +51,5 @@ Expected URL after deployment: https://pkafr0911.github.io/skystride/
 Best runs remain in local storage on the current origin. A best from the original app is not transferred across origins automatically. Paused runs and practice attempts do not replace a personal best. Online leaderboards are not implemented.
 
 See [game notes](docs/game-design.md) for mechanics, performance decisions, and first-playable limitations.
+
+Character asset: `public/models/skystride-runner.glb`. Regenerate from the live geometry with `node scripts/export-runner.cjs`.

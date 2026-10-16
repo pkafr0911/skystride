@@ -107,9 +107,13 @@ function footTrack(phase: number, z: number): { point: Point; angle: number } {
     }
   return { point: [0.38, 0.09, z], angle: 0 };
 }
-export function runPose(x: number): Pose {
+export function runPose(x: number, speed = 12): Pose {
   const p = basePose(),
     phase = (((x / STRIDE) % 1) + 1) % 1;
+  const intensity = clamp((speed - 6) / 8);
+  // Keep stance feet planted; increase the airborne reach and body drive with speed.
+  p.chest = [mix(0.14, 0.43, intensity), mix(1.45, 1.29, intensity), 0];
+  p.head = [mix(0.18, 0.61, intensity), mix(1.78, 1.57, intensity), 0];
   const step = phase % 0.5;
   const load =
     step < STANCE
@@ -125,11 +129,23 @@ export function runPose(x: number): Pose {
       side = s ? 1 : -1,
       foot = footTrack(u, side * 0.14);
     p.feet[s] = foot.point;
+    if (u > STANCE) {
+      const extension = Math.sin((Math.PI * (u - STANCE)) / (1 - STANCE));
+      p.feet[s][0] +=
+        Math.sign(p.feet[s][0]) * extension * mix(-0.09, 0.18, intensity);
+      p.feet[s][1] += extension * mix(-0.05, 0.08, intensity);
+    }
     p.footAngles[s] = foot.angle;
     p.knees[s] = [0.85, 0.7, side * 0.14];
     const swing = (Math.cos(u * Math.PI * 2 - 0.3) + 1) / 2;
     p.hands[s] = [mix(0.68, -0.26, swing), mix(1.48, 1.03, swing), side * 0.23];
     p.elbows[s] = [mix(0.25, -0.43, swing), mix(1.03, 1.3, swing), side * 0.24];
+    const driveX = p.chest[0] - 0.24,
+      driveY = p.chest[1] - 1.42;
+    p.hands[s][0] += driveX + (0.5 - swing) * intensity * 0.22;
+    p.elbows[s][0] += driveX;
+    p.hands[s][1] += driveY;
+    p.elbows[s][1] += driveY;
   }
   return p;
 }
@@ -227,7 +243,7 @@ function landingPose(f: Frame): Pose {
     mix(0.5, 1, force) *
     smooth(0, 0.045, age) *
     (1 - smooth(0.065, recovery, age));
-  const p = runPose(f.x);
+  const p = runPose(f.x, f.speed);
   const braced = basePose();
   braced.hip = [-0.13, 0.87 - 0.3 * load, 0];
   braced.chest = [0.2 + 0.1 * load, 1.4 - 0.43 * load, 0];
@@ -253,7 +269,7 @@ function landingPose(f: Frame): Pose {
 }
 function vaultPose(f: Frame): Pose {
   const p = f.progress,
-    run = runPose(f.x),
+    run = runPose(f.x, f.speed),
     plant = basePose(),
     carry = basePose(),
     exit = basePose();
@@ -529,7 +545,7 @@ function rollPose(f: Frame): Pose {
   for (const name of ["feet", "hands", "knees", "elbows"] as const)
     p[name] = p[name].map(rotate);
   p.footAngles = [rotation - 0.6, rotation - 0.6];
-  return blend(p, runPose(f.x), smooth(0.84, 1, u));
+  return blend(p, runPose(f.x, f.speed), smooth(0.84, 1, u));
 }
 function climbPose(f: Frame): Pose {
   const p = basePose(),
@@ -560,14 +576,16 @@ function climbPose(f: Frame): Pose {
         f.contact.y - f.y + 0.03,
         s ? 0.23 : -0.23,
       ];
-  return blend(p, runPose(f.x), smooth(0.73, 1, u));
+  return blend(p, runPose(f.x, f.speed), smooth(0.73, 1, u));
 }
 
 /** Pure animation sampling: seeking, ghost playback and live frames all evaluate identical poses. */
 export function poseFor(f: Frame): Pose {
   switch (f.move) {
     case "run":
-      return (f.landingAge ?? 1) < 0.32 ? landingPose(f) : runPose(f.x);
+      return (f.landingAge ?? 1) < 0.32
+        ? landingPose(f)
+        : runPose(f.x, f.speed);
     case "land":
       return landingPose(f);
     case "jump":
@@ -583,7 +601,7 @@ export function poseFor(f: Frame): Pose {
         low.hands[1] = [-0.31, 0.81, 0.23];
         low.feet[1] = [0.04, 0.09, 0.17];
       }
-      return blend(runPose(f.x), low, smooth(0, 0.045, f.moveTime));
+      return blend(runPose(f.x, f.speed), low, smooth(0, 0.045, f.moveTime));
     }
     case "roll":
       return rollPose(f);
@@ -598,7 +616,7 @@ export function poseFor(f: Frame): Pose {
       });
       p.feet[0] = [0.47, 0.45 + 0.25 * Math.sin(Math.PI * f.progress), -0.14];
       p.hands[0] = [0.66, 1.65, -0.23];
-      return blend(p, runPose(f.x), smooth(0.77, 1, f.progress));
+      return blend(p, runPose(f.x, f.speed), smooth(0.77, 1, f.progress));
     }
   }
 }

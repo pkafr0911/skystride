@@ -3,6 +3,7 @@ import { test } from "node:test";
 import * as THREE from "three";
 import { Frame, obstacles, Run, STEP } from "./model";
 import { interpolateFrame, poseFor, runPose, STANCE, STRIDE } from "./motion";
+import { limbSurface } from "../../assets/limb-surface";
 import { makeRunner, solveJoint } from "./runner";
 
 test("sprint support feet remain fixed in world space until toe-off", () => {
@@ -185,4 +186,45 @@ test("step-through vaults keep the leading knee bent forward", () => {
     );
     assert.ok(knee.x > (hip.x + foot.x) / 2, vault);
   }
+});
+
+test("speed drives a lower chest/head and wider airborne stride while preserving stance", () => {
+  let slowReach = 0,
+    fastReach = 0;
+  for (let i = 0; i < 100; i++) {
+    const x = (STRIDE * i) / 100,
+      slow = runPose(x, 6),
+      fast = runPose(x, 14);
+    assert.ok(fast.chest[0] > slow.chest[0]);
+    assert.ok(fast.head[1] < slow.head[1]);
+    assert.ok(fast.chest[1] < slow.chest[1]);
+    slowReach = Math.max(slowReach, ...slow.feet.map((f) => Math.abs(f[0])));
+    fastReach = Math.max(fastReach, ...fast.feet.map((f) => Math.abs(f[0])));
+    if (i / 100 <= STANCE) assert.deepEqual(slow.feet[0], fast.feet[0]);
+  }
+  assert.ok(fastReach > slowReach + 0.1);
+});
+
+test("continuous limbs retain finite outward-facing surfaces through deep joint bends", () => {
+  const material = new THREE.MeshStandardMaterial();
+  const skin = limbSurface(material);
+  for (const bend of [0, 0.1, 0.5, 0.9]) {
+    skin.update(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(bend, 0.5, 0),
+      new THREE.Vector3(0, 0, 0),
+      0.14,
+      0.075,
+      true,
+    );
+    const positions = skin.geometry.getAttribute("position"),
+      normals = skin.geometry.getAttribute("normal");
+    assert.ok(Array.from(positions.array).every(Number.isFinite));
+    assert.ok(Array.from(normals.array).every(Number.isFinite));
+    // On a straight limb, the first side faces left. Its normal must point outward.
+    if (bend === 0) assert.ok(normals.getX(12 * 4) < -0.5);
+    assert.ok(skin.geometry.index!.count > 1000);
+  }
+  skin.geometry.dispose();
+  material.dispose();
 });
