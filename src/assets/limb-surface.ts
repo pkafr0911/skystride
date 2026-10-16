@@ -70,11 +70,12 @@ export function limbSurface(material: THREE.Material) {
           t < 0.5
             ? THREE.MathUtils.lerp(upper, lower * 1.15, t * 2) *
               (1 + 0.12 * Math.sin(t * 2 * Math.PI))
-            : lower * (1 + 0.25 * Math.sin((t - 0.5) * 2 * Math.PI));
+            : lower *
+              (1 + (leg ? 0.43 : 0.32) * Math.sin((t - 0.5) * 2 * Math.PI));
         const endCap = Math.min(1, Math.sin(Math.PI * t) * 12 + 0.18);
         for (let s = 0; s < sides; s++) {
           const angle = (s / sides) * Math.PI * 2;
-          const fold = leg ? 1 + 0.025 * Math.sin(t * 22 + angle * 3) : 1;
+          const fold = leg ? 1 + 0.012 * Math.sin(t * 22 + angle * 3) : 1;
           const offset = (r * sides + s) * 3;
           positions[offset] =
             center.x + side.x * Math.cos(angle) * radius * endCap * fold;

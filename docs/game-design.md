@@ -1,4 +1,4 @@
-# Skystride — movement pass
+# Skystride — movement and course design
 
 ## Visual reference
 
@@ -8,7 +8,7 @@ The supplied Skystride / Urban Silhouette concept is the visual direction: peach
 
 The character now has horizontal velocity, acceleration, vertical velocity, gravity and grounded state. Up jumps anywhere on a roof, with no obstacle required. Jump input is consumed on the next 120 Hz simulation tick. A 120 ms buffer accepts presses just before landing or traversal exit; 90 ms of coyote time permits a slightly late edge jump. There is no double jump. Holding a key does not auto-repeat actions.
 
-Cruising speed is 12 units/s, up from 7.8. Clean actions build flow and retain extra momentum; running targets up to 13.5 and action boosts cap at 14. Stumbles and heavy landings remove speed, followed by acceleration. Gravity is 30 units/s² while rising and 35.4 while falling and the standard launch speed is 12.4 units/s. These are arcade tuning values, not measurements of human performance or device latency.
+Runs start at 7.5 units/s and build toward a cruising speed of 12 units/s. Clean actions build flow and retain extra momentum; running targets up to 13.5 and action boosts cap at 14. Stumbles and heavy landings remove speed. Ground acceleration is 3 units/s²; airborne motion retains takeoff momentum with only 0.12 units/s² drag, rather than accelerating toward cruising speed. Gravity is 30 units/s² while rising and 35.4 while falling and the standard launch speed is 12.4 units/s. These are arcade tuning values, not measurements of human performance or device latency.
 
 Movement remains on a 2D plane. Roof tops, gaps, upper-route undersides and roof facades use shared authored geometry and fixed-step swept crossing checks. An impossible jump falls physically before failure; it cannot pass through the next roof facade. Lower-route jumps hit the underside of upper platforms. Obstacles use body-height checks and recoverable contact responses.
 
@@ -29,15 +29,15 @@ Eight vault profiles have distinct body, knee, foot and arm poses:
 
 Vault paths rise before the obstacle, retain clearance across its full width and descend after the trailing edge. Their poses have entry, contact, tuck and release phases. Hands aim at world-space obstacle anchors while within anatomical reach. Two-bone inverse kinematics keeps arms and legs consistent in length. Contact releases as the shoulder passes beyond reach.
 
-Up at a branch performs a wall step onto the high line. A fresh up input near a reachable lip while falling catches it, hangs briefly, then climbs. Up during the hang commits the climb sooner; down releases. Unreachable ledges do not rescue the player.
+Up at a branch performs a wall step onto the high line. Four entrances now have 3.3-unit walls with a foot drive, two-hand catch, pull, palm press and top-out sequence. Their faces occupy the rear route lane so the normal line can pass in front. A fresh up input near a reachable lip while falling catches it, hangs briefly, then climbs. Up during the hang commits the climb sooner; down releases. Unreachable ledges do not rescue the player.
 
 Down on the roof starts a 0.62 second slide, extending the low stance until the overhead obstacle is clear. Down in the air arms a landing roll for 250 ms on upper routes or 400 ms on the normal line. Drops over two units or impact speeds over 14 require a roll to preserve momentum; otherwise a compressed heavy landing costs speed. The roll rotates the tucked body through a full cycle. Jumping can interrupt ground recovery, while non-interruptible vault contacts accept buffered exit input.
 
-Right / D / swipe right performs a slightly longer jump. Up/down remain the essential controls. Swipe recognition uses an adjustable 10–32 pixel threshold (18 default), before release, with one action per contact.
+Right / D / swipe right performs a long jump when current speed is at least 11.5 units/s, using a 13.6 units/s vertical launch. At lower speed it performs a normal jump and shows a build-speed cue. It never adds horizontal speed on takeoff. Up/down remain the essential controls. Swipe recognition uses an adjustable 10–32 pixel threshold (18 default), before release, with one action per contact.
 
-## Sunset Relay v4
+## Sunset Relay v6
 
-The course is now 3,000 units long with boundaries at 1,000, 2,000 and 3,000. The extended spacing supports the faster pace. Two upper routes add wall steps, gaps, vaults and drops; the lower line uses barriers and ducts. Both clean routes and early vault-jump attempts are exercised end-to-end by simulation tests. Tests verify that the clean upper route beats the clean lower route and that early vault jumps cost time.
+The course is now 3,000 units long with boundaries at 1,000, 2,000 and 3,000. The extended spacing supports the faster pace. Two upper routes add wall steps, gaps, vaults and drops; the lower line uses barriers and ducts. Both clean routes are exercised end-to-end by simulation tests. Tests verify that the clean upper route beats the clean lower route. Repeated mistimed vault jumps can now lose enough momentum to fail a later gap; air acceleration does not rescue those attempts.
 
 Practice starts from a sector boundary and continues to the end; it does not yet loop isolated sectors or select upper-route entry states. There is one course. Pursuit, collectibles, online rankings, controller support and sound are not implemented in this pass.
 
@@ -45,7 +45,7 @@ Practice starts from a sector boundary and continues to the end; it does not yet
 
 The camera renders interpolated player positions between simulation ticks, looks ahead and eases vertically with elevated routes. A branch approach adds a small upward anticipation. No shake or dramatic zoom. Touch keeps the full play area as its gesture surface. Native fullscreen and landscape locking are requested where supported; edge-to-edge browser play remains available. Rotation, focus loss and long frame stalls pause the run and remove personal-best eligibility.
 
-The HUD shows time, personal best, route, current speed and flow. Results include sector times and difference against the previous best. The new course key is skystride.sunset-relay-v4.best, keeping incompatible earlier records separate.
+The HUD shows time, personal best, route, current speed and flow. Results include sector times and difference against the previous best. The new course key is skystride.sunset-relay-v6.best, keeping incompatible earlier records separate.
 
 Records now contain tick-stamped inputs and sampled animation frames. Tests reconstruct a complete upper-route run from its recorded inputs and compare its entire resulting record. This is local reproducibility testing; no server validation or cross-device determinism certification is claimed. Local saved data is not trusted competition data.
 
@@ -77,13 +77,13 @@ Browser review checks gameplay and the movement study. Real-phone latency, therm
 
 The runner uses a shaped cream shirt with a dark side inset, layered swept hair, loose upper trouser legs, amber soles and a short amber sash. These original meshes are assembled by the existing IK rig. `node scripts/export-runner.cjs` regenerates the approximately 400 KB GLB from the same geometry and rig; it is an articulated mesh asset in a sample sprint pose, not a skinned skeleton with baked animation clips. Runtime continues to animate the shared geometry directly, so gameplay and exported asset stay aligned.
 
-Chest and head lean increase continuously between 6 and 14 m/s. Airborne leg reach and opposing arm drive increase with speed; the planted foot path remains unchanged to prevent skating. A small air-speed curve eases at the crest and gains speed on descent. Gravity remains active at the apex. Vaults ease over support and accelerate toward release, with a longer safety-vault duration. No input delay, hit-stop, or global slow-motion effect is introduced.
+Chest and head lean increase continuously between 6 and 14 m/s. Airborne leg reach and opposing arm drive increase with speed; the planted foot path remains unchanged to prevent skating. Vertical speed falls toward zero at the crest and increases on descent under gravity. Horizontal speed is carried from takeoff, so slower approaches make shorter jumps. Vaults ease over support and accelerate toward release, with a longer safety-vault duration. No input delay, hit-stop, or global slow-motion effect is introduced.
 
 The 500–1450 m district supplies 48 obstacles on each line, covering all eight vault families, with regular slide passages and gaps on the upper line. Its 950 m length lasts at least 67.8 seconds at the 14 m/s flow cap. It follows the opening course and leads into three rooftop blocks and a final approach. Both complete routes are tested to finish in 180–300 seconds with zero forced recoveries. Repeatable patterns support route learning. Ledge catches remain a recovery opportunity rather than a mandatory failure.
 
 Roof trim, railings, water tanks and checkpoint posts have neutral edges. Amber strips mark interactive vault surfaces, ducts, branch lips, gap edges and drops. Background sunlight and the runner’s costume accents retain the concept palette. Static boxes are instanced by material within 80 m chunks so distant districts can be culled; skyline layers wrap beyond the old 480 m extent.
 
-The course/replay key is bumped to v4 because layout, timing and traversal trajectories changed. Existing records are left in storage but are not compared against the new course. This pass was checked through simulation, type checking, lint, production compilation and a software-rendered character pose study. Browser gameplay and real-phone feel still need visual/device playtesting.
+The course/replay key is now v6 because layout, timing and traversal trajectories changed. Existing records are left in storage but are not compared against the new course. This pass was checked through simulation, type checking, lint, production compilation and a software-rendered character pose study. Browser gameplay and real-phone feel still need visual/device playtesting.
 
 ## Character surface refinement
 
@@ -97,4 +97,41 @@ The GLB export includes the refined geometry. A software pose study checked crui
 
 The course now has 567 obstacles across the two routes, up from 189. Added approach obstacles alternate compact vaults and narrow ducts. New contacts are spaced 5.8 m along the hard line and 7 m along the normal line where the existing terrain permits. Gap landing areas, wall-step exits and route rejoin zones retain clearance; obstacles are not inserted into those recovery paths.
 
-Clean simulation attempts require 362 inputs on the normal route (previously 107) and 358 on the hard route (previously 125). Both complete without recoveries in approximately 3:41–3:42. Full-route tests enforce at least 350 actions and a median interval below 650 ms. This increases input frequency while retaining the previous clean timing windows and movement speed. The v4 record key separates these results from the less-dense course.
+Clean simulation attempts require 362 inputs on the normal route (previously 107) and 358 on the hard route (previously 125). With the contact and momentum pass, the clean normal attempt finishes in 4:00.84 and the hard attempt in 3:59.37, both without recoveries. Full-route tests enforce at least 350 actions and a median interval below 650 ms. This increases input frequency while retaining the previous clean timing windows and movement speed. The v6 record key separates these results from earlier physics and less-dense courses.
+
+
+## Contact and momentum pass
+
+Running hips now compress during the planted part of each stride and rebound after toe-off, with chest/head following that motion. Faster running increases the compression and existing forward lean. Descending jumps extend both feet ahead of the hips. Landing plants both feet before recovering into the run or rolling; heavy impacts add a hand brace and a longer, 380 ms recovery. A missed roll removes 4.2 units/s and briefly lowers the recovery-speed target. The existing 250/400 ms roll windows are unchanged.
+
+Slide entry has a 70 ms crouch, followed by leg extension into the low pose by 170 ms. Input and low collision state still take effect on the next simulation tick. Sliding removes up to 0.7 units/s at entry and continues losing up to 1.9 units/s² toward 10.8 units/s. It never speeds up an already slow runner. Standing blends back over 160 ms, while normal running rebuilds momentum at up to 3 units/s². This makes slide-heavy paths slower than clean vault paths without adding input delay.
+
+Kong now has distinct leg-load, leg-push, hand-plant, hand-push and release phases. The initial load stays near the roof before the dive. A second lift begins after hand contact, with a one-time 0.3 units/s exit impulse; the whole traversal retains obstacle clearance. These are authored arcade trajectories rather than a rigid-body character simulation.
+
+Narrow ducts have a 1.65-unit top and a 1.25-unit underside. Up can slowly climb over them when there is overhead clearance; Down slides underneath faster. Ducts beneath another roof do not offer a climb. The HUD exposes the choice only where it is valid, and the movement study includes a mantle preview. Rendered beam height and collision height use the same obstacle data.
+
+The latest full-course simulation finishes both routes with zero recoveries and 362 normal / 358 hard inputs. The technical district takes approximately 77 seconds on the normal route and 75 seconds on the hard route. Regression tests cover momentum loss/recovery, no slide speed boost after a stumble, climb clearance and duration, the second Kong lift, body rebound, two-foot/hand landing targets, slide entry and reachable hand support. Offline rendering of the actual articulated geometry checks the transition silhouettes. This pass has not been visually verified in a browser or on a phone.
+
+
+## Silhouette, momentum and high walls — v6
+
+The current runner replaces the earlier cream-shirt/sash costume with a dark athletic silhouette inspired by Vector and Shadow Fight. The torso has independently shaped rib-cage depth, shoulder width and waist sections. A rounded pelvis, tapered thighs/calves and continuous arm surfaces meet the existing IK targets. The head/neck proportions, short hair profile, hands, shoes and arm swing have been revised. Running arms now swing along upper-arm/forearm arcs rather than collapsing toward the ribs during the middle of a stride. This remains original procedural articulated geometry, not imported character animation or a mocap asset.
+
+The reference research used [Nekki’s Vector page](https://vector.game/), [Cascadeur’s account of its Nekki origins and physics-based approach](https://cascadeur.com/about), and [London Parkour’s wall-run/climb-up lesson and transcript](https://londonparkour.com/tutorials/wall-run-climbup/). The wall lesson informed the sequence from foot drive to ledge catch and upward press. Those observations guide authored game poses; the runtime does not use Cascadeur or simulate a complete biomechanical body.
+
+Flat-ground simulation measurements illustrate the momentum rule:
+
+| Takeoff speed | Normal jump | Right / forward input |
+| --- | --- | --- |
+| 6 m/s | 4.71 m | 4.71 m; normal jump |
+| 9 m/s | 7.09 m | 7.09 m; normal jump |
+| 12 m/s | 9.46 m | 10.35 m; long jump |
+| 14 m/s | 11.05 m | 12.09 m; long jump |
+
+These use the game’s units and fixed-step flight on a level roof; actual gaps depend on takeoff location and landing height. Regaining 11.5 m/s from 6 m/s takes about 1.84 seconds of uninterrupted ground acceleration. Jumping while slow does not bypass that recovery. Long jumps still require an appropriately timed roll for a hard landing. The HUD shows when long-jump speed is ready.
+
+Four high-route entrances at 115, 1595, 2075 and 2555 m lead to 3.3 m wall faces. The character moves into the rear climbing lane, plants a foot, drives upward, holds the lip, pulls and presses, then lifts the leading shoe above the lip before stepping onto the upper roof. Slower approaches lengthen the climb; exiting removes 10% of carried speed. Eight upper technical-district ducts become wide Kong obstacles, reducing slide friction for clean high-route play and preserving a time advantage despite climbing. Total obstacle count remains 567.
+
+The movement lab adds long-jump and wall-climb previews plus a 6–14 m/s entry-speed slider. The shared GLB is regenerated from the same runtime geometry. `node scripts/runner-study.cjs --wall` produces an offline triangle study for the six wall-climb phases. No new runtime dependencies or postprocessing were added; the 120 Hz input/simulation loop is unchanged.
+
+The 52-test suite covers takeoff-speed distance, long-jump readiness, slower momentum recovery, all four wall exits, planted-foot/hand contacts, leading-shoe clearance, deterministic replay and the existing full-course checks. The v6 key separates the new physics and course from previous personal bests without deleting them. Character pose inspection uses offline geometry renders; browser lighting, animation feel and real-phone performance still need device review.

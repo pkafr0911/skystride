@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   FINISH,
+  canMantle,
   timingWindow,
   timingRange,
   TECHNICAL,
@@ -124,13 +125,13 @@ test("both routes complete physically with clean contacts and three splits", () 
     assert.ok(g.time >= 180 && g.time <= 300);
   }
 });
-test("route choice and early vault jumps produce measurable time differences", () => {
+test("clean hard routes beat normal routes; mistimed chains can lose the speed needed for gaps", () => {
   const lower = complete(),
     upper = complete(true),
     early = complete(false, true);
-  assert.equal(early.phase, "finished");
   assert.ok(upper.time < lower.time, `${upper.time} vs ${lower.time}`);
-  assert.ok(early.time > lower.time);
+  assert.ok(early.recoveries > 0);
+  assert.ok(early.phase === "failed" || early.time > lower.time);
 });
 test("every authored vault type has its own traversal and obstacle contact anchor", () => {
   for (const o of obstacles.filter((item) => item.kind === "vault")) {
@@ -345,6 +346,7 @@ test("a jump buffered during vault release launches on its first grounded tick",
 test("up at a reachable lip catches it and climbs onto its real surface", () => {
   const g = new Run();
   g.start();
+  g.speed = 12;
   g.x = 70;
   g.grounded = false;
   advance(g, 26 * STEP);
@@ -356,6 +358,68 @@ test("up at a reachable lip catches it and climbs onto its real surface", () => 
   assert.equal(g.grounded, true);
   assert.equal(g.y, 0);
   assert.equal(g.recoveries, 1);
+});
+
+test("jump distance carries takeoff speed and a long jump needs earned momentum", () => {
+  const flights = [6, 9, 12, 14].map((speed) => {
+    const g = new Run();
+    g.start();
+    g.speed = speed;
+    g.action("forward");
+    g.step();
+    const long = g.frame().longJump;
+    while (!g.grounded && g.time < 2) {
+      assert.ok(
+        g.speed <= speed,
+        "airborne motion cannot restore running speed",
+      );
+      g.step();
+    }
+    return { distance: g.x, long };
+  });
+  assert.deepEqual(
+    flights.map((f) => f.long),
+    [false, false, true, true],
+  );
+  for (let i = 1; i < flights.length; i++)
+    assert.ok(flights[i].distance > flights[i - 1].distance + 1);
+  assert.ok(flights[0].distance < 5);
+  assert.ok(flights[3].distance > 11);
+});
+test("a slowed runner needs a sustained run-up to regain long-jump speed", () => {
+  const g = new Run();
+  g.start();
+  g.speed = 6;
+  advance(g, 1);
+  assert.ok(g.speed > 8.9 && g.speed < 9.1);
+  advance(g, 0.9);
+  assert.ok(g.speed >= 11.5 && g.speed < 12);
+});
+test("high walls pause horizontal travel for the catch and finish on the upper roof", () => {
+  const walls = obstacles.filter((o) => o.kind === "branch" && o.height);
+  assert.equal(walls.length, 4);
+  for (const o of walls) {
+    const g = new Run();
+    g.start();
+    g.x = o.x - 1.9;
+    g.speed = 12;
+    g.action("up");
+    g.step();
+    assert.equal(g.move, "wall-climb");
+    while (g.frame().progress < 0.53) g.step();
+    const gripX = g.x;
+    assert.ok(g.y < o.height! - 1.5);
+    while (g.frame().progress < 0.6) {
+      g.step();
+      assert.equal(g.x, gripX);
+    }
+    while (g.traversal) g.step();
+    assert.equal(g.y, o.height);
+    assert.equal(g.grounded, true);
+    assert.equal(g.upper, true);
+    assert.equal(g.recoveries, 0);
+    assert.ok(g.speed < 12);
+  }
 });
 test("an early jump beneath the upper route hits its underside", () => {
   const g = new Run();
@@ -435,4 +499,68 @@ test("vault slows over support and accelerates into release without changing col
   }
   assert.ok(rates[Math.floor(rates.length / 2)] < rates[2]);
   assert.ok(rates[Math.floor(rates.length / 2)] < rates[rates.length - 3]);
+});
+
+test("slide loses momentum and rebuilding speed requires running", () => {
+  const g = new Run();
+  g.start();
+  g.action("down");
+  advance(g, 0.4);
+  assert.equal(g.move, "slide");
+  assert.ok(g.speed <= 11);
+  const slow = g.speed;
+  advance(g, 0.5);
+  assert.equal(g.move, "run");
+  assert.ok(g.speed > slow);
+});
+test("starting a slide after a stumble never creates momentum", () => {
+  const g = new Run();
+  g.start();
+  g.speed = 6;
+  g.action("down");
+  g.step();
+  assert.ok(g.speed <= 6);
+});
+test("up climbs a low uncovered duct more slowly than sliding under it", () => {
+  const o = obstacles.find(canMantle)!;
+  const times: number[] = [];
+  for (const action of ["up", "down"] as const) {
+    const g = new Run();
+    g.start();
+    g.x = o.x - 1.9;
+    g.y = o.route === "upper" ? 3.3 : 0;
+    g.upper = o.route === "upper";
+    g.action(action);
+    g.step();
+    assert.equal(g.move, action === "up" ? "mantle" : "slide");
+    while (g.x < o.x + o.width + 1.5 && g.time < 3) g.step();
+    times.push(g.time);
+    assert.equal(g.recoveries, 0);
+  }
+  assert.ok(times[0] > times[1] + 0.5);
+});
+test("climb-over alternative is forbidden beneath another roof", () => {
+  for (const o of obstacles.filter(
+    (o) => o.kind === "slide" && o.route === "lower" && o.x > 500 && o.x < 1400,
+  ))
+    assert.equal(canMantle(o), false);
+});
+test("Kong hand push produces a second lift and a one-time exit impulse", () => {
+  const o = obstacles.find((o) => o.vault === "kong")!,
+    g = new Run();
+  g.start();
+  g.x = o.x - 1.9;
+  g.action("up");
+  g.step();
+  let pushed = false,
+    maxLift = -Infinity;
+  while (g.traversal) {
+    const t = g.traversal;
+    g.step();
+    pushed ||= !!t.pushed;
+    if (g.traversal && g.frame().progress > 0.5 && g.frame().progress < 0.8)
+      maxLift = Math.max(maxLift, g.y);
+  }
+  assert.ok(pushed);
+  assert.ok(maxLift > (o.height ?? 1) + 0.15);
 });

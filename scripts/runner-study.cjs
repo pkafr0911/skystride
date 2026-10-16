@@ -3,18 +3,19 @@ require("ts-node/register");
 const fs = require("node:fs");
 const THREE = require("three");
 const { makeRunner } = require("../src/pages/Skystride/runner");
-const { Run } = require("../src/pages/Skystride/model");
+const { Run, obstacles } = require("../src/pages/Skystride/model");
 const scene = new THREE.Scene(),
   runner = makeRunner(scene),
   game = new Run();
 game.start();
 const panels = [];
-for (const [title, speed, move] of [
+const samples = [
   ["CRUISE / 6 M/S", 6, "run"],
   ["SPRINT / 14 M/S", 14, "run"],
   ["KONG / CONTACT", 14, "vault"],
-]) {
-  const f = {
+].map(([title, speed, move]) => ({
+  title,
+  frame: {
     ...game.frame(),
     x: 3.5,
     speed,
@@ -25,7 +26,32 @@ for (const [title, speed, move] of [
     grounded: move === "run",
     contact: move === "vault" ? { x: 3.6, y: 1.1 } : null,
     landingAge: 1,
-  };
+  },
+}));
+if (process.argv.includes("--wall")) {
+  samples.length = 0;
+  const wall = obstacles.find((o) => o.kind === "branch" && o.height);
+  game.x = wall.x - 1.9;
+  game.speed = 12;
+  game.action("up");
+  game.step();
+  for (const [title, progress] of [
+    ["FOOT PLANT", 0.35],
+    ["DRIVE", 0.46],
+    ["LIP CATCH", 0.57],
+    ["PULL", 0.73],
+    ["PALM PRESS", 0.85],
+    ["TOP OUT", 0.97],
+  ]) {
+    while (game.traversal && game.frame().progress < progress) game.step();
+    samples.push({
+      title,
+      frame: game.frame(),
+      obstacle: { x: wall.x + wall.width - game.x, height: wall.height },
+    });
+  }
+}
+for (const { title, frame: f, obstacle } of samples) {
   runner.pose(f, 0, 0);
   runner.group.position.x = 0;
   runner.group.updateMatrixWorld(true);
@@ -49,7 +75,7 @@ for (const [title, speed, move] of [
     }
   });
   triangles.sort((a, b) => a.depth - b.depth);
-  panels.push({ title, triangles });
+  panels.push({ title, triangles, obstacle });
 }
 fs.writeFileSync("/tmp/skystride-runner-study.json", JSON.stringify(panels));
 runner.dispose();

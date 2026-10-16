@@ -1,6 +1,6 @@
 # Skystride
 
-A standalone, fullscreen rooftop parkour time-trial game. Sunset Relay is a 3 km course with three sectors, two elevated shortcuts, contextual traversal, swipe controls, and a local personal-best ghost.
+A standalone, fullscreen rooftop parkour time-trial game. Sunset Relay is a 3 km course with three sectors, elevated route choices, contextual traversal, swipe controls, and a local personal-best ghost.
 
 ## Development
 
@@ -42,9 +42,9 @@ Expected URL after deployment: https://pkafr0911.github.io/skystride/
 
 ## Controls
 
-- Up / W / Space: jump anywhere; contextual vault or wall step near a suitable obstacle.
+- Up / W / Space: jump anywhere; contextual vault, low-duct climb, wall step or high-wall climb near a suitable obstacle.
 - Down / S: slide; press before landing from a drop to roll.
-- Right / D: longer jump.
+- Right / D: long jump at 11.5 m/s or faster; a normal jump below that speed. Jump distance carries current momentum, so build speed before a wide gap.
 - R: restart. Escape: pause.
 - Touch: swipe up/down/right; actions trigger before finger release. Swipe sensitivity is adjustable in the course menu.
 
@@ -53,3 +53,5 @@ Best runs remain in local storage on the current origin. A best from the origina
 See [game notes](docs/game-design.md) for mechanics, performance decisions, and first-playable limitations.
 
 Character asset: `public/models/skystride-runner.glb`. Regenerate from the live geometry with `node scripts/export-runner.cjs`.
+
+The runner uses an original dark athletic silhouette with continuous limb surfaces and procedural contact animation. The movement lab includes an entry-speed slider, long-jump preview, and high-wall climb study. `node scripts/runner-study.cjs --wall` exports mesh triangles for offline inspection of the wall-climb poses.

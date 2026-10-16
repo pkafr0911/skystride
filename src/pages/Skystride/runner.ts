@@ -4,6 +4,7 @@ import { runnerGeometry } from "../../assets/runner-model";
 import { Frame } from "./model";
 import { clamp, Point, poseFor } from "./motion";
 export { poseFor } from "./motion";
+export const LEG_LENGTHS = { thigh: 0.51, shin: 0.55 } as const;
 
 /** Stable two-bone IK. Pole projection defines the joint plane, including at full extension. */
 export function solveJoint(
@@ -36,12 +37,12 @@ export function solveJoint(
 
 export function makeRunner(scene: THREE.Scene, ghost = false) {
   const group = new THREE.Group();
-  group.name = "Skystride_Urban_Runner";
+  group.name = "Skystride_Silhouette_Runner";
   scene.add(group);
   const geometries = runnerGeometry();
   const colors = ghost
     ? [0xa4e2df, 0xa4e2df, 0xa4e2df, 0xa4e2df, 0xa4e2df]
-    : [0x101c30, 0xf6dfac, 0xe8ab56, 0x0b1729, 0x29364b];
+    : [0x111821, 0x121a24, 0xf3ae65, 0x0b1119, 0x1c2735];
   const mats = colors.map(
     (color) =>
       new THREE.MeshStandardMaterial({
@@ -49,7 +50,7 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
         roughness: 0.92,
         metalness: 0,
         emissive: color,
-        emissiveIntensity: 0.16,
+        emissiveIntensity: 0.08,
         transparent: ghost,
         opacity: ghost ? 0.25 : 1,
         depthWrite: !ghost,
@@ -61,11 +62,7 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
     return m;
   };
   const torso = mesh(7, 1),
-    collar = mesh(10, 3),
-    scarf = mesh(9, 2),
-    belt = mesh(0, 2),
-    waist = mesh(0, 3),
-    hips = mesh(1, 3),
+    hips = mesh(11, 3),
     head = mesh(2, 0),
     hair = mesh(3, 3),
     neck = mesh(0, 0);
@@ -82,10 +79,9 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
     group.add(surface.mesh);
   });
   const shoulders = [mesh(1, 1), mesh(1, 1)];
-  const sleeves = [mesh(0, 1), mesh(0, 1)];
   const shoes = [mesh(4, 3), mesh(4, 3)],
     soles = [mesh(5, 2), mesh(5, 2)];
-  const hands = [mesh(1, 4), mesh(1, 0)];
+  const hands = [mesh(12, 4), mesh(12, 0)];
   const thumbs = [mesh(1, 4), mesh(1, 0)];
   const shoePanels = [mesh(4, 0), mesh(4, 0)];
   const axis = new THREE.Vector3(0, 1, 0),
@@ -141,41 +137,39 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
     group,
     pose(f: Frame, time: number, dt: number) {
       const p = poseFor(f);
-      group.position.set(f.x, f.y, 0.55);
+      const wallLane =
+        f.move === "wall-climb"
+          ? Math.sin((Math.PI * Math.min(1, f.progress / 0.18)) / 2) *
+            (1 - clamp((f.progress - 0.92) / 0.08))
+          : 0;
+      group.position.set(f.x, f.y, 0.55 - 1.05 * wallLane);
       const hip = vec(p.hip),
         chest = vec(p.chest),
-        skull = vec(p.head);
-      segment(torso, hip.clone().lerp(chest, 0.12), chest, 0.22, 0.2);
+        headAxis = vec(p.head).sub(chest).normalize(),
+        skull = chest.clone().addScaledVector(headAxis, 0.205);
       segment(
-        waist,
-        hip.clone().add(new THREE.Vector3(0, -0.06, 0)),
-        hip.clone().lerp(chest, 0.19),
+        torso,
+        hip.clone().add(new THREE.Vector3(0, -0.045, 0)),
+        chest,
         0.17,
-        0.17,
+        0.21,
       );
-      hips.position.copy(hip);
-      hips.scale.set(0.19, 0.13, 0.19);
-      collar.position
-        .copy(chest)
-        .addScaledVector(chest.clone().sub(hip).normalize(), 0.015);
-      collar.quaternion.copy(torso.quaternion);
-      collar.rotateX(Math.PI / 2);
-      collar.scale.set(0.11, 0.1, 0.1);
-      scarf.position.copy(hip).add(new THREE.Vector3(-0.03, 0.1, 0.22));
-      scarf.scale.setScalar(0.72);
-      scarf.rotation.z = -0.15 - Math.min(0.45, f.speed / 35);
-      belt.position.copy(hip).add(new THREE.Vector3(0, 0.09, 0));
-      belt.scale.set(0.19, 0.06, 0.185);
-      const headAxis = skull.clone().sub(chest).normalize();
+      segment(
+        hips,
+        hip.clone().add(new THREE.Vector3(0, -0.15, 0)),
+        hip.clone().lerp(chest, 0.14),
+        0.16,
+        0.175,
+      );
       segment(
         neck,
         chest,
-        skull.clone().addScaledVector(headAxis, -0.12),
-        0.065,
+        skull.clone().addScaledVector(headAxis, -0.135),
+        0.055,
       );
       head.position.copy(skull);
-      head.scale.setScalar(0.84);
-      hair.scale.setScalar(0.84);
+      head.scale.setScalar(0.78);
+      hair.scale.setScalar(0.76);
       hair.position.copy(skull);
       head.rotation.z = Math.atan2(headAxis.y, headAxis.x) - Math.PI / 2;
       hair.rotation.copy(head.rotation);
@@ -183,8 +177,14 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
         const sign = s ? 1 : -1;
         const root = hip.clone().add(new THREE.Vector3(0, -0.025, sign * 0.14));
         const foot = vec(p.feet[s]),
-          knee = solveJoint(root, foot, vec(p.knees[s]), 0.51, 0.51);
-        limbSkins[s].update(root, knee, foot, 0.14, 0.075, true);
+          knee = solveJoint(
+            root,
+            foot,
+            vec(p.knees[s]),
+            LEG_LENGTHS.thigh,
+            LEG_LENGTHS.shin,
+          );
+        limbSkins[s].update(root, knee, foot, 0.118, 0.058, true);
         shoes[s].position.copy(foot);
         soles[s].position.copy(foot);
         shoes[s].rotation.z = p.footAngles[s];
@@ -193,20 +193,13 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
           .clone()
           .add(new THREE.Vector3(-0.015, -0.025, sign * 0.185));
         shoulders[s].position.copy(shoulder);
-        shoulders[s].scale.set(0.11, 0.1, 0.105);
+        shoulders[s].scale.set(0.085, 0.09, 0.085);
         const hand = vec(p.hands[s]),
           elbow = solveJoint(shoulder, hand, vec(p.elbows[s]), 0.34, 0.34);
-        limbSkins[2 + s].update(shoulder, elbow, hand, 0.073, 0.05, false);
-        segment(
-          sleeves[s],
-          shoulder,
-          shoulder.clone().lerp(elbow, 0.28),
-          0.086,
-          0.08,
-        );
+        limbSkins[2 + s].update(shoulder, elbow, hand, 0.078, 0.038, false);
 
         hands[s].position.copy(hand);
-        hands[s].scale.set(0.075, 0.044, 0.055);
+        hands[s].scale.setScalar(0.85);
         hands[s].rotation.z = Math.atan2(hand.y - elbow.y, hand.x - elbow.x);
         thumbs[s].position
           .copy(hand)

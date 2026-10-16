@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import {
   FINISH,
+  canMantle,
   timingRange,
   timingWindow,
   TECHNICAL,
@@ -18,6 +19,7 @@ import {
   RecordRun,
   Run,
   Swipe,
+  LONG_JUMP_SPEED,
   VERSION,
 } from "./model";
 import styles from "./styles.less";
@@ -123,11 +125,15 @@ export default function Skystride() {
   const range = next ? timingRange(next, game.speed) : { near: 0, far: 0 };
   const cue =
     next?.kind === "branch"
-      ? "↑ HARD LINE / RUN FOR NORMAL"
+      ? next.height
+        ? "↑ WALL CLIMB / RUN FOR NORMAL"
+        : "↑ HARD LINE / RUN FOR NORMAL"
       : next?.kind === "drop"
         ? "↓ LANDING ROLL"
         : next?.kind === "slide"
-          ? "↓ SLIDE"
+          ? next && canMantle(next)
+            ? "↓ SLIDE / ↑ SLOW CLIMB"
+            : "↓ SLIDE"
           : next?.kind === "gap"
             ? "↑ GAP JUMP"
             : "↑ VAULT";
@@ -265,6 +271,9 @@ export default function Skystride() {
                 </span>
                 <span className={styles.flow}>
                   {game.speed.toFixed(1)} M/S · {game.flow} FLOW
+                  {game.speed >= LONG_JUMP_SPEED
+                    ? " · LONG JUMP READY"
+                    : " · BUILD SPEED"}
                   {game.x >= TECHNICAL.start && game.x <= TECHNICAL.end
                     ? " · TECHNICAL DISTRICT"
                     : ""}
@@ -337,7 +346,7 @@ export default function Skystride() {
                       ? "Jump near the edge to carry across. Press R or tap below to go again."
                       : game.paused
                         ? "Paused runs remain playable, but cannot set a personal best."
-                        : "Jump whenever you want. Swipe up near a barrier to vault. Down to slide; down before a drop landing to roll. Keep your momentum. Find your line."}
+                        : "Swipe up to jump, vault, or climb a marked wall. Down to slide; down before a drop landing to roll. Build speed, then swipe right for a long jump. Keep your momentum. Find your line."}
                 </p>
                 {finished && (
                   <div className={styles.splits}>
@@ -423,7 +432,7 @@ export default function Skystride() {
                 {storageNotice && <p role="status">{storageNotice}</p>}
                 <small className={styles.panelNote}>
                   UP / SPACE · JUMP & VAULT &nbsp; DOWN · SLIDE & ROLL &nbsp; →
-                  · LONG JUMP &nbsp; R · RETRY
+                  · LONG JUMP AT 11.5 M/S &nbsp; R · RETRY
                 </small>
               </div>
             </div>

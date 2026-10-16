@@ -1,7 +1,39 @@
 import * as THREE from "three";
 
-/** Original Urban Silhouette model geometry. Shared by live rig and GLB export. */
+/** Original athletic silhouette geometry. Shared by the live rig and GLB export. */
 export function runnerGeometry() {
+  // Anatomical cross-sections: depth and shoulder width vary independently.
+  // Unlike a lathed cylinder this gives the rib cage, waist and pelvis different volumes.
+  const body = (sections: number[][]) => {
+    const curve = new THREE.CatmullRomCurve3(
+      sections.map(([y, depth, width]) => new THREE.Vector3(depth, y, width)),
+    );
+    const vertices: number[] = [],
+      indices: number[] = [];
+    const rings = 25,
+      sides = 24;
+    for (let r = 0; r < rings; r++) {
+      const section = curve.getPoint(r / (rings - 1));
+      for (let s = 0; s < sides; s++) {
+        const angle = (s / sides) * Math.PI * 2;
+        vertices.push(
+          Math.cos(angle) * section.x,
+          section.y,
+          Math.sin(angle) * section.z,
+        );
+        if (r < rings - 1) {
+          const a = r * sides + s,
+            b = r * sides + ((s + 1) % sides);
+          indices.push(a, a + sides, b, b, a + sides, b + sides);
+        }
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+    g.setIndex(indices);
+    g.computeVertexNormals();
+    return g;
+  };
   const profile = (points: number[][], depth: number) => {
     const shape = new THREE.Shape();
     const middle = (a: number[], b: number[]) => [
@@ -50,19 +82,16 @@ export function runnerGeometry() {
     ),
     profile(
       [
-        [-0.23, -0.04],
-        [-0.26, -0.04],
-        [-0.27, 0.03],
-        [-0.22, 0.18],
-        [-0.27, 0.13],
-        [-0.23, 0.22],
-        [-0.18, 0.25],
-        [-0.01, 0.27],
-        [0.1, 0.2],
-        [0.15, 0.1],
-        [0.04, 0.14],
-        [-0.06, 0.11],
-        [-0.14, 0.02],
+        [-0.17, -0.02],
+        [-0.19, 0.08],
+        [-0.16, 0.19],
+        [-0.08, 0.23],
+        [0.06, 0.24],
+        [0.14, 0.15],
+        [0.13, 0.08],
+        [0.06, 0.15],
+        [-0.07, 0.17],
+        [-0.12, 0.08],
       ],
       0.27,
     ),
@@ -87,20 +116,15 @@ export function runnerGeometry() {
       0.165,
     ),
     new THREE.CircleGeometry(1, 5),
-    new THREE.LatheGeometry(
-      [
-        new THREE.Vector2(0.62, -0.5),
-        new THREE.Vector2(0.72, -0.46),
-        new THREE.Vector2(0.78, -0.3),
-        new THREE.Vector2(0.9, -0.1),
-        new THREE.Vector2(1, 0.12),
-        new THREE.Vector2(1.02, 0.28),
-        new THREE.Vector2(0.94, 0.4),
-        new THREE.Vector2(0.72, 0.48),
-        new THREE.Vector2(0.52, 0.5),
-      ],
-      24,
-    ),
+    body([
+      [-0.5, 0.6, 0.67],
+      [-0.35, 0.7, 0.73],
+      [-0.12, 0.8, 0.82],
+      [0.13, 0.95, 1],
+      [0.31, 0.87, 1.13],
+      [0.42, 0.64, 1.04],
+      [0.5, 0.32, 0.35],
+    ]),
     profile(
       [
         [-0.72, -0.5],
@@ -123,5 +147,25 @@ export function runnerGeometry() {
       0.3,
     ),
     new THREE.TorusGeometry(1, 0.065, 8, 24),
+    body([
+      [-0.5, 0.15, 0.4],
+      [-0.35, 0.68, 0.87],
+      [0, 0.95, 1],
+      [0.3, 0.88, 0.93],
+      [0.5, 0.72, 0.8],
+    ]),
+    profile(
+      [
+        [-0.05, -0.035],
+        [0.02, -0.045],
+        [0.085, -0.035],
+        [0.12, -0.01],
+        [0.11, 0.012],
+        [0.08, 0.04],
+        [0.015, 0.045],
+        [-0.05, 0.03],
+      ],
+      0.075,
+    ),
   ];
 }

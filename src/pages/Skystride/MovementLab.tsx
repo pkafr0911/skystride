@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { Frame, obstacles, Run, STEP } from "./model";
+import { Frame, obstacles, Run, STEP, canMantle } from "./model";
 import { makeRunner } from "./runner";
 import { interpolateFrame, motionPhase } from "./motion";
 import styles from "./styles.less";
@@ -8,6 +8,7 @@ import styles from "./styles.less";
 const options = [
   "run",
   "jump",
+  "long-jump",
   "step",
   "hurdle",
   "speed",
@@ -17,23 +18,29 @@ const options = [
   "kong",
   "step-leap",
   "slide",
+  "mantle",
   "wall",
+  "wall-climb",
   "roll",
   "catch",
   "landing",
 ] as const;
 type Preview = (typeof options)[number];
-function framesFor(move: Preview): Frame[] {
+function framesFor(move: Preview, entrySpeed: number): Frame[] {
   const g = new Run();
   g.start();
-  const o = obstacles.find((item) => item.vault === move);
+  g.speed = entrySpeed;
+  const o = obstacles.find((item) =>
+    move === "mantle" ? canMantle(item) : item.vault === move,
+  );
   if (o) {
     g.x = o.x - 2;
     g.y = o.route === "upper" ? 3.3 : 0;
     g.upper = o.route === "upper";
   }
   if (move === "slide") g.x = 88.8;
-  if (move === "wall") g.x = 113;
+  if (move === "wall") g.x = 288;
+  if (move === "wall-climb") g.x = 113;
   if (move === "roll") {
     g.x = 196;
     g.y = 3.3;
@@ -49,9 +56,15 @@ function framesFor(move: Preview): Frame[] {
     g.grounded = false;
   }
   const frames: Frame[] = [];
-  for (let tick = 0; tick < 210; tick++) {
-    if (tick === 12 && (o || move === "jump" || move === "wall"))
+  for (let tick = 0; tick < (move === "wall-climb" ? 330 : 210); tick++) {
+    if (tick === 12 && (move === "jump" || move === "long-jump"))
+      g.speed = entrySpeed;
+    if (
+      tick === 12 &&
+      (o || move === "jump" || move === "wall" || move === "wall-climb")
+    )
       g.action("up");
+    if (tick === 12 && move === "long-jump") g.action("forward");
     if (tick === 26 && move === "catch") g.action("up");
     if (tick === 8 && move === "slide") g.action("down");
     if (move === "roll" && !g.grounded && g.y < 2.5 && g.y > 1)
@@ -70,6 +83,7 @@ export default function MovementLab() {
   const [scrub, setScrub] = useState(0);
   const [slow, setSlow] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [entrySpeed, setEntrySpeed] = useState(12);
   const [phase, setPhase] = useState("");
   const progress = useRef(0);
   const controls = useRef({ playing, scrub, slow, sheet });
@@ -86,7 +100,7 @@ export default function MovementLab() {
     scene.add(light);
     const camera = new THREE.OrthographicCamera(-6, 6, 4, -3, 0.1, 100);
     const actor = makeRunner(scene),
-      samples = framesFor(move);
+      samples = framesFor(move, entrySpeed);
     const studies = Array.from({ length: 5 }, () => makeRunner(scene));
     const environment = new THREE.Group();
     scene.add(environment);
@@ -103,7 +117,7 @@ export default function MovementLab() {
     const keys =
       move === "run"
         ? [0, 9, 17, 26, 36]
-        : move === "jump"
+        : move === "jump" || move === "long-jump"
           ? [13, 21, 43, 89, landing]
           : move === "landing"
             ? [
@@ -124,9 +138,13 @@ export default function MovementLab() {
                     atProgress(
                       move === "wall"
                         ? "wall"
-                        : move === "slide"
-                          ? "slide"
-                          : "vault",
+                        : move === "wall-climb"
+                          ? "wall-climb"
+                          : move === "slide"
+                            ? "slide"
+                            : move === "mantle"
+                              ? "mantle"
+                              : "vault",
                       p,
                     ),
                   );
@@ -145,7 +163,9 @@ export default function MovementLab() {
       m.scale.set(w, h, 2.5);
       environment.add(m);
     };
-    const o = obstacles.find((item) => item.vault === move),
+    const o = obstacles.find((item) =>
+        move === "mantle" ? canMantle(item) : item.vault === move,
+      ),
       base = o?.route === "upper" ? 3.3 : 0;
     const start = samples[0].x;
     if (move === "catch") {
@@ -159,13 +179,20 @@ export default function MovementLab() {
       box(start + 8, base, 40, 0.035, amber);
     }
     if (o) {
-      box(o.x + o.width / 2, base + o.height! / 2, o.width, o.height!);
+      const bottom = o.kind === "slide" ? 1.25 : 0;
+      box(
+        o.x + o.width / 2,
+        base + (bottom + o.height!) / 2,
+        o.width,
+        o.height! - bottom,
+      );
       box(o.x + o.width / 2, base + o.height!, o.width, 0.045, amber);
     }
     if (move === "slide") box(93.75, 1.8, 5.5, 1.1);
-    if (move === "wall") {
-      box(126, 1.65, 12, 3.3);
-      box(126, 3.3, 12, 0.04, amber);
+    if (move === "wall" || move === "wall-climb") {
+      const face = move === "wall-climb" ? 120 : 295;
+      box(face + 6, 1.65, 12, 3.3);
+      box(face + 6, 3.3, 12, 0.04, amber);
     }
     // Meter ticks make the planted-foot phase readable while the camera tracks the runner.
     for (let x = Math.floor(start) - 4; x < start + 30; x++)
@@ -250,7 +277,7 @@ export default function MovementLab() {
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [move]);
+  }, [move, entrySpeed]);
   return (
     <main
       className={styles.lab}
@@ -300,6 +327,22 @@ export default function MovementLab() {
         >
           {playing ? "Freeze" : "Play"}
         </button>
+        <label>
+          Entry speed {entrySpeed.toFixed(1)} m/s
+          <input
+            aria-label="Entry speed"
+            type="range"
+            min="6"
+            max="14"
+            step="0.5"
+            value={entrySpeed}
+            onChange={(e) => {
+              setEntrySpeed(Number(e.target.value));
+              setScrub(0);
+              setPlaying(true);
+            }}
+          />
+        </label>
         <label>
           <input
             type="checkbox"

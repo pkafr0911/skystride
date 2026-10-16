@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
-import { Frame, obstacles, Run, STEP } from "./model";
+import { canMantle, Frame, obstacles, Run, STEP } from "./model";
 import { interpolateFrame, poseFor, runPose, STANCE, STRIDE } from "./motion";
 import { limbSurface } from "../../assets/limb-surface";
-import { makeRunner, solveJoint } from "./runner";
+import { LEG_LENGTHS, makeRunner, solveJoint } from "./runner";
 
 test("sprint support feet remain fixed in world space until toe-off", () => {
   for (const s of [0, 1]) {
@@ -36,7 +36,13 @@ test("sprint support feet remain fixed in world space until toe-off", () => {
       );
       const ankle = new THREE.Vector3(...pose.feet[s]),
         target = ankle.clone();
-      solveJoint(hip, ankle, new THREE.Vector3(...pose.knees[s]), 0.51, 0.51);
+      solveJoint(
+        hip,
+        ankle,
+        new THREE.Vector3(...pose.knees[s]),
+        LEG_LENGTHS.thigh,
+        LEG_LENGTHS.shin,
+      );
       assert.ok(
         ankle.distanceTo(target) < 1e-6,
         "IK must not pull a planted foot off the roof",
@@ -181,8 +187,8 @@ test("step-through vaults keep the leading knee bent forward", () => {
       hip,
       foot,
       new THREE.Vector3(...p.knees[0]),
-      0.51,
-      0.51,
+      LEG_LENGTHS.thigh,
+      LEG_LENGTHS.shin,
     );
     assert.ok(knee.x > (hip.x + foot.x) / 2, vault);
   }
@@ -227,4 +233,132 @@ test("continuous limbs retain finite outward-facing surfaces through deep joint 
   }
   skin.geometry.dispose();
   material.dispose();
+});
+
+test("body mass compresses in stance and rebounds after toe-off", () => {
+  const hips = Array.from(
+    { length: 100 },
+    (_, i) => runPose((i / 100) * STRIDE, 14).hip[1],
+  );
+  assert.ok(Math.max(...hips) - Math.min(...hips) > 0.18);
+  assert.ok(
+    runPose((STANCE * STRIDE) / 2, 14).hip[1] <
+      runPose((STANCE + 0.1) * STRIDE, 14).hip[1],
+  );
+});
+test("descending jumps present both feet forward and heavy impacts brace a hand", () => {
+  const f = {
+    ...new Run().frame(),
+    move: "fall" as const,
+    moveTime: 0.6,
+    vy: -15,
+  };
+  const pose = poseFor(f);
+  assert.ok(pose.feet.every((p) => p[0] > 0.2 && p[1] < 0.15));
+  const landing = poseFor({
+    ...f,
+    move: "land",
+    impact: 17,
+    landingAge: 0.055,
+    landX: f.x,
+  });
+  assert.ok(landing.feet.every((p) => p[1] < 0.1));
+  assert.ok(landing.hands[1][1] < 0.07);
+});
+test("slide passes through a distinct crouch before extending the legs", () => {
+  const f = { ...new Run().frame(), move: "slide" as const, progress: 0 };
+  const entry = poseFor({ ...f, moveTime: 0 }),
+    duck = poseFor({ ...f, moveTime: 0.07 }),
+    glide = poseFor({ ...f, moveTime: 0.2 });
+  assert.ok(entry.hip[1] > duck.hip[1] && duck.hip[1] > glide.hip[1]);
+  assert.ok(glide.feet[0][0] > duck.feet[0][0]);
+});
+
+test("Kong and low-duct climb put both reachable wrists on the obstacle", () => {
+  for (const o of [
+    obstacles.find((o) => o.vault === "kong")!,
+    obstacles.find(canMantle)!,
+  ]) {
+    const g = new Run();
+    g.start();
+    g.x = o.x - 1.9;
+    g.y = o.route === "upper" ? 3.3 : 0;
+    g.upper = o.route === "upper";
+    g.action("up");
+    g.step();
+    let contactFrames = 0;
+    while (g.traversal) {
+      const f = g.frame(),
+        p = poseFor(f);
+      const touching = [0, 1].every((side) => {
+        const hand = new THREE.Vector3(...p.hands[side]);
+        solveJoint(
+          new THREE.Vector3(...p.chest).add(
+            new THREE.Vector3(-0.015, -0.025, side ? 0.185 : -0.185),
+          ),
+          hand,
+          new THREE.Vector3(...p.elbows[side]),
+          0.34,
+          0.34,
+        );
+        return (
+          Math.abs(hand.y + f.y - f.contact!.y) < 0.08 &&
+          Math.abs(hand.x + f.x - f.contact!.x) < 0.1
+        );
+      });
+      if (touching) contactFrames++;
+      g.step();
+    }
+    assert.ok(
+      contactFrames >= 2,
+      `${o.vault ?? "mantle"} needs sustained hand support`,
+    );
+  }
+});
+
+test("high-wall climb plants a foot, holds both hands at the lip and clears the leading shoe", () => {
+  const o = obstacles.find((o) => o.kind === "branch" && o.height)!;
+  const g = new Run();
+  g.start();
+  g.x = o.x - 1.9;
+  g.speed = 12;
+  g.action("up");
+  g.step();
+  let caught = 0,
+    planted = false;
+  while (g.traversal) {
+    const f = g.frame(),
+      p = poseFor(f),
+      face = f.contact!.x,
+      lip = f.contact!.y;
+    if (f.progress > 0.34 && f.progress < 0.38) {
+      assert.ok(Math.abs(f.x + p.feet[0][0] + 0.09 - face) < 0.035);
+      planted = true;
+    }
+    if (f.progress > 0.54 && f.progress < 0.8) {
+      for (const side of [0, 1]) {
+        const hand = new THREE.Vector3(...p.hands[side]);
+        solveJoint(
+          new THREE.Vector3(...p.chest).add(
+            new THREE.Vector3(-0.015, -0.025, side ? 0.185 : -0.185),
+          ),
+          hand,
+          new THREE.Vector3(...p.elbows[side]),
+          0.34,
+          0.34,
+        );
+        assert.ok(Math.abs(hand.x + f.x - face) < 0.07);
+        assert.ok(Math.abs(hand.y + f.y - lip) < 0.07);
+      }
+      caught++;
+    }
+    if (f.progress > 0.85 && f.progress < 0.94) {
+      assert.ok(
+        p.feet[0][1] + f.y >= lip + 0.07,
+        "raise the leading shoe before stepping across the lip",
+      );
+    }
+    g.step();
+  }
+  assert.ok(planted && caught > 8);
 });

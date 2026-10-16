@@ -200,23 +200,78 @@ export default function Scene({
             black,
           );
       } else if (o.kind === "slide") {
-        box(scene, o.x + o.width / 2, y + 1.8, 0, o.width, 1.1, 3.3, roof);
-        box(scene, o.x + o.width / 2, y + 2.38, 0, o.width, 0.05, 3.3, edge);
+        box(
+          scene,
+          o.x + o.width / 2,
+          y + (1.25 + (o.height ?? 2.35)) / 2,
+          0,
+          o.width,
+          (o.height ?? 2.35) - 1.25,
+          3.3,
+          roof,
+        );
+        box(
+          scene,
+          o.x + o.width / 2,
+          y + (o.height ?? 2.35) + 0.03,
+          0,
+          o.width,
+          0.05,
+          3.3,
+          edge,
+        );
         for (const x of [o.x, o.x + o.width])
           box(scene, x, y + 0.7, -1.5, 0.2, 1.4, 0.2, metal);
       } else if (o.kind === "branch") {
-        // Steps sit behind the lower running lane; jumping commits to the elevated line.
-        for (let i = 0; i < 3; i++)
+        if (o.height) {
+          // Climb face occupies the rear branch lane; the normal line passes in front.
+          const face = o.x + o.width;
           box(
             scene,
-            o.x + 0.8 + i * 1.65,
-            (i + 1) * 0.55,
-            -1.3,
-            2,
-            (i + 1) * 1.1,
-            1.2,
+            face + 1.1,
+            o.height / 2,
+            -1.25,
+            2.2,
+            o.height,
+            2.25,
             roof,
           );
+          box(
+            scene,
+            face + 1.1,
+            o.height + 0.025,
+            -1.25,
+            2.2,
+            0.05,
+            2.25,
+            edge,
+          );
+          box(scene, face - 0.025, 1.25, -1.25, 0.05, 0.12, 1.9, edge);
+          for (let row = 0; row < 4; row++)
+            box(
+              scene,
+              face - 0.015,
+              0.4 + row * 0.7,
+              -1.25,
+              0.03,
+              0.025,
+              2.25,
+              metal,
+            );
+        } else {
+          // Steps sit behind the lower running lane; jumping commits to the elevated line.
+          for (let i = 0; i < 3; i++)
+            box(
+              scene,
+              o.x + 0.8 + i * 1.65,
+              (i + 1) * 0.55,
+              -1.3,
+              2,
+              (i + 1) * 1.1,
+              1.2,
+              roof,
+            );
+        }
       }
       if (o.kind === "gap" || o.kind === "drop") {
         box(scene, o.x - 0.12, y + 0.035, 0, 0.24, 0.06, 4.15, edge);
