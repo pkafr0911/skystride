@@ -445,18 +445,19 @@ test("a missed landing cannot tunnel through the next roof facade", () => {
   assert.ok(g.x < 73.2);
 });
 
-test("technical district sustains more than a minute at maximum flow with all eight vaults", () => {
+test("technical district sustains more than a minute at maximum flow with all four primary vaults", () => {
   assert.ok((TECHNICAL.end - TECHNICAL.start) / 14 >= 60);
   for (const route of ["upper", "lower"]) {
     const segment = obstacles.filter(
       (o) => o.route === route && o.x >= TECHNICAL.start && o.x < TECHNICAL.end,
     );
     assert.ok(segment.length >= 45);
-    assert.equal(
-      new Set(segment.filter((o) => o.kind === "vault").map((o) => o.vault))
-        .size,
-      8,
+    const families = new Set(
+      segment.filter((o) => o.kind === "vault").map((o) => o.vault),
     );
+    for (const vault of ["kong", "dash", "speed", "lazy"] as const)
+      assert.ok(families.has(vault));
+    assert.ok(![...families].some((v) => String(v).startsWith("step")));
     assert.ok(segment.slice(1).every((o, i) => o.x - segment[i].x <= 20));
   }
 });
@@ -563,4 +564,133 @@ test("Kong hand push produces a second lift and a one-time exit impulse", () => 
   }
   assert.ok(pushed);
   assert.ok(maxLift > (o.height ?? 1) + 0.15);
+});
+
+test("climb inputs work beside the visible face, not only before its marker", () => {
+  for (const offset of [4, 1.1, 0.24]) {
+    const wall = obstacles.find((o) => o.kind === "branch" && o.height)!;
+    const g = new Run();
+    g.start();
+    g.x = wall.x + wall.width - offset;
+    g.speed = 10;
+    g.action("up");
+    g.step();
+    assert.equal(g.move, "wall-climb");
+    assert.ok(
+      g.x >= g.previous.x,
+      "late climbs cannot pull the runner backwards",
+    );
+    for (let i = 0; g.traversal && i < 400; i++) g.step();
+    assert.equal(g.traversal, null);
+    assert.equal(g.y, 3.3);
+    assert.equal(g.upper, true);
+    g.action("up");
+    g.step();
+    assert.ok(g.vy > 0, "can jump again immediately on the roof");
+  }
+});
+
+test("airborne wall input uses reachable contact without snapping to the lip", () => {
+  for (const y of [0.8, 2.1]) {
+    const g = new Run();
+    g.start();
+    g.x = 119.4;
+    g.y = y;
+    g.grounded = false;
+    g.action("up");
+    g.step();
+    assert.ok(g.move === "wall-climb" || g.move === "climb");
+    assert.ok(Math.abs(g.x - 119.4) < 0.1);
+    assert.ok(Math.abs(g.y - y) < 0.1);
+    for (let i = 0; g.traversal && i < 400; i++) g.step();
+    assert.equal(g.y, 3.3);
+    assert.equal(g.grounded, true);
+  }
+  const g = new Run();
+  g.start();
+  g.x = 116;
+  g.y = 1.5;
+  g.grounded = false;
+  advance(g, 0.13);
+  g.action("up");
+  g.step();
+  assert.equal(
+    g.traversal,
+    null,
+    "an airborne input far from the wall cannot magnetize to it",
+  );
+});
+
+test("descending onto barriers and ducts gives real support and immediate follow-up jumps", () => {
+  for (const o of [
+    obstacles.find((o) => o.vault === "kong")!,
+    obstacles.find(canMantle)!,
+    obstacles.find((o) => o.kind === "slide" && !o.route && !o.height)!,
+    obstacles.find((o) => o.kind === "vault" && o.route === "upper")!,
+  ]) {
+    const g = new Run();
+    g.start();
+    g.upper = o.route === "upper";
+    const top = (g.upper ? 3.3 : 0) + (o.height ?? 2.35);
+    g.x = o.x + 0.12;
+    g.y = top + 0.015;
+    g.vy = -3;
+    g.grounded = false;
+    g.speed = 6;
+    g.step();
+    assert.equal(g.grounded, true);
+    assert.equal(g.y, top);
+    assert.equal(
+      g.upper,
+      o.route === "upper",
+      "tall ducts must not switch routes",
+    );
+    assert.ok(g.onObstacle());
+    g.action("up");
+    g.step();
+    assert.equal(g.move, "jump");
+    assert.ok(g.y > top && g.vy > 0);
+    assert.equal(g.traversal, null);
+  }
+});
+
+test("mantle tops allow a supported jump or a feet-first edge exit", () => {
+  const o = obstacles.find(canMantle)!;
+  for (const action of ["up", "down"] as const) {
+    const g = new Run();
+    g.start();
+    g.x = o.x - 1.7;
+    g.speed = 8;
+    g.action("up");
+    g.step();
+    for (let i = 0; !g.onObstacle() && g.traversal && i < 300; i++) g.step();
+    assert.ok(g.onObstacle(), "mantle must expose a supported top-out phase");
+    const oldY = g.y;
+    g.action(action);
+    g.step();
+    assert.equal(g.traversal, null);
+    if (action === "up") {
+      assert.equal(g.move, "jump");
+      assert.ok(g.vy > 0 && g.y >= oldY);
+    } else {
+      assert.equal(g.move, "slide");
+      for (let i = 0; g.grounded && i < 100; i++) g.step();
+      assert.equal(g.grounded, false);
+      g.step();
+      assert.ok(g.vy < 0, "edge exits fall under gravity");
+      for (let i = 0; !g.grounded && g.phase === "running" && i < 200; i++)
+        g.step();
+      assert.equal(g.grounded, true);
+      assert.equal(g.y, 0);
+    }
+  }
+});
+
+test("route content removes step vaults and emphasizes the four requested families", () => {
+  const vaults = obstacles.filter((o) => o.kind === "vault");
+  assert.ok(vaults.every((o) => !String(o.vault).startsWith("step")));
+  const primary = vaults.filter((o) =>
+    ["kong", "dash", "speed", "lazy"].includes(o.vault!),
+  );
+  assert.ok(primary.length / vaults.length > 0.9);
 });

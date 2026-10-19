@@ -121,10 +121,12 @@ export default function Skystride() {
     focus();
   };
   const next = game.next();
+  const onTop = Boolean(game.onObstacle());
   const distance = next ? next.x - game.x : Infinity;
   const range = next ? timingRange(next, game.speed) : { near: 0, far: 0 };
-  const cue =
-    next?.kind === "branch"
+  const cue = onTop
+    ? "↑ JUMP AGAIN / ↓ EDGE SLIDE"
+    : next?.kind === "branch"
       ? next.height
         ? "↑ WALL CLIMB / RUN FOR NORMAL"
         : "↑ HARD LINE / RUN FOR NORMAL"
@@ -279,22 +281,26 @@ export default function Skystride() {
                     : ""}
                 </span>
               </div>
-              {next && distance < 23 && !game.traversal && (
+              {(onTop || (next && distance < 23 && !game.traversal)) && (
                 <div
                   className={`${styles.cue} ${distance >= range.near && distance <= range.far ? styles.clean : ""}`}
                 >
                   {cue}
                   <small>
-                    {next
-                      ? `${Math.round(timingWindow(next) * 1000)} MS CLEAN WINDOW`
-                      : ""}
+                    {onTop
+                      ? "TOP CONTACT · CHOOSE YOUR EXIT"
+                      : next
+                        ? `${Math.round(timingWindow(next) * 1000)} MS CLEAN WINDOW`
+                        : ""}
                   </small>
                   <small>
-                    {distance > range.far
-                      ? "READ THE APPROACH"
-                      : distance >= range.near
-                        ? "FLOW WINDOW"
-                        : "COMMIT"}
+                    {onTop
+                      ? "KEEP YOUR MOMENTUM"
+                      : distance > range.far
+                        ? "READ THE APPROACH"
+                        : distance >= range.near
+                          ? "FLOW WINDOW"
+                          : "COMMIT"}
                   </small>
                 </div>
               )}
@@ -346,7 +352,7 @@ export default function Skystride() {
                       ? "Jump near the edge to carry across. Press R or tap below to go again."
                       : game.paused
                         ? "Paused runs remain playable, but cannot set a personal best."
-                        : "Swipe up to jump, vault, or climb a marked wall. Down to slide; down before a drop landing to roll. Build speed, then swipe right for a long jump. Keep your momentum. Find your line."}
+                        : "Swipe up to jump, vault, or climb a marked wall. Down to slide; down before a drop landing to roll. On obstacle tops, swipe up to jump again or down to slide off. Build speed, then swipe right for a long jump. Keep your momentum. Find your line."}
                 </p>
                 {finished && (
                   <div className={styles.splits}>

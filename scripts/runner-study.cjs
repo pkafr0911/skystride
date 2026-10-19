@@ -28,6 +28,55 @@ const samples = [
     landingAge: 1,
   },
 }));
+if (process.argv.includes("--run")) {
+  samples.length = 0;
+  for (const [i, x] of [0, 1.1, 2.2, 3.3].entries())
+    samples.push({
+      title: `SPRINT / PHASE ${i + 1}`,
+      frame: {
+        ...game.frame(),
+        x,
+        speed: 14,
+        landingAge: 1,
+      },
+    });
+}
+if (process.argv.includes("--dash")) {
+  samples.length = 0;
+  const obstacle = obstacles.find((o) => o.vault === "dash");
+  game.x = obstacle.x - 1.9;
+  game.y = obstacle.route === "upper" ? 3.3 : 0;
+  game.upper = obstacle.route === "upper";
+  game.speed = 12;
+  game.action("up");
+  game.step();
+  for (const [title, progress] of [
+    ["TAKEOFF", 0.18],
+    ["FEET LEAD", 0.36],
+    ["PALM PUSH", 0.59],
+    ["RELEASE", 0.75],
+  ]) {
+    while (game.traversal && game.frame().progress < progress) game.step();
+    const frame = game.frame();
+    const base = obstacle.route === "upper" ? 3.3 : 0;
+    samples.push({
+      title,
+      frame: {
+        ...frame,
+        y: frame.y - base,
+        contact: frame.contact && {
+          ...frame.contact,
+          y: frame.contact.y - base,
+        },
+      },
+      obstacle: {
+        x: obstacle.x - game.x,
+        height: obstacle.height,
+        width: obstacle.width,
+      },
+    });
+  }
+}
 if (process.argv.includes("--wall")) {
   samples.length = 0;
   const wall = obstacles.find((o) => o.kind === "branch" && o.height);

@@ -140,13 +140,15 @@ export function runPose(x: number, speed = 12): Pose {
     // Swing from the shoulder with an actual upper-arm/forearm arc. Interpolating
     // arbitrary wrist positions folded both elbows into the ribs at mid-stride.
     const swing = Math.cos(u * Math.PI * 2 - 0.3);
-    const upperAngle = -mix(0.6, 0.9, intensity) * swing;
+    const upperAngle = -0.4 - mix(0.75, 1.25, intensity) * swing;
     const elbow: Point = [
       p.chest[0] - 0.015 + Math.sin(upperAngle) * 0.34,
       p.chest[1] - 0.025 - Math.cos(upperAngle) * 0.34,
       side * 0.2,
     ];
-    const forearmAngle = mix(0.85, 1.15, (swing + 1) / 2);
+    // Bend relative to the upper arm: the forearm travels back with the
+    // shoulder instead of always pointing toward the finish line.
+    const forearmAngle = upperAngle + mix(-0.2, 0.35, (1 - swing) / 2);
     p.elbows[s] = elbow;
     p.hands[s] = [
       elbow[0] + Math.cos(forearmAngle) * 0.34,
@@ -353,25 +355,6 @@ function vaultPose(f: Frame): Pose {
       ];
       carry.footAngles = [-0.7, -0.85];
       break;
-    case "step":
-      carry.hip = [-0.03, 0.86, 0];
-      carry.chest = [0.29, 1.34, 0];
-      carry.head = [0.43, 1.64, 0];
-      carry.feet = [
-        [0.49, 0.58, -0.14],
-        [-0.55, 0.12, 0.14],
-      ];
-      carry.knees = [
-        [0.9, 1, -0.14],
-        [0.3, 0.6, 0.14],
-      ];
-      carry.footAngles = [0.05, -0.65];
-      carry.hands = [
-        [-0.37, 1.15, -0.23],
-        [0.66, 1.47, 0.23],
-      ];
-      Object.assign(plant, blend(basePose(), carry, 0.4));
-      break;
     case "hurdle":
       carry.hip = [-0.12, 0.79, 0];
       carry.chest = [0.29, 1.21, 0];
@@ -466,24 +449,39 @@ function vaultPose(f: Frame): Pose {
       ];
       carry.hands[1] = [0.45, 0.77, 0.25];
       break;
-    case "step-leap":
-      carry.hip = [-0.02, 0.87, 0];
-      carry.chest = [0.29, 1.36, 0];
-      carry.head = [0.42, 1.66, 0];
+    case "dash":
+      // Feet lead; both palms brace behind the hips before the second push.
+      plant.hip = [-0.15, 0.64, 0];
+      plant.chest = [-0.25, 1.08, 0];
+      plant.head = [-0.2, 1.39, 0];
+      plant.feet = [
+        [0.62, 0.48, -0.16],
+        [0.45, 0.42, 0.16],
+      ];
+      carry.hip = [0.07, 0.34, 0];
+      carry.chest = [-0.28, 0.58, 0];
+      carry.head = [-0.29, 0.89, 0];
       carry.feet = [
-        [0.36, 0.78, -0.16],
-        [-0.54, 0.18, 0.16],
+        [0.92, 0.48, -0.16],
+        [0.86, 0.45, 0.16],
       ];
       carry.knees = [
-        [0.95, 1.05, -0.16],
-        [0.3, 0.6, 0.16],
+        [0.51, 0.72, -0.16],
+        [0.48, 0.7, 0.16],
       ];
-      carry.footAngles = [-0.35, -0.85];
       carry.hands = [
-        [0.65, 1.75, -0.24],
-        [-0.41, 1.17, 0.24],
+        [-0.33, 0.02, -0.24],
+        [-0.33, 0.02, 0.24],
       ];
-      Object.assign(plant, blend(basePose(), carry, 0.3));
+      carry.elbows = [
+        [-0.5, 0.34, -0.24],
+        [-0.5, 0.34, 0.24],
+      ];
+      carry.footAngles = [0.12, 0.12];
+      exit.hands = [
+        [-0.42, 0.97, -0.24],
+        [-0.42, 0.97, 0.24],
+      ];
       break;
   }
   const coil = blend(run, plant, 0.7);
@@ -525,24 +523,24 @@ function vaultPose(f: Frame): Pose {
           { at: 0, pose: run },
           { at: 0.18, pose: plant },
           { at: 0.36, pose: carry },
-          { at: 0.59, pose: carry },
+          { at: f.vault === "dash" ? 0.64 : 0.59, pose: carry },
           { at: 0.86, pose: exit },
           { at: 1, pose: run },
         ],
     p,
   );
-  if (f.contact && !["step", "hurdle", "step-leap"].includes(f.vault)) {
+  if (f.contact && f.vault !== "hurdle") {
     const hand: Point = [f.contact.x - f.x, f.contact.y - f.y + 0.025, -0.23];
     const reach = Math.hypot(
       hand[0] - result.chest[0],
       hand[1] - result.chest[1],
     );
     const pin =
-      smooth(0.1, 0.24, p) *
+      (f.vault === "dash" ? smooth(0.28, 0.43, p) : smooth(0.1, 0.24, p)) *
       (1 - smooth(0.61, 0.69, reach)) *
       (1 - smooth(0.65, 0.82, p));
     result.hands[0] = pointMix(result.hands[0], hand, pin);
-    if (f.vault === "kong")
+    if (f.vault === "kong" || f.vault === "dash")
       result.hands[1] = pointMix(
         result.hands[1],
         [hand[0], hand[1], 0.23],
@@ -872,8 +870,15 @@ export function poseFor(f: Frame): Pose {
     case "land":
       return landingPose(f);
     case "jump":
-    case "fall":
       return jumpPose(f);
+    case "fall":
+      return (f.slideExitAge ?? 1) < 0.22
+        ? blend(
+            lowPose(),
+            jumpPose({ ...f, vy: Math.min(-10.5, f.vy) }),
+            smooth(0, 0.22, f.slideExitAge!),
+          )
+        : jumpPose(f);
     case "vault":
       return vaultPose(f);
     case "mantle":

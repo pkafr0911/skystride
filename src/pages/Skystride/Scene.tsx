@@ -69,8 +69,12 @@ export default function Scene({
     const roof = material(0x13213a),
       side = material(0x10203a),
       edge = material(0xf3ae65);
-    const metal = material(0x344456),
+    const metal = material(0x40506a),
       black = material(0x101c2c);
+    // Atmospheric props have a deliberately lighter, quieter value range.
+    const decor = new THREE.MeshBasicMaterial({ color: 0x9797ad });
+    const decorDark = new THREE.MeshBasicMaterial({ color: 0x838ba2 });
+    materials.push(decor, decorDark);
     const chunks = new Map<number, THREE.Group>();
     const chunkFor = (x: number) => {
       const key = Math.floor(x / 80);
@@ -105,10 +109,10 @@ export default function Scene({
       skyline.add(buildings);
       skylineLayers.push(buildings);
       const mat = new THREE.MeshBasicMaterial({
-        color: [0xb3a0ba, 0x9289a7, 0x686e91][layer],
+        color: [0xb9a8bd, 0xa39bb5, 0x9297b0][layer],
       });
       const glass = new THREE.MeshBasicMaterial({
-        color: [0xc4adc0, 0xa69ab5, 0x8587a5][layer],
+        color: [0xc4adc0, 0xada4bc, 0xa0a5bc][layer],
       });
       materials.push(mat, glass);
       for (let i = 0; i < 125; i++) {
@@ -220,6 +224,16 @@ export default function Scene({
           3.3,
           edge,
         );
+        box(
+          scene,
+          o.x + o.width / 2,
+          y + 1.25,
+          1.67,
+          o.width,
+          0.055,
+          0.055,
+          edge,
+        );
         for (const x of [o.x, o.x + o.width])
           box(scene, x, y + 0.7, -1.5, 0.2, 1.4, 0.2, metal);
       } else if (o.kind === "branch") {
@@ -293,14 +307,14 @@ export default function Scene({
     // Rooftop service details, kept behind the playable silhouette.
     for (let i = 0; i < Math.ceil(FINISH / 22); i++) {
       const x = i * 22 - 10;
-      box(scene, x, 1.1, -4, 0.12, 2.2, 0.12, metal);
-      box(scene, x + 3, 1.1, -4, 0.12, 2.2, 0.12, metal);
-      box(scene, x + 1.5, 2.1, -4, 3, 0.1, 0.1, metal);
+      box(scene, x, 1.1, -9, 0.12, 2.2, 0.12, decor);
+      box(scene, x + 3, 1.1, -9, 0.12, 2.2, 0.12, decor);
+      box(scene, x + 1.5, 2.1, -9, 3, 0.1, 0.1, decor);
       if (i % 3 === 0) {
-        box(scene, x + 6, 2.4, -7, 3, 2.7, 3, metal);
+        box(scene, x + 6, 2.4, -12, 3, 2.7, 3, decor);
         for (const offset of [-1, 1])
-          box(scene, x + 6 + offset, 0.7, -7, 0.15, 1.4, 2, black);
-        box(scene, x + 6, 3.8, -7, 3.1, 0.1, 3.1, metal);
+          box(scene, x + 6 + offset, 0.7, -12, 0.15, 1.4, 2, decorDark);
+        box(scene, x + 6, 3.8, -12, 3.1, 0.1, 3.1, decor);
       }
     }
     for (const x of [SECTOR, SECTOR * 2, FINISH]) {
@@ -310,33 +324,33 @@ export default function Scene({
     // Water towers, pipework and a distant bridge echo the supplied silhouette concept.
     for (const x of [-10, 104, 280, 391]) {
       for (const offset of [-1.5, 1.5]) {
-        box(scene, x + offset, 3, -5.8, 0.2, 6, 0.2, black);
+        box(scene, x + offset, 3, -12, 0.2, 6, 0.2, decorDark);
         const brace = box(
           scene,
           x,
           2.7 + offset * 0.5,
-          -5.8,
+          -12,
           3.7,
           0.12,
           0.12,
-          black,
+          decorDark,
         );
         brace.rotation.z = offset > 0 ? 0.65 : -0.65;
       }
-      const tank = new THREE.Mesh(cylinderGeometry, roof);
+      const tank = new THREE.Mesh(cylinderGeometry, decorDark);
       tank.scale.set(2, 3.4, 2);
-      tank.position.set(x, 7, -5.8);
+      tank.position.set(x, 7, -12);
       scene.add(tank);
-      box(scene, x, 5.2, -5.8, 4.15, 0.16, 4.15, black);
-      box(scene, x + 2.4, 3.5, -5.8, 0.2, 7, 0.2, metal);
-      box(scene, x + 1.8, 6.9, -5.8, 1.4, 0.2, 0.2, metal);
+      box(scene, x, 5.2, -12, 4.15, 0.16, 4.15, decorDark);
+      box(scene, x + 2.4, 3.5, -12, 0.2, 7, 0.2, decor);
+      box(scene, x + 1.8, 6.9, -12, 1.4, 0.2, 0.2, decor);
     }
     const bridge = new THREE.Group();
     skyline.add(bridge);
-    box(bridge, 140, 1, -47, 150, 0.35, 1, metal);
+    box(bridge, 140, 1, -47, 150, 0.35, 1, decor);
     for (let x = 70; x < 215; x += 10) {
-      box(bridge, x, -3, -47, 0.6, 8, 0.6, metal);
-      const brace = box(bridge, x + 4.5, -0.4, -47, 9, 0.13, 0.15, metal);
+      box(bridge, x, -3, -47, 0.6, 8, 0.6, decor);
+      const brace = box(bridge, x + 4.5, -0.4, -47, 9, 0.13, 0.15, decor);
       brace.rotation.z = 0.3;
     }
     // Batch static boxes by material inside spatial chunks. Distant districts are culled.

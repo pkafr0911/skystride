@@ -171,8 +171,8 @@ test("all vaults remain finite through contact, clearance and release", () => {
   }
   actor.dispose();
 });
-test("step-through vaults keep the leading knee bent forward", () => {
-  for (const vault of ["step", "step-leap", "safety"] as const) {
+test("safety vaults keep the leading knee bent forward", () => {
+  for (const vault of ["safety"] as const) {
     const p = poseFor({
       ...new Run().frame(),
       move: "vault",
@@ -361,4 +361,111 @@ test("high-wall climb plants a foot, holds both hands at the lip and clears the 
     g.step();
   }
   assert.ok(planted && caught > 8);
+});
+
+test("running wrists swing behind and ahead of the torso in opposing phases", () => {
+  for (const speed of [6, 10, 14]) {
+    const offsets: number[][] = [[], []];
+    const hips: number[][] = [[], []];
+    for (let i = 0; i < 100; i++) {
+      const p = runPose((STRIDE * i) / 100, speed);
+      for (const side of [0, 1]) {
+        offsets[side].push(p.hands[side][0] - p.chest[0]);
+        hips[side].push(p.hands[side][0] - p.hip[0]);
+        const upper = new THREE.Vector3(...p.elbows[side]).sub(
+          new THREE.Vector3(
+            p.chest[0] - 0.015,
+            p.chest[1] - 0.025,
+            side ? 0.2 : -0.2,
+          ),
+        );
+        assert.ok(Math.abs(upper.length() - 0.34) < 1e-6);
+      }
+      if (Math.abs(Math.cos((i / 100) * Math.PI * 2 - 0.3)) > 0.8)
+        assert.ok(
+          offsets[0][i] * offsets[1][i] < 0,
+          "one arm must drive back while the other drives forward",
+        );
+    }
+    for (const side of [0, 1]) {
+      assert.ok(Math.min(...offsets[side]) < -0.22);
+      assert.ok(Math.max(...offsets[side]) > 0.3);
+      assert.ok(Math.min(...hips[side]) < 0, "rear wrist must pass the hip");
+    }
+  }
+});
+
+test("dash leads with both feet and braces both palms behind the hips", () => {
+  const f = {
+    ...new Run().frame(),
+    move: "vault" as const,
+    vault: "dash" as const,
+    progress: 0.5,
+  };
+  const p = poseFor(f);
+  for (const side of [0, 1]) {
+    assert.ok(p.feet[side][0] > p.hip[0] + 0.6);
+    assert.ok(p.hands[side][0] < p.hip[0] - 0.2);
+  }
+  const supported = poseFor({
+    ...f,
+    x: 0.3,
+    y: 1.1,
+    contact: { x: 0.1, y: 1.1 },
+  });
+  for (const hand of supported.hands)
+    assert.ok(
+      Math.abs(hand[1] - 0.025) < 0.03,
+      "palms contact the support during the push",
+    );
+});
+
+test("dash wrists reach actual narrow and wide obstacle contact points", () => {
+  for (const o of [
+    obstacles.find((o) => o.vault === "dash" && o.width < 1)!,
+    obstacles.find((o) => o.vault === "dash" && o.width > 2)!,
+  ]) {
+    const g = new Run();
+    g.start();
+    g.x = o.x - 1.9;
+    g.speed = 12;
+    g.upper = o.route === "upper";
+    g.y = g.upper ? 3.3 : 0;
+    g.action("up");
+    g.step();
+    let contacts = 0;
+    for (let i = 0; g.traversal && i < 200; i++) {
+      const f = g.frame(),
+        p = poseFor(f);
+      if (
+        p.hands.every(
+          (hand) =>
+            Math.hypot(
+              hand[0] + f.x - f.contact!.x,
+              hand[1] + f.y - f.contact!.y - 0.025,
+            ) < 0.055,
+        )
+      )
+        contacts++;
+      g.step();
+    }
+    assert.ok(
+      contacts >= 2,
+      `dash width ${o.width}: ${contacts} supported ticks`,
+    );
+  }
+});
+
+test("a feet-first slide exit blends into a landing reach without a mid-air running pose", () => {
+  const f = {
+    ...new Run().frame(),
+    move: "fall" as const,
+    slideExitAge: 0,
+    vy: 0,
+  };
+  const start = poseFor(f),
+    end = poseFor({ ...f, slideExitAge: 0.2, vy: -7 });
+  assert.ok(start.hip[1] < 0.4);
+  assert.ok(end.feet.every((foot) => foot[0] > end.hip[0]));
+  assert.ok(end.hip[1] > start.hip[1]);
 });

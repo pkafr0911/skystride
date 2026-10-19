@@ -42,8 +42,8 @@ Expected URL after deployment: https://pkafr0911.github.io/skystride/
 
 ## Controls
 
-- Up / W / Space: jump anywhere; contextual vault, low-duct climb, wall step or high-wall climb near a suitable obstacle.
-- Down / S: slide; press before landing from a drop to roll.
+- Up / W / Space: jump from a roof or obstacle top; contextual vault, low-duct climb, wall step or high-wall climb near a suitable obstacle. Climb input remains available up to the visible wall face.
+- Down / S: slide; on an obstacle top, slide off its edge with a prepared landing roll. In the air, press before landing from a drop to roll.
 - Right / D: long jump at 11.5 m/s or faster; a normal jump below that speed. Jump distance carries current momentum, so build speed before a wide gap.
 - R: restart. Escape: pause.
 - Touch: swipe up/down/right; actions trigger before finger release. Swipe sensitivity is adjustable in the course menu.

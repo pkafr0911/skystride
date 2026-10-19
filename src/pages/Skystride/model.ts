@@ -1,7 +1,7 @@
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v6";
+export const VERSION = "sunset-relay-v7";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -25,14 +25,13 @@ export type Move =
   | "stumble"
   | "mantle";
 export type Vault =
-  | "step"
+  | "dash"
   | "hurdle"
   | "speed"
   | "one-hand"
   | "safety"
   | "lazy"
-  | "kong"
-  | "step-leap";
+  | "kong";
 export type Obstacle = {
   x: number;
   width: number;
@@ -42,7 +41,7 @@ export type Obstacle = {
   vault?: Vault;
 };
 const opening: Obstacle[] = [
-  { x: 27, width: 0.7, height: 0.5, kind: "vault", vault: "step" },
+  { x: 27, width: 0.7, height: 0.5, kind: "vault", vault: "speed" },
   { x: 46, width: 0.9, height: 0.8, kind: "vault", vault: "hurdle" },
   { x: 67, width: 6.2, kind: "gap" },
   { x: 91, width: 5.5, kind: "slide" },
@@ -85,7 +84,7 @@ const opening: Obstacle[] = [
     width: 2.6,
     height: 1.2,
     kind: "vault",
-    vault: "step-leap",
+    vault: "dash",
     route: "upper",
   },
   { x: 375, width: 9, kind: "drop", route: "upper" },
@@ -101,14 +100,14 @@ const circuit: Obstacle[] = [
   { x: 1450, width: 9, kind: "drop", route: "upper" },
 ];
 const variants: Vault[] = [
-  "step",
-  "hurdle",
+  "kong",
+  "dash",
   "speed",
-  "one-hand",
-  "safety",
   "lazy",
   "kong",
-  "step-leap",
+  "dash",
+  "speed",
+  "lazy",
 ];
 for (let i = 0; i < 48; i++) {
   const x = 512 + i * 19;
@@ -177,7 +176,9 @@ function denseLane(start: number, end: number, route: "upper" | "lower") {
               height: 0.65 + (n % 2) * 0.15,
               kind: "vault",
               vault:
-                route === "lower" ? "one-hand" : n % 2 ? "hurdle" : "speed",
+                variants[
+                  (i + n + (route === "upper" ? 1 : 0)) % variants.length
+                ],
               route,
             },
       );
@@ -236,6 +237,27 @@ export const surfaces: Surface[] = [
   ...cut(-30, FINISH + 25, 0, false),
   ...upperPlatforms.flatMap((p) => cut(p.start, p.end, 3.3, true)),
 ];
+/** Solid obstacle tops are support surfaces even after their scoring event is handled. */
+export const obstacleTops = obstacles.flatMap((o, index) =>
+  o.kind === "vault" || o.kind === "slide"
+    ? [
+        {
+          start: o.x,
+          end: o.x + o.width,
+          y:
+            (o.route === "upper" ? 3.3 : 0) +
+            (o.height ?? (o.kind === "slide" ? 2.35 : 1)),
+          index,
+          upper: o.route === "upper",
+        },
+      ]
+    : [],
+);
+// Build once; the 120 Hz loop must not allocate and filter the full course per tick.
+const supportSurfaces = {
+  lower: [...surfaces, ...obstacleTops.filter((s) => !s.upper)],
+  upper: [...surfaces, ...obstacleTops.filter((s) => s.upper)],
+};
 export function ground(x: number, upper: boolean) {
   return upper && upperPlatforms.some((p) => x >= p.start && x <= p.end)
     ? 3.3
@@ -288,14 +310,13 @@ const moves: Move[] = [
   "mantle",
 ];
 const vaults: Vault[] = [
-  "step",
+  "dash",
   "hurdle",
   "speed",
   "one-hand",
   "safety",
   "lazy",
   "kong",
-  "step-leap",
 ];
 export function readRecord(raw: string | null): RecordRun | null {
   try {
@@ -575,7 +596,11 @@ export class Run {
             : "WALL STEP · HIGH LINE"
           : `${vault.replace("-", " ").toUpperCase()} · FLOW`,
       );
-    else this.recover("SAFETY VAULT · KEEP MOVING", 1.6);
+    else
+      this.recover(
+        wall ? "WALL CLIMB · LATE APPROACH" : "SAFETY VAULT · KEEP MOVING",
+        1.6,
+      );
     this.traversal = {
       start: this.x,
       end,
@@ -605,9 +630,49 @@ export class Run {
     this.vy = 0;
     this.setMove(move);
   }
+  onObstacle() {
+    return obstacleTops.find(
+      (s) =>
+        s.upper === this.upper &&
+        this.x >= s.start &&
+        this.x < s.end &&
+        Math.abs(this.y - s.y) < 0.16 &&
+        (this.grounded || this.traversal?.move === "mantle"),
+    );
+  }
+  private jump(action: Action) {
+    this.launchX = this.x;
+    this.launchY = this.y;
+    this.lead = (this.x / 4.4) % 1 < 0.5 ? 1 : 0;
+    this.longJump = action === "forward" && this.speed >= LONG_JUMP_SPEED;
+    this.vy = JUMP_SPEED + (this.longJump ? 1.2 : 0);
+    if (action === "forward")
+      this.say(
+        this.longJump
+          ? "LONG JUMP · CARRY YOUR SPEED"
+          : "BUILD SPEED FOR A LONG JUMP",
+      );
+    this.grounded = false;
+    this.lastGround = -1;
+    this.dropFrom = this.y;
+    this.setMove("jump");
+  }
   private tryAction(action: Action): boolean {
     const t = this.traversal;
     if (t) {
+      const top = this.onObstacle();
+      const toppedOut =
+        (t.move === "wall-climb" || t.move === "climb") &&
+        t.elapsed / t.duration >= 0.92 &&
+        this.y >= t.y1 - 0.025 &&
+        this.x >= (t.contact?.x ?? Infinity);
+      if (top || toppedOut) {
+        this.traversal = null;
+        this.y = top?.y ?? t.y1;
+        this.grounded = true;
+        this.lastGround = this.time;
+        return this.tryAction(action);
+      }
       if (t.move === "catch" && action === "down") {
         this.traversal = null;
         this.speed = 6;
@@ -620,6 +685,64 @@ export class Run {
         return true;
       }
       return false;
+    }
+    const top = this.grounded ? this.onObstacle() : undefined;
+    if (top) {
+      this.handled.add(top.index);
+      if (action !== "down") this.jump(action);
+      else {
+        // A low feet-first exit runs off the actual edge, then falls under gravity.
+        this.rollUntil =
+          this.time + (top.end - this.x) / Math.max(1, this.speed) + 1.2;
+        this.speed = Math.min(this.speed, Math.max(6, this.speed - 0.5));
+        this.setMove("slide", 0.62);
+        this.say("EDGE SLIDE · ROLL READY");
+      }
+      return true;
+    }
+    // Branch markers start before the actual face. Accept input all the way to
+    // the wall, including a reachable airborne catch, rather than ending at the marker.
+    const wall =
+      action !== "down" && !this.upper
+        ? obstacles.find(
+            (o, i) =>
+              o.kind === "branch" &&
+              !this.handled.has(i) &&
+              this.x >= o.x - timingRange(o, this.speed).far &&
+              this.x <= o.x + o.width - 0.2 &&
+              (this.grounded ||
+                (this.y >= 0 && this.y < 3.3 && this.x >= o.x + o.width - 0.8)),
+          )
+        : undefined;
+    if (wall) {
+      if (!this.grounded && this.y >= 1.65) {
+        this.handled.add(obstacles.indexOf(wall));
+        this.traversal = {
+          start: this.x,
+          end: wall.x + wall.width + 0.7,
+          y0: this.y,
+          y1: 3.3,
+          elapsed: 0,
+          duration: 0.42,
+          arc: 0,
+          move: "climb",
+          vault: "safety",
+          contact: { x: wall.x + wall.width, y: 3.3 },
+        };
+        this.vy = 0;
+        this.setMove("climb");
+        this.say("WALL CATCH · PULL UP");
+      } else {
+        this.traverse(
+          wall,
+          wall.height ? "wall-climb" : "wall",
+          3.3,
+          0.8,
+          this.x <= wall.x,
+        );
+      }
+      this.upper = true;
+      return true;
     }
     if (action === "down") {
       if (!this.grounded) {
@@ -649,14 +772,7 @@ export class Run {
       d >= -0.1 &&
       d <= timingRange(o, this.speed).far
     ) {
-      this.traverse(
-        o,
-        "mantle",
-        this.y,
-        (o.height ?? 1.65) + 0.12,
-        false,
-        "safety",
-      );
+      this.traverse(o, "mantle", this.y, o.height ?? 1.65, false, "safety");
       this.traversal!.contact!.y = this.y + (o.height ?? 1.65);
     } else if (
       o?.kind === "vault" &&
@@ -666,14 +782,7 @@ export class Run {
     ) {
       const clean = d >= 0.55;
       const variant = clean ? o.vault || "speed" : "safety";
-      this.traverse(
-        o,
-        "vault",
-        this.y,
-        (o.height || 1) + (variant === "step-leap" ? 0.7 : 0.04),
-        clean,
-        variant,
-      );
+      this.traverse(o, "vault", this.y, (o.height || 1) + 0.04, clean, variant);
     } else if (
       o?.kind === "branch" &&
       d >= -0.1 &&
@@ -688,25 +797,11 @@ export class Run {
         if (d >= range.near && d <= range.far)
           this.timed.add(obstacles.indexOf(o));
       }
-      this.launchX = this.x;
-      this.launchY = this.y;
-      this.lead = (this.x / 4.4) % 1 < 0.5 ? 1 : 0;
-      this.longJump = action === "forward" && this.speed >= LONG_JUMP_SPEED;
-      this.vy = JUMP_SPEED + (this.longJump ? 1.2 : 0);
-      if (action === "forward")
-        this.say(
-          this.longJump
-            ? "LONG JUMP · CARRY YOUR SPEED"
-            : "BUILD SPEED FOR A LONG JUMP",
-        );
-      this.grounded = false;
-      this.lastGround = -1;
-      this.dropFrom = this.y;
-      this.setMove("jump");
+      this.jump(action);
     }
     return true;
   }
-  private land(y: number) {
+  private land(y: number, upper = y > 2) {
     const impact = -this.vy;
     this.impact = impact;
     this.landX = this.x;
@@ -715,7 +810,7 @@ export class Run {
     this.vy = 0;
     this.grounded = true;
     this.lastGround = this.time;
-    this.upper = y > 2;
+    this.upper = upper;
     if (impact > 14 || this.dropFrom - y > 2) {
       if (this.rollUntil >= this.time) {
         this.setMove("roll", 0.48);
@@ -750,11 +845,13 @@ export class Run {
       this.vy -= GRAVITY * (this.vy < 0 ? 1.18 : 1) * STEP;
       this.y += this.vy * STEP;
     }
-    const support = surfaces.find(
+    const supports = supportSurfaces[this.upper ? "upper" : "lower"];
+    const support = supports.find(
       (s) =>
         this.x >= s.start && this.x < s.end && Math.abs(s.y - this.y) < 0.025,
     );
     if (this.grounded && !support) {
+      if (this.move === "slide") this.slideExitAt = this.time;
       this.launchX = oldX;
       this.launchY = this.y;
       this.grounded = false;
@@ -779,14 +876,19 @@ export class Run {
       }
     }
     if (!this.grounded && this.vy <= 0) {
-      const landing = surfaces
+      const landing = supports
         .filter(
           (s) =>
             this.x >= s.start && this.x < s.end && oldY >= s.y && this.y <= s.y,
         )
         .sort((a, b) => b.y - a.y)[0];
-      if (landing) this.land(landing.y);
-      else if (this.time - this.jumpIntent < 0.18) {
+      if (landing) {
+        this.land(
+          landing.y,
+          "upper" in landing ? Boolean(landing.upper) : landing.y > 2,
+        );
+        if ("index" in landing) this.handled.add(Number(landing.index));
+      } else if (this.time - this.jumpIntent < 0.18) {
         const lip = surfaces.find(
           (s) =>
             oldX < s.start &&
@@ -999,30 +1101,36 @@ export class Run {
           t.y0 +
           (t.y1 - t.y0) * Math.min(1, p / 0.78) +
           Math.sin(Math.PI * p) * t.arc;
+      if (t.move === "climb") {
+        const lift = clamp(p / 0.72, 0, 1);
+        const over = clamp((p - 0.72) / 0.28, 0, 1);
+        this.y = t.y0 + (t.y1 - t.y0) * lift * lift * (3 - 2 * lift);
+        this.x = t.start + (t.end - t.start) * over * over * (3 - 2 * over);
+      }
       if (t.move === "wall-climb" && t.contact) {
         const ease = (v: number) => {
           const u = clamp(v, 0, 1);
           return u * u * (3 - 2 * u);
         };
         const face = t.contact.x,
-          lip = t.contact.y;
+          lip = t.contact.y,
+          gripX = Math.max(t.start, face - 0.55),
+          gripY = Math.min(lip - 1.65, t.y0 + 0.35);
         if (p < 0.35) {
           const u = ease(p / 0.35);
-          this.x = t.start + (face - 0.55 - t.start) * u;
-          this.y = t.y0 + 0.35 * u;
+          this.x = t.start + (gripX - t.start) * u;
+          this.y = t.y0 + (gripY - t.y0) * u;
         } else if (p < 0.52) {
-          this.x = face - 0.55;
-          this.y =
-            t.y0 + 0.35 + (lip - 1.65 - t.y0 - 0.35) * ease((p - 0.35) / 0.17);
+          this.x = gripX;
+          this.y = gripY + (lip - 1.65 - gripY) * ease((p - 0.35) / 0.17);
         } else if (p < 0.62) {
-          this.x = face - 0.55;
+          this.x = gripX;
           this.y = lip - 1.65 - 0.06 * Math.sin((Math.PI * (p - 0.52)) / 0.1);
         } else if (p < 0.82) {
-          this.x = face - 0.55;
+          this.x = gripX;
           this.y = lip - 1.65 + 1.1 * ease((p - 0.62) / 0.2);
         } else {
-          this.x =
-            face - 0.55 + (t.end - face + 0.55) * ease((p - 0.82) / 0.18);
+          this.x = gripX + (t.end - gripX) * ease((p - 0.82) / 0.18);
           this.y = lip - 0.55 + 0.55 * ease((p - 0.82) / 0.1);
         }
       }

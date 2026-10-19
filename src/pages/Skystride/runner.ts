@@ -138,7 +138,7 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
     pose(f: Frame, time: number, dt: number) {
       const p = poseFor(f);
       const wallLane =
-        f.move === "wall-climb"
+        f.move === "wall-climb" || (f.move === "climb" && f.contact?.y === 3.3)
           ? Math.sin((Math.PI * Math.min(1, f.progress / 0.18)) / 2) *
             (1 - clamp((f.progress - 0.92) / 0.08))
           : 0;
