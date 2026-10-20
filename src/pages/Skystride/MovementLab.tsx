@@ -1,78 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { Frame, obstacles, Run, STEP, canMantle } from "./model";
+import { Frame, STEP } from "./model";
+import { options, Preview, framesFor, previewObstacles } from "./lab-model";
+import { techniques, isSwing, Technique } from "./combos";
+import { creativeObstacle } from "./obstacle-mesh";
 import { makeRunner } from "./runner";
 import { interpolateFrame, motionPhase } from "./motion";
 import styles from "./styles.less";
-
-const options = [
-  "run",
-  "jump",
-  "long-jump",
-  "dash",
-  "hurdle",
-  "speed",
-  "one-hand",
-  "safety",
-  "lazy",
-  "kong",
-  "slide",
-  "mantle",
-  "wall",
-  "wall-climb",
-  "roll",
-  "catch",
-  "landing",
-] as const;
-type Preview = (typeof options)[number];
-function framesFor(move: Preview, entrySpeed: number): Frame[] {
-  const g = new Run();
-  g.start();
-  g.speed = entrySpeed;
-  const o = obstacles.find((item) =>
-    move === "mantle" ? canMantle(item) : item.vault === move,
-  );
-  if (o) {
-    g.x = o.x - 2;
-    g.y = o.route === "upper" ? 3.3 : 0;
-    g.upper = o.route === "upper";
-  }
-  if (move === "slide") g.x = 88.8;
-  if (move === "wall") g.x = 288;
-  if (move === "wall-climb") g.x = 113;
-  if (move === "roll") {
-    g.x = 196;
-    g.y = 3.3;
-    g.upper = true;
-  }
-  if (move === "landing") {
-    g.x = 196;
-    g.y = 3.3;
-    g.upper = true;
-  }
-  if (move === "catch") {
-    g.x = 70;
-    g.grounded = false;
-  }
-  const frames: Frame[] = [];
-  for (let tick = 0; tick < (move === "wall-climb" ? 330 : 210); tick++) {
-    if (tick === 12 && (move === "jump" || move === "long-jump"))
-      g.speed = entrySpeed;
-    if (
-      tick === 12 &&
-      (o || move === "jump" || move === "wall" || move === "wall-climb")
-    )
-      g.action("up");
-    if (tick === 12 && move === "long-jump") g.action("forward");
-    if (tick === 26 && move === "catch") g.action("up");
-    if (tick === 8 && move === "slide") g.action("down");
-    if (move === "roll" && !g.grounded && g.y < 2.5 && g.y > 1)
-      g.action("down");
-    g.step();
-    frames.push(g.frame());
-  }
-  return frames;
-}
 
 /** Isolated animation inspection uses the same simulation and runner as the playable course. */
 export default function MovementLab() {
@@ -83,6 +17,7 @@ export default function MovementLab() {
   const [slow, setSlow] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [entrySpeed, setEntrySpeed] = useState(12);
+  const [releaseAt, setReleaseAt] = useState(0.55);
   const [phase, setPhase] = useState("");
   const progress = useRef(0);
   const controls = useRef({ playing, scrub, slow, sheet });
@@ -99,7 +34,7 @@ export default function MovementLab() {
     scene.add(light);
     const camera = new THREE.OrthographicCamera(-6, 6, 4, -3, 0.1, 100);
     const actor = makeRunner(scene),
-      samples = framesFor(move, entrySpeed);
+      samples = framesFor(move, entrySpeed, releaseAt);
     const studies = Array.from({ length: 5 }, () => makeRunner(scene));
     const environment = new THREE.Group();
     scene.add(environment);
@@ -113,40 +48,55 @@ export default function MovementLab() {
     );
     const atProgress = (kind: Frame["move"], value: number) =>
       first((f) => f.move === kind && f.progress >= value, 160);
-    const keys =
-      move === "run"
-        ? [0, 9, 17, 26, 36]
-        : move === "jump" || move === "long-jump"
-          ? [13, 21, 43, 89, landing]
-          : move === "landing"
-            ? [
-                Math.max(0, landing - 12),
-                Math.max(0, landing - 5),
-                landing,
-                landing + 9,
-                landing + 28,
-              ]
-            : move === "roll"
-              ? [0, 0.2, 0.4, 0.7, 0.98].map((p) => atProgress("roll", p))
-              : move === "catch"
-                ? [
-                    atProgress("catch", 0),
-                    ...[0.1, 0.4, 0.7, 0.98].map((p) => atProgress("climb", p)),
-                  ]
-                : [0, 0.18, 0.4, 0.7, 0.97].map((p) =>
-                    atProgress(
-                      move === "wall"
-                        ? "wall"
-                        : move === "wall-climb"
-                          ? "wall-climb"
-                          : move === "slide"
-                            ? "slide"
-                            : move === "mantle"
-                              ? "mantle"
-                              : "vault",
-                      p,
-                    ),
-                  );
+    const keys = isSwing(move as Technique)
+      ? [
+          atProgress("special", 0),
+          atProgress("special", 0.2),
+          atProgress("special", 0.4),
+          first((f) => f.move === "jump", samples.length - 1),
+          landing,
+        ]
+      : move.startsWith("combo:")
+        ? previewObstacles(move).map((o) => first((f) => f.x >= o.x, 0))
+        : move === "run"
+          ? [0, 9, 17, 26, 36]
+          : move === "jump" || move === "long-jump"
+            ? [13, 21, 43, 89, landing]
+            : move === "landing"
+              ? [
+                  Math.max(0, landing - 12),
+                  Math.max(0, landing - 5),
+                  landing,
+                  landing + 9,
+                  landing + 28,
+                ]
+              : move === "roll"
+                ? [0, 0.2, 0.4, 0.7, 0.98].map((p) => atProgress("roll", p))
+                : move === "catch"
+                  ? [
+                      atProgress("catch", 0),
+                      ...[0.1, 0.4, 0.7, 0.98].map((p) =>
+                        atProgress("climb", p),
+                      ),
+                    ]
+                  : [0, 0.18, 0.4, 0.7, 0.97].map((p) =>
+                      atProgress(
+                        techniques.includes(move as Technique)
+                          ? "special"
+                          : move === "wall-run" || move === "dive"
+                            ? move
+                            : move === "wall"
+                              ? "wall"
+                              : move === "wall-climb"
+                                ? "wall-climb"
+                                : move === "slide"
+                                  ? "slide"
+                                  : move === "mantle"
+                                    ? "mantle"
+                                    : "vault",
+                        p,
+                      ),
+                    );
     const geometry = new THREE.BoxGeometry(1, 1, 1),
       roof = new THREE.MeshStandardMaterial({ color: 0x14243e }),
       amber = new THREE.MeshBasicMaterial({ color: 0xffc56e });
@@ -162,9 +112,8 @@ export default function MovementLab() {
       m.scale.set(w, h, 2.5);
       environment.add(m);
     };
-    const o = obstacles.find((item) =>
-        move === "mantle" ? canMantle(item) : item.vault === move,
-      ),
+    const previewItems = previewObstacles(move),
+      o = previewItems[0],
       base = o?.route === "upper" ? 3.3 : 0;
     const start = samples[0].x;
     if (move === "catch") {
@@ -174,18 +123,45 @@ export default function MovementLab() {
       box(191, 1.3, 8, 4);
       box(206, -2, 22, 4);
     } else {
-      box(start + 8, base - 2, 40, 4);
-      box(start + 8, base, 40, 0.035, amber);
-    }
-    if (o) {
-      const bottom = o.kind === "slide" ? 1.25 : 0;
-      box(
-        o.x + o.width / 2,
-        base + (bottom + o.height!) / 2,
-        o.width,
-        o.height! - bottom,
+      const floorLength = Math.max(
+        40,
+        (previewItems.at(-1)?.x ?? start) - start + 18,
       );
-      box(o.x + o.width / 2, base + o.height!, o.width, 0.045, amber);
+      const gaps = previewItems.filter((item) => isSwing(item.technique));
+      let cursor = start - 8;
+      const floorEnd = start + floorLength - 8;
+      for (const gap of [...gaps, { x: floorEnd, width: 0 }]) {
+        if (gap.x > cursor) {
+          box((cursor + gap.x) / 2, base - 2, gap.x - cursor, 4);
+          box((cursor + gap.x) / 2, base, gap.x - cursor, 0.035, amber);
+        }
+        cursor = gap.x + gap.width + 1.4;
+      }
+    }
+    const cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
+    for (const o of previewItems) {
+      if (o.feature) {
+        environment.add(
+          creativeObstacle(o, {
+            box: geometry,
+            cylinder,
+            face: roof,
+            dark: roof,
+            trim: roof,
+            amber,
+            panel: roof,
+          }),
+        );
+      } else if (o) {
+        const bottom = o.kind === "slide" ? 1.25 : 0;
+        box(
+          o.x + o.width / 2,
+          base + (bottom + o.height!) / 2,
+          o.width,
+          o.height! - bottom,
+        );
+        box(o.x + o.width / 2, base + o.height!, o.width, 0.045, amber);
+      }
     }
     if (move === "slide") box(93.75, 1.8, 5.5, 1.1);
     if (move === "wall" || move === "wall-climb") {
@@ -271,12 +247,13 @@ export default function MovementLab() {
       actor.dispose();
       studies.forEach((study) => study.dispose());
       geometry.dispose();
+      cylinder.dispose();
       roof.dispose();
       amber.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [move, entrySpeed]);
+  }, [move, entrySpeed, releaseAt]);
   return (
     <main
       className={styles.lab}
@@ -301,7 +278,7 @@ export default function MovementLab() {
         <a href="./" style={{ color: "#ffca89" }}>
           ← Skystride
         </a>
-        <strong>MOVEMENT STUDY</strong>
+        <strong>MOVEMENT & COMBO STUDY</strong>
         <label>
           Move{" "}
           <select
@@ -313,7 +290,9 @@ export default function MovementLab() {
             }}
           >
             {options.map((name) => (
-              <option key={name}>{name}</option>
+              <option key={name} value={name}>
+                {name.startsWith("combo:") ? `CHAIN · ${name.slice(6)}` : name}
+              </option>
             ))}
           </select>
         </label>
@@ -326,6 +305,22 @@ export default function MovementLab() {
         >
           {playing ? "Freeze" : "Play"}
         </button>
+        <label>
+          Bar release{" "}
+          <select
+            aria-label="Bar release"
+            value={releaseAt}
+            onChange={(e) => {
+              setReleaseAt(Number(e.target.value));
+              setScrub(0);
+            }}
+          >
+            <option value={0.4}>Early</option>
+            <option value={0.55}>Normal</option>
+            <option value={0.7}>Late</option>
+            <option value={1}>Automatic exit</option>
+          </select>
+        </label>
         <label>
           Entry speed {entrySpeed.toFixed(1)} m/s
           <input

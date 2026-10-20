@@ -40,6 +40,12 @@ Expected URL after deployment: https://pkafr0911.github.io/skystride/
 
 `npm run build` instead targets `/` for root-domain hosting. The `/` route is the game; `/movement-lab` is the animation study with slow motion and pose scrubbing. No deployment is triggered by local setup; `npm run deploy` is the explicit publishing step.
 
+## Creative rooftop encounters
+
+Sunset Relay includes split ventilation banks, low/high pipe crossings, solar launch ramps and billboard openings. Early jumps open top routes; close Up inputs perform contextual vaults. Ramp landings need a timed roll. The first new encounters start at 217 m and recur across later blocks.
+
+See the [obstacle geometry preview](docs/creative-obstacles.png) and [movement/course notes](docs/game-design.md). Course v8 keeps earlier personal bests separate.
+
 ## Controls
 
 - Up / W / Space: jump from a roof or obstacle top; contextual vault, low-duct climb, wall step or high-wall climb near a suitable obstacle. Climb input remains available up to the visible wall face.
@@ -55,3 +61,9 @@ See [game notes](docs/game-design.md) for mechanics, performance decisions, and 
 Character asset: `public/models/skystride-runner.glb`. Regenerate from the live geometry with `node scripts/export-runner.cjs`.
 
 The runner uses an original dark athletic silhouette with continuous limb surfaces and procedural contact animation. The movement lab includes an entry-speed slider, long-jump preview, and high-wall climb study. `node scripts/runner-study.cjs --wall` exports mesh triangles for offline inspection of the wall-climb poses.
+
+Creative course encounters include ventilation chains, solar launch ramps, tank cradles, wall-run billboards, pipe crossings, broken bridges, construction windows, greenhouses, suspended scaffolds and staggered balconies. Swipe Up for contextual contacts/climbs; swipe Right near a window for a fast dive or near a tank for its service platform. New wall-run and dive previews are in the movement lab. See the v9 section of the game notes for animation phases and route choices.
+
+Combo update: the technical district includes 20 named five-contact chains and 18 new procedural parkour profiles. In the movement lab, select an individual technique or a `CHAIN · …` preview; adjust entry speed and bar-release timing, scrub, freeze or inspect the pose sheet. Chain previews use scripted inputs through the same simulation as gameplay. Right releases a bar contact into flight; Down offers a controlled drop; Up tops out a cat catch. See the v13 game notes for current scope and limitations.
+
+Bar crossings (v14): jump into hand reach, catch, then release across a real roof gap. Movement-lab previews include the same gaps and airborne approach; walking into a bar no longer starts the move.

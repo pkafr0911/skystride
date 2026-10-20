@@ -142,7 +142,7 @@ export function makeRunner(scene: THREE.Scene, ghost = false) {
           ? Math.sin((Math.PI * Math.min(1, f.progress / 0.18)) / 2) *
             (1 - clamp((f.progress - 0.92) / 0.08))
           : 0;
-      group.position.set(f.x, f.y, 0.55 - 1.05 * wallLane);
+      group.position.set(f.x, f.y, (f.lane ?? 0.55) - 1.05 * wallLane);
       const hip = vec(p.hip),
         chest = vec(p.chest),
         headAxis = vec(p.head).sub(chest).normalize(),

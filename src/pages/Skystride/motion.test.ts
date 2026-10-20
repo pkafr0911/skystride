@@ -3,6 +3,9 @@ import { test } from "node:test";
 import * as THREE from "three";
 import { canMantle, Frame, obstacles, Run, STEP } from "./model";
 import { interpolateFrame, poseFor, runPose, STANCE, STRIDE } from "./motion";
+import { creativeObstacle } from "./obstacle-mesh";
+import { framesFor, previewObstacles } from "./lab-model";
+import { techniques, comboNames, isSwing } from "./combos";
 import { limbSurface } from "../../assets/limb-surface";
 import { LEG_LENGTHS, makeRunner, solveJoint } from "./runner";
 
@@ -468,4 +471,165 @@ test("a feet-first slide exit blends into a landing reach without a mid-air runn
   assert.ok(start.hip[1] < 0.4);
   assert.ok(end.feet.every((foot) => foot[0] > end.hip[0]));
   assert.ok(end.hip[1] > start.hip[1]);
+});
+
+test("running feet and soles follow the solar incline", () => {
+  const f = {
+    ...new Run().frame(),
+    x: 236.5,
+    y: 0.55,
+    slope: 1.1 / 6,
+    grounded: true,
+    landingAge: 1,
+  };
+  const flat = poseFor({ ...f, slope: 0 }),
+    uphill = poseFor(f);
+  for (let side = 0; side < 2; side++) {
+    assert.ok(
+      Math.abs(
+        uphill.feet[side][1] -
+          flat.feet[side][1] -
+          flat.feet[side][0] * f.slope,
+      ) < 1e-6,
+    );
+    assert.ok(
+      Math.abs(
+        uphill.footAngles[side] - flat.footAngles[side] - Math.atan(f.slope),
+      ) < 1e-6,
+    );
+  }
+});
+
+test("creative obstacle mesh contact planes match the simulation dimensions", () => {
+  const box = new THREE.BoxGeometry(),
+    cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const kit = {
+    box,
+    cylinder,
+    face: material,
+    dark: material,
+    trim: material,
+    amber: material,
+    panel: material,
+  };
+  try {
+    for (const feature of ["vent-bank", "pipe", "solar", "window"] as const) {
+      for (const o of obstacles.filter(
+        (o) => o.feature === feature && o.x < 480,
+      )) {
+        const mesh = creativeObstacle(o, kit);
+        mesh.updateMatrixWorld(true);
+        const expected = feature === "solar" ? o.height! / 2 : o.height!;
+        const ray = new THREE.Raycaster(
+          new THREE.Vector3(
+            o.x + o.width / 2,
+            feature === "window" ? 2.5 : 8,
+            0.55,
+          ),
+          new THREE.Vector3(0, -1, 0),
+        );
+        const hit = ray.intersectObject(mesh, true)[0];
+        assert.ok(hit, feature);
+        assert.ok(
+          Math.abs(hit.point.y - expected) < 0.025,
+          `${feature}: mesh=${hit.point.y}, support=${expected}`,
+        );
+        if (feature === "window") {
+          ray.set(
+            new THREE.Vector3(o.x + o.width / 2, 2.5, 0.55),
+            new THREE.Vector3(0, 1, 0),
+          );
+          assert.ok(
+            Math.abs(
+              ray.intersectObject(mesh, true)[0].point.y - o.openingTop!,
+            ) < 1e-6,
+          );
+        }
+        mesh.traverse((part) =>
+          assert.ok(part.matrixWorld.toArray().every(Number.isFinite)),
+        );
+      }
+    }
+  } finally {
+    box.dispose();
+    cylinder.dispose();
+    material.dispose();
+  }
+});
+
+test("dive transitions from leg load through horizontal reach to landing tuck", () => {
+  const f = { ...new Run().frame(), move: "dive" as const };
+  const load = poseFor({ ...f, progress: 0.12 });
+  const flight = poseFor({ ...f, progress: 0.4 });
+  const tuck = poseFor({ ...f, progress: 1 });
+  assert.ok(flight.hands.every((p) => p[0] > flight.head[0]));
+  assert.ok(flight.feet.every((p) => p[0] < flight.hip[0]));
+  assert.ok(tuck.feet.every((p) => p[0] > tuck.hip[0]));
+  assert.notDeepEqual(load, flight);
+});
+test("wall-run foot contacts alternate and finish in a kick-off pose", () => {
+  const f = {
+    ...new Run().frame(),
+    move: "wall-run" as const,
+    progress: 0.4,
+    speed: 12,
+  };
+  const a = poseFor({ ...f, x: 47 }),
+    b = poseFor({ ...f, x: 48 });
+  assert.notDeepEqual(a.feet, b.feet);
+  assert.ok(a.feet.every((p) => p[2] < 0));
+  assert.notDeepEqual(a, poseFor({ ...f, progress: 0.98 }));
+});
+
+test("all signature poses remain finite throughout their real traversals", () => {
+  for (const o of obstacles.filter(
+    (o) => o.kind === "signature" && o.route === "lower",
+  )) {
+    const g = new Run();
+    g.start();
+    g.x = o.x - 1.9;
+    g.speed = 12;
+    g.action("up");
+    g.step();
+    if (isSwing(o.technique))
+      for (let tick = 0; tick < 100 && !g.traversal; tick++) g.step();
+    const poses = new Set<string>();
+    for (let tick = 0; tick < 240 && g.traversal; tick++) {
+      const p = poseFor(g.frame());
+      assert.ok(
+        [p.hip, p.chest, p.head, ...p.hands, ...p.feet, ...p.knees, ...p.elbows]
+          .flat()
+          .every(Number.isFinite),
+        o.technique,
+      );
+      poses.add(JSON.stringify(p));
+      g.step();
+    }
+    assert.ok(
+      poses.size > 10,
+      `${o.technique} needs an animated contact sequence`,
+    );
+  }
+});
+
+test("movement lab samples every new technique and all 20 full chains", () => {
+  for (const technique of techniques) {
+    const frames = framesFor(technique, 12);
+    assert.ok(
+      frames.some((f) => f.technique === technique),
+      `${technique} preview missing`,
+    );
+    assert.ok(frames.every((f) => Number.isFinite(f.x + f.y + f.speed)));
+  }
+  for (const name of comboNames) {
+    const move = `combo:${name}` as const,
+      frames = framesFor(move, 12),
+      props = previewObstacles(move);
+    assert.equal(props.length, 5);
+    assert.ok(
+      frames[frames.length - 1].x > props[4].x + props[4].width,
+      `${name} preview did not finish`,
+    );
+  }
 });

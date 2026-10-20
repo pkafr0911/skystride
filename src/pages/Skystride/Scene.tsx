@@ -1,3 +1,4 @@
+import { isSwing } from "./combos";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import {
@@ -11,6 +12,7 @@ import {
   Run,
   STEP,
 } from "./model";
+import { creativeObstacle } from "./obstacle-mesh";
 import { makeRunner } from "./runner";
 import { interpolateFrame } from "./motion";
 
@@ -54,7 +56,7 @@ export default function Scene({
     scene.add(fill);
     const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
     const sphereGeometry = new THREE.SphereGeometry(1, 10, 8);
-    const cylinderGeometry = new THREE.CylinderGeometry(1, 1, 1, 8);
+    const cylinderGeometry = new THREE.CylinderGeometry(1, 1, 1, 12);
     const materials: THREE.Material[] = [];
     const material = (color: number, opacity = 1) => {
       const m = new THREE.MeshStandardMaterial({
@@ -75,6 +77,8 @@ export default function Scene({
     const decor = new THREE.MeshBasicMaterial({ color: 0x9797ad });
     const decorDark = new THREE.MeshBasicMaterial({ color: 0x838ba2 });
     materials.push(decor, decorDark);
+    const solar = material(0x203958),
+      alloy = material(0x718097);
     const chunks = new Map<number, THREE.Group>();
     const chunkFor = (x: number) => {
       const key = Math.floor(x / 80);
@@ -170,8 +174,24 @@ export default function Scene({
       }
     }
     obstacles.forEach((o) => {
-      const y = ground(o.x, o.route === "upper");
-      if (o.kind === "vault") {
+      const y = isSwing(o.technique)
+        ? o.route === "upper"
+          ? 3.3
+          : 0
+        : ground(o.x, o.route === "upper");
+      if (o.feature) {
+        chunkFor(o.x).add(
+          creativeObstacle(o, {
+            box: boxGeometry,
+            cylinder: cylinderGeometry,
+            face: metal,
+            dark: black,
+            trim: alloy,
+            amber: edge,
+            panel: solar,
+          }),
+        );
+      } else if (o.kind === "vault") {
         box(
           scene,
           o.x + o.width / 2,
@@ -287,12 +307,12 @@ export default function Scene({
             );
         }
       }
-      if (o.kind === "gap" || o.kind === "drop") {
+      if (o.kind === "gap" || o.kind === "drop" || isSwing(o.technique)) {
         box(scene, o.x - 0.12, y + 0.035, 0, 0.24, 0.06, 4.15, edge);
-        if (o.kind === "gap")
+        if (o.kind === "gap" || isSwing(o.technique))
           box(
             scene,
-            o.x + o.width + 0.12,
+            o.x + o.width + (isSwing(o.technique) ? 1.4 : 0) + 0.12,
             y + 0.035,
             0,
             0.24,

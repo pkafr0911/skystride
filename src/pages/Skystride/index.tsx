@@ -1,3 +1,4 @@
+import { isSwing } from "./combos";
 import { Button, ConfigProvider, Select, theme } from "antd";
 import React, {
   lazy,
@@ -121,24 +122,68 @@ export default function Skystride() {
     focus();
   };
   const next = game.next();
-  const onTop = Boolean(game.onObstacle());
+  const supportedTop = game.onObstacle();
+  const onTop = Boolean(supportedTop);
   const distance = next ? next.x - game.x : Infinity;
   const range = next ? timingRange(next, game.speed) : { near: 0, far: 0 };
-  const cue = onTop
-    ? "↑ JUMP AGAIN / ↓ EDGE SLIDE"
-    : next?.kind === "branch"
-      ? next.height
-        ? "↑ WALL CLIMB / RUN FOR NORMAL"
-        : "↑ HARD LINE / RUN FOR NORMAL"
-      : next?.kind === "drop"
-        ? "↓ LANDING ROLL"
-        : next?.kind === "slide"
-          ? next && canMantle(next)
-            ? "↓ SLIDE / ↑ SLOW CLIMB"
-            : "↓ SLIDE"
-          : next?.kind === "gap"
-            ? "↑ GAP JUMP"
-            : "↑ VAULT";
+  const motionFrame = game.frame();
+  const landingCue =
+    !game.grounded &&
+    !game.traversal &&
+    game.vy < -4 &&
+    ((motionFrame.launchY ?? 0) > 0.5 || Boolean(motionFrame.longJump));
+  const cue =
+    game.move === "special"
+      ? `${motionFrame.technique?.replaceAll("-", " ").toUpperCase()} · ${isSwing(motionFrame.technique) ? "→ RELEASE / ↓ DROP" : motionFrame.technique === "cat-leap" ? "↑ TOP OUT / ↓ DROP" : motionFrame.technique === "wall-pop" ? "↑ TOP OUT" : motionFrame.technique === "shimmy" ? "↓ DROP" : "CONTACT → EXIT"}`
+      : next?.kind === "signature"
+        ? isSwing(next.technique)
+          ? "↑ JUMP & CATCH BAR → RIGHT TO CROSS GAP"
+          : `↑ ${next.technique?.replaceAll("-", " ").toUpperCase()}`
+        : landingCue
+          ? "↓ ROLL BEFORE LANDING · KEEP YOUR SPEED"
+          : onTop
+            ? next?.kind === "glass"
+              ? game.x >= (supportedTop?.end ?? Infinity) - 0.8
+                ? "↑ JUMP NOW · CLEAR THE GLASS"
+                : "RUN TO LEDGE EDGE → ↑ JUMP"
+              : "↑ JUMP AGAIN / ↓ EDGE SLIDE"
+            : next?.feature === "tank"
+              ? "↓ SLIDE / ↑ LAZY / → SERVICE PLATFORM"
+              : next?.feature === "wall-billboard"
+                ? "↑ WALL RUN TO LEDGE"
+                : next?.kind === "ledge"
+                  ? next.feature === "greenhouse"
+                    ? "↑ CLIMB FOR TOP ROUTE / ↓ SLIDE UNDER LEDGE"
+                    : "↑ CATCH & CLIMB / ↑ AGAIN TO LAUNCH"
+                  : next?.kind === "glass"
+                    ? game.frame().slope
+                      ? distance <= 2.1
+                        ? "↑ LAUNCH NOW → ↓ ROLL BEFORE LANDING"
+                        : "RUN UP THE RAMP → ↑ AT THE AMBER EDGE"
+                      : "↓ SLIDE UNDER FRAME TO RECOVER"
+                    : next?.feature === "vent-bank"
+                      ? "EARLY ↑ TOP LINE / LATE ↑ VAULT"
+                      : next?.feature === "pipe"
+                        ? next.kind === "slide"
+                          ? "↓ UNDER PIPE / JUMP OVER FROM TOP"
+                          : "EARLY ↑ TOP LINE / LATE ↑ DASH"
+                        : next?.feature === "window"
+                          ? "↑ SILL VAULT / → FAST DIVE"
+                          : next?.kind === "branch"
+                            ? next.height
+                              ? "↑ WALL CLIMB / RUN FOR NORMAL"
+                              : "↑ HARD LINE / RUN FOR NORMAL"
+                            : next?.kind === "drop"
+                              ? "↓ LANDING ROLL"
+                              : next?.kind === "slide"
+                                ? next && canMantle(next)
+                                  ? "↓ SLIDE / ↑ SLOW CLIMB"
+                                  : "↓ SLIDE"
+                                : next?.kind === "gap"
+                                  ? game.frame().slope
+                                    ? "↑ RAMP LAUNCH / ↓ ROLL BEFORE LANDING"
+                                    : "↑ GAP JUMP"
+                                  : "↑ VAULT";
   const finished = game.phase === "finished";
   const splitIndex = game.splits.reduce(
     (latest, value, index) => (Number.isFinite(value) ? index : latest),
@@ -281,10 +326,18 @@ export default function Skystride() {
                     : ""}
                 </span>
               </div>
-              {(onTop || (next && distance < 23 && !game.traversal)) && (
+              {(game.move === "special" ||
+                onTop ||
+                (next && distance < 23 && !game.traversal)) && (
                 <div
                   className={`${styles.cue} ${distance >= range.near && distance <= range.far ? styles.clean : ""}`}
                 >
+                  {next?.combo && (
+                    <small>
+                      {next.combo} · {next.contact}/5
+                      <br />
+                    </small>
+                  )}
                   {cue}
                   <small>
                     {onTop

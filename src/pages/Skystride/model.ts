@@ -1,7 +1,8 @@
+import { comboCourse, isSwing, techniques, Technique } from "./combos";
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v7";
+export const VERSION = "sunset-relay-v14";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -23,7 +24,10 @@ export type Move =
   | "climb"
   | "roll"
   | "stumble"
-  | "mantle";
+  | "mantle"
+  | "wall-run"
+  | "dive"
+  | "special";
 export type Vault =
   | "dash"
   | "hurdle"
@@ -32,19 +36,55 @@ export type Vault =
   | "safety"
   | "lazy"
   | "kong";
+export type Feature =
+  | "vent-bank"
+  | "pipe"
+  | "window"
+  | "solar"
+  | "tank"
+  | "wall-billboard"
+  | "bridge"
+  | "greenhouse"
+  | "scaffold"
+  | "balcony"
+  | "signature";
 export type Obstacle = {
   x: number;
   width: number;
   height?: number;
-  kind: "vault" | "gap" | "slide" | "branch" | "drop";
+  kind:
+    | "vault"
+    | "gap"
+    | "slide"
+    | "branch"
+    | "drop"
+    | "ramp"
+    | "ledge"
+    | "glass"
+    | "encounter"
+    | "signature";
+  technique?: Technique;
+  combo?: string;
+  contact?: number;
+  side?: 1 | -1;
+  feature?: Feature;
+  part?: "planter" | "ledge" | "glass";
+  /** Underside of a billboard header, measured from its roof. */
+  openingTop?: number;
   route?: "upper" | "lower";
   vault?: Vault;
 };
 const opening: Obstacle[] = [
   { x: 27, width: 0.7, height: 0.5, kind: "vault", vault: "speed" },
-  { x: 46, width: 0.9, height: 0.8, kind: "vault", vault: "hurdle" },
-  { x: 67, width: 6.2, kind: "gap" },
-  { x: 91, width: 5.5, kind: "slide" },
+  {
+    x: 46,
+    width: 6,
+    height: 1.4,
+    kind: "encounter",
+    feature: "wall-billboard",
+  },
+  { x: 67, width: 6.2, kind: "gap", feature: "bridge" },
+  { x: 91, width: 5.5, height: 1.65, kind: "slide", feature: "tank" },
   { x: 115, width: 5, height: 3.3, kind: "branch" },
   {
     x: 139,
@@ -57,17 +97,82 @@ const opening: Obstacle[] = [
   { x: 153, width: 6, kind: "slide", route: "lower" },
   { x: 148, width: 6.5, kind: "gap", route: "upper" },
   {
-    x: 176,
-    width: 1.5,
-    height: 1.1,
-    kind: "vault",
-    vault: "one-hand",
+    x: 150.5,
+    width: 1.8,
+    height: 0.65,
+    kind: "ledge",
     route: "upper",
+    feature: "scaffold",
+  },
+  {
+    x: 176,
+    width: 2.3,
+    height: 2.2,
+    kind: "ledge",
+    route: "upper",
+    feature: "balcony",
+  },
+  {
+    x: 179.5,
+    width: 2.3,
+    height: 3.3,
+    kind: "ledge",
+    route: "upper",
+    feature: "balcony",
+  },
+  {
+    x: 183,
+    width: 3,
+    height: 4.3,
+    kind: "ledge",
+    route: "upper",
+    feature: "balcony",
   },
   { x: 195, width: 9, kind: "drop", route: "upper" },
-  { x: 217, width: 1.6, height: 1.15, kind: "vault", vault: "lazy" },
+  {
+    x: 217,
+    width: 1.8,
+    height: 1.15,
+    kind: "vault",
+    vault: "kong",
+    feature: "vent-bank",
+  },
+  {
+    x: 223.2,
+    width: 1.6,
+    height: 1.15,
+    kind: "vault",
+    vault: "dash",
+    feature: "vent-bank",
+  },
+  { x: 234, width: 6, height: 1.1, kind: "ramp", feature: "solar" },
   { x: 240, width: 7, kind: "gap" },
-  { x: 267, width: 6, kind: "slide" },
+  {
+    x: 267,
+    width: 1.2,
+    height: 0.85,
+    kind: "vault",
+    vault: "lazy",
+    feature: "greenhouse",
+    part: "planter",
+  },
+  {
+    x: 271,
+    width: 6,
+    height: 1.45,
+    kind: "ramp",
+    feature: "greenhouse",
+    part: "ledge",
+  },
+  {
+    x: 278,
+    width: 3,
+    height: 2.5,
+    openingTop: 1.25,
+    kind: "glass",
+    feature: "greenhouse",
+    part: "glass",
+  },
   { x: 290, width: 5, kind: "branch" },
   {
     x: 312,
@@ -88,8 +193,24 @@ const opening: Obstacle[] = [
     route: "upper",
   },
   { x: 375, width: 9, kind: "drop", route: "upper" },
-  { x: 402, width: 1.1, height: 1.35, kind: "vault", vault: "safety" },
-  { x: 424, width: 0.9, height: 0.85, kind: "vault", vault: "speed" },
+  {
+    x: 402,
+    width: 3.4,
+    height: 0.85,
+    kind: "vault",
+    vault: "speed",
+    feature: "window",
+    openingTop: 3.45,
+  },
+  {
+    x: 424,
+    width: 1.4,
+    height: 1.05,
+    kind: "vault",
+    vault: "dash",
+    feature: "pipe",
+  },
+  { x: 431.2, width: 4.2, height: 2.35, kind: "slide", feature: "pipe" },
   { x: 448, width: 7.2, kind: "gap" },
 ];
 // An authored opening, a sustained technical district, then three varied rooftop blocks.
@@ -109,29 +230,7 @@ const variants: Vault[] = [
   "speed",
   "lazy",
 ];
-for (let i = 0; i < 48; i++) {
-  const x = 512 + i * 19;
-  for (const route of ["lower", "upper"] as const) {
-    const n = route === "upper" ? i : i + 2;
-    circuit.push(
-      // Wide Kong lines reward the harder climb with less slide friction.
-      n % 6 === 5 && route === "upper"
-        ? { x, width: 4.2, height: 1.1, kind: "vault", vault: "kong", route }
-        : n % 6 === 4 && route === "upper"
-          ? { x, width: route === "upper" ? 6.8 : 5.8, kind: "gap", route }
-          : n % 6 === 5 || (n % 6 === 4 && route === "lower")
-            ? { x, width: 4.2, kind: "slide", route }
-            : {
-                x,
-                width: variants[n % 8] === "kong" ? 2.5 : 1.1,
-                height: 0.7 + (n % 3) * 0.2,
-                kind: "vault",
-                vault: variants[n % 8],
-                route,
-              },
-    );
-  }
-}
+circuit.push(...comboCourse());
 const districts = [1480, 1960, 2440];
 const courseAnchors: Obstacle[] = [
   ...opening,
@@ -161,9 +260,24 @@ function denseLane(start: number, end: number, route: "upper" | "lower") {
   for (let i = 0; i < anchors.length - 1; i++) {
     const previous = anchors[i],
       next = anchors[i + 1];
-    if (previous.kind === "drop") continue;
+    if (
+      (previous.combo && previous.combo === next.combo) ||
+      previous.kind === "drop" ||
+      previous.kind === "ramp" ||
+      previous.kind === "ledge" ||
+      (previous.feature === "greenhouse" && next.feature === "greenhouse") ||
+      (previous.feature === "vent-bank" && next.feature === "vent-bank") ||
+      (previous.feature === "pipe" && next.feature === "pipe")
+    )
+      continue;
     const clearance =
-      previous.kind === "gap" ? 5.5 : previous.kind === "branch" ? 8 : 2.8;
+      previous.kind === "glass"
+        ? 8
+        : previous.kind === "gap"
+          ? 5.5
+          : previous.kind === "branch"
+            ? 8
+            : 2.8;
     let x = previous.x + previous.width + clearance;
     let n = 0;
     while (x <= next.x - 5.8 && x < end - 5) {
@@ -186,11 +300,40 @@ function denseLane(start: number, end: number, route: "upper" | "lower") {
       n++;
     }
   }
-  return additions.filter(
-    (o) =>
-      route !== "lower" ||
-      !upperPlatforms.some((p) => o.x >= p.end - 2 && o.x < p.end + 15),
-  );
+  return additions.filter((o) => {
+    if (
+      route === "lower" &&
+      upperPlatforms.some((p) => o.x >= p.end - 2 && o.x < p.end + 15)
+    )
+      return false;
+    // Leave a visible run-up for the early-jump alternative. Filler must not
+    // consume the same input that is meant to choose the top line.
+    if (
+      courseAnchors.some(
+        (a) =>
+          (!a.route || a.route === route) &&
+          ((a.feature === "greenhouse" &&
+            o.x >= a.x - 2 &&
+            o.x < a.x + a.width + 4) ||
+            (a.feature === "balcony" &&
+              o.x >= a.x - 3 &&
+              o.x < a.x + a.width + 5) ||
+            (a.feature === "wall-billboard" &&
+              o.x >= a.x &&
+              o.x < a.x + a.width + 5)),
+      )
+    )
+      return false;
+    return !courseAnchors.some(
+      (anchor) =>
+        (!anchor.route || anchor.route === route) &&
+        ((anchor.feature === "vent-bank" && anchor.vault === "kong") ||
+          (anchor.feature === "pipe" && anchor.kind === "vault") ||
+          anchor.feature === "window") &&
+        o.x >= anchor.x - (anchor.feature === "window" ? 8 : 10) &&
+        o.x < anchor.x,
+    );
+  });
 }
 export const obstacles: Obstacle[] = [
   ...courseAnchors,
@@ -201,6 +344,7 @@ export const obstacles: Obstacle[] = [
 export function canMantle(o: Obstacle) {
   return (
     o.kind === "slide" &&
+    o.feature !== "tank" &&
     (o.height ?? 2.35) <= 1.8 &&
     (o.route === "upper" ||
       !upperPlatforms.some((p) => o.x < p.end && o.x + o.width > p.start))
@@ -222,13 +366,13 @@ function cut(start: number, end: number, y: number, upper: boolean): Surface[] {
   let cursor = start;
   for (const o of obstacles.filter(
     (item) =>
-      item.kind === "gap" &&
+      (item.kind === "gap" || isSwing(item.technique)) &&
       (upper ? item.route === "upper" : item.route !== "upper") &&
       item.x >= start &&
       item.x < end,
   )) {
     result.push({ start: cursor, end: o.x, y });
-    cursor = o.x + o.width;
+    cursor = o.x + o.width + (isSwing(o.technique) ? 1.4 : 0);
   }
   result.push({ start: cursor, end, y });
   return result;
@@ -239,7 +383,7 @@ export const surfaces: Surface[] = [
 ];
 /** Solid obstacle tops are support surfaces even after their scoring event is handled. */
 export const obstacleTops = obstacles.flatMap((o, index) =>
-  o.kind === "vault" || o.kind === "slide"
+  o.kind === "vault" || o.kind === "slide" || o.kind === "ledge"
     ? [
         {
           start: o.x,
@@ -253,10 +397,59 @@ export const obstacleTops = obstacles.flatMap((o, index) =>
       ]
     : [],
 );
+const glassObstacles = obstacles.filter((o) => o.kind === "glass");
+export const ramps = obstacles.filter((o) => o.kind === "ramp");
+export function rampHeight(o: Obstacle, x: number) {
+  return (
+    (o.route === "upper" ? 3.3 : 0) +
+    Math.max(0, Math.min(1, (x - o.x) / o.width)) * (o.height ?? 1.1)
+  );
+}
+export const billboardHeaders = obstacles.flatMap((o, index) =>
+  o.feature === "window"
+    ? [
+        {
+          start: o.x,
+          end: o.x + o.width,
+          y: (o.route === "upper" ? 3.3 : 0) + o.openingTop! + 0.55,
+          index,
+          upper: o.route === "upper",
+        },
+      ]
+    : [],
+);
+export const wallRunLedges = obstacles.flatMap((o, index) =>
+  o.feature === "wall-billboard"
+    ? [
+        {
+          start: o.x + o.width,
+          end: o.x + o.width + 3,
+          y: (o.route === "upper" ? 3.3 : 0) + o.height!,
+          index,
+          upper: o.route === "upper",
+        },
+      ]
+    : [],
+);
+const interactiveTops = [
+  ...obstacleTops,
+  ...billboardHeaders,
+  ...wallRunLedges,
+];
 // Build once; the 120 Hz loop must not allocate and filter the full course per tick.
 const supportSurfaces = {
-  lower: [...surfaces, ...obstacleTops.filter((s) => !s.upper)],
-  upper: [...surfaces, ...obstacleTops.filter((s) => s.upper)],
+  lower: [
+    ...surfaces,
+    ...obstacleTops.filter((s) => !s.upper),
+    ...billboardHeaders.filter((s) => !s.upper),
+    ...wallRunLedges.filter((s) => !s.upper),
+  ],
+  upper: [
+    ...surfaces,
+    ...obstacleTops.filter((s) => s.upper),
+    ...billboardHeaders.filter((s) => s.upper),
+    ...wallRunLedges.filter((s) => s.upper),
+  ],
 };
 export function ground(x: number, upper: boolean) {
   return upper && upperPlatforms.some((p) => x >= p.start && x <= p.end)
@@ -284,6 +477,10 @@ export type Frame = {
   slideExitAge?: number;
   longJump?: boolean;
   lead?: number;
+  slope?: number;
+  lane?: number;
+  technique?: Technique;
+  side?: 1 | -1;
 };
 export type Sample = { time: number; frame: Frame };
 export type Input = { tick: number; action: Action };
@@ -308,6 +505,9 @@ const moves: Move[] = [
   "roll",
   "stumble",
   "mantle",
+  "wall-run",
+  "dive",
+  "special",
 ];
 const vaults: Vault[] = [
   "dash",
@@ -373,6 +573,7 @@ export function readRecord(raw: string | null): RecordRun | null {
           f.progress >= 0 &&
           f.progress <= 1 &&
           typeof f.grounded === "boolean" &&
+          (f.slope === undefined || Math.abs(f.slope) <= 1) &&
           (f.longJump === undefined || typeof f.longJump === "boolean") &&
           [
             f.launchX,
@@ -382,7 +583,11 @@ export function readRecord(raw: string | null): RecordRun | null {
             f.landingAge,
             f.slideExitAge,
             f.lead,
+            f.slope,
+            f.lane,
           ].every((value) => value === undefined || Number.isFinite(value)) &&
+          (f.technique === undefined || techniques.includes(f.technique)) &&
+          (f.side === undefined || f.side === 1 || f.side === -1) &&
           moves.includes(f.move) &&
           vaults.includes(f.vault) &&
           (f.contact === null ||
@@ -419,6 +624,12 @@ export type Traversal = {
   vault: Vault;
   obstacle?: { start: number; end: number };
   pushed?: boolean;
+  upper?: boolean;
+  technique?: Technique;
+  side?: 1 | -1;
+  released?: boolean;
+  catchX?: number;
+  catchY?: number;
 };
 const clamp = (n: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, n));
@@ -448,6 +659,7 @@ export class Run {
   inputs: Input[] = [];
   handled = new Set<number>();
   private timed = new Set<number>();
+  private headerHits = new Set<number>();
   traversal: Traversal | null = null;
   message = "Find your line. Own your time.";
   messageUntil = 0;
@@ -468,6 +680,8 @@ export class Run {
   private landedAt = -10;
   private lead = 0;
   private longJump = false;
+  private sideLaneStart = -10;
+  private sideLaneEnd = -10;
   start(sector = 0, practice = false) {
     this.phase = "running";
     this.startSector = sector;
@@ -507,7 +721,9 @@ export class Run {
     this.landedAt = -10;
     this.lead = 0;
     this.longJump = false;
+    this.sideLaneStart = this.sideLaneEnd = -10;
     this.timed.clear();
+    this.headerHits.clear();
     this.handled = new Set(
       obstacles.flatMap((o, i) => (o.x + o.width < this.x ? [i] : [])),
     );
@@ -533,6 +749,11 @@ export class Run {
   next() {
     return obstacles.find(
       (o, i) =>
+        o.kind !== "ramp" &&
+        !(
+          (o.kind === "encounter" || o.kind === "ledge") &&
+          this.x > o.x + 0.1
+        ) &&
         !this.handled.has(i) &&
         this.applicable(o) &&
         o.x + o.width >= this.x - 0.25,
@@ -573,7 +794,7 @@ export class Run {
     clean: boolean,
     vault: Vault = "speed",
   ) {
-    this.handled.add(obstacles.indexOf(o));
+    if (obstacles.indexOf(o) >= 0) this.handled.add(obstacles.indexOf(o));
     const wall = move === "wall" || move === "wall-climb";
     const end = o.x + o.width + (wall ? 0.75 : 1.4);
     const contact = {
@@ -621,6 +842,7 @@ export class Run {
       contact,
       vault,
       obstacle: { start: o.x, end: o.x + o.width },
+      side: o.side ?? 1,
     };
     if (move === "mantle") this.traversal.duration += 0.75;
     if (move === "wall-climb")
@@ -631,7 +853,7 @@ export class Run {
     this.setMove(move);
   }
   onObstacle() {
-    return obstacleTops.find(
+    return interactiveTops.find(
       (s) =>
         s.upper === this.upper &&
         this.x >= s.start &&
@@ -657,9 +879,107 @@ export class Run {
     this.dropFrom = this.y;
     this.setMove("jump");
   }
+  private signature(o: Obstacle, clean: boolean) {
+    this.traverse(o, "special", this.y, o.height ?? 1.1, clean);
+    const t = this.traversal!;
+    t.technique = o.technique;
+    t.side = o.side ?? 1;
+    t.upper = this.upper;
+    t.duration = Math.max(
+      isSwing(o.technique) ? 0.75 : 0.48,
+      (t.end - t.start) / Math.max(3, this.speed),
+    );
+    t.contact = { x: o.x + o.width / 2, y: this.y + (o.height ?? 1.1) };
+    this.say(
+      `${o.combo ?? "PARKOUR"} · ${o.technique?.replaceAll("-", " ").toUpperCase()}`,
+    );
+  }
+  private mount(o: Obstacle) {
+    const base = o.route === "upper" ? 3.3 : 0;
+    const top = base + o.height!;
+    if (obstacles.indexOf(o) >= 0) this.handled.add(obstacles.indexOf(o));
+    this.traversal = {
+      start: this.x,
+      end: o.x + Math.min(0.8, o.width * 0.5),
+      y0: this.y,
+      y1: top,
+      elapsed: 0,
+      duration: 0.4 + Math.max(0, top - this.y) * 0.16,
+      arc: 0,
+      move: top - this.y > 1.65 ? "wall-climb" : "climb",
+      contact: { x: o.x, y: top },
+      vault: "safety",
+      upper: this.upper,
+    };
+    this.speed = Math.max(5.5, this.speed - 0.8);
+    this.vy = 0;
+    this.grounded = false;
+    this.setMove(this.traversal.move);
+    this.say("LEDGE CONTACT · PULL, PRESS, EXIT");
+  }
   private tryAction(action: Action): boolean {
     const t = this.traversal;
     if (t) {
+      if (
+        t.move === "special" &&
+        isSwing(t.technique) &&
+        action === "forward" &&
+        t.elapsed / t.duration >= 0.35 &&
+        !t.released
+      ) {
+        this.launchX = this.x;
+        this.launchY = this.y;
+        this.dropFrom = this.y;
+        this.vy = 2.5 + clamp(t.elapsed / t.duration, 0, 1) * 1.5;
+        if (!this.upper && t.obstacle) {
+          // The lower exit passes below the upper deck: project a low arc
+          // instead of driving the runner's head into its leading fascia.
+          const flight = Math.max(
+            0.05,
+            (t.obstacle.end + 1.4 - 0.23 - this.x) / Math.max(3, this.speed),
+          );
+          this.vy = Math.min(
+            this.vy,
+            (0.48 - this.y + GRAVITY * 0.5 * flight * flight) / flight,
+          );
+        }
+        this.traversal = null;
+        this.grounded = false;
+        this.lastGround = -1;
+        this.setMove("jump");
+        this.say("RELEASE · CARRY INTO THE NEXT CONTACT");
+        return true;
+      }
+      if (
+        t.move === "special" &&
+        action === "down" &&
+        (isSwing(t.technique) ||
+          t.technique === "cat-leap" ||
+          t.technique === "shimmy") &&
+        t.elapsed / t.duration > 0.25
+      ) {
+        this.launchX = this.x;
+        this.launchY = this.y;
+        this.dropFrom = this.y;
+        this.traversal = null;
+        this.grounded = false;
+        this.lastGround = -1;
+        this.vy = -1;
+        this.rollUntil = this.time + 0.5;
+        this.setMove("fall");
+        this.say("CONTROLLED DROP · LOW EXIT");
+        return true;
+      }
+      if (
+        t.move === "special" &&
+        action === "up" &&
+        (t.technique === "cat-leap" || t.technique === "wall-pop") &&
+        t.elapsed / t.duration >= 0.35
+      ) {
+        t.released = true;
+        this.say("PRESS UP · TOP OUT");
+        return true;
+      }
       const top = this.onObstacle();
       const toppedOut =
         (t.move === "wall-climb" || t.move === "climb") &&
@@ -685,6 +1005,23 @@ export class Run {
         return true;
       }
       return false;
+    }
+    const ledge =
+      action === "up"
+        ? obstacles.find(
+            (o) =>
+              o.kind === "ledge" &&
+              this.applicable(o) &&
+              this.x < o.x &&
+              o.x - this.x <= (this.grounded ? 1.9 : 0.8) &&
+              this.y < (o.route === "upper" ? 3.3 : 0) + o.height! &&
+              (this.grounded ||
+                this.y >= (o.route === "upper" ? 3.3 : 0) + o.height! - 1.65),
+          )
+        : undefined;
+    if (ledge) {
+      this.mount(ledge);
+      return true;
     }
     const top = this.grounded ? this.onObstacle() : undefined;
     if (top) {
@@ -744,6 +1081,21 @@ export class Run {
       this.upper = true;
       return true;
     }
+    const signature = this.next();
+    if (
+      signature?.kind === "signature" &&
+      this.grounded &&
+      signature.x - this.x >= -0.25 &&
+      signature.x - this.x <= 2.5
+    ) {
+      if (isSwing(signature.technique)) {
+        if (action === "down") return false;
+        this.jump("up");
+        this.vy = signature.route === "upper" ? 8.8 : 5.5;
+        this.say("JUMP → REACH FOR BAR → RIGHT TO RELEASE");
+      } else this.signature(signature, true);
+      return true;
+    }
     if (action === "down") {
       if (!this.grounded) {
         this.rollUntil = this.time + (this.upper ? 0.25 : 0.4);
@@ -765,6 +1117,53 @@ export class Run {
     if (!this.grounded && this.time - this.lastGround > COYOTE) return false;
     const o = this.next();
     const d = o ? o.x - this.x : Infinity;
+    if (
+      o &&
+      d >= -0.1 &&
+      d <= timingRange(o, this.speed).far &&
+      this.grounded
+    ) {
+      if (o.feature === "tank") {
+        if (action === "forward") this.mount(o);
+        else {
+          if (obstacles.indexOf(o) >= 0) this.handled.add(obstacles.indexOf(o));
+          this.sideLaneStart = this.x;
+          this.sideLaneEnd = o.x + o.width + 1.4;
+          this.traverse(
+            { ...o, width: 1.3, height: 0.85 },
+            "vault",
+            this.y,
+            0.89,
+            d >= 0.55,
+            "lazy",
+          );
+          this.traversal!.contact!.y = this.y + 0.85;
+        }
+        return true;
+      }
+      if (o.feature === "wall-billboard") {
+        this.traverse(o, "wall-run", this.y + o.height!, 0.25, true);
+        this.traversal!.end = o.x + o.width + 0.8;
+        this.traversal!.upper = this.upper;
+        this.traversal!.contact = { x: o.x + o.width, y: this.y + o.height! };
+        this.say("WALL RUN · DRIVE, TRANSFER, LAND");
+        return true;
+      }
+      if (
+        o.feature === "window" &&
+        action === "forward" &&
+        this.speed >= 10.5
+      ) {
+        this.traverse(o, "dive", this.y, o.height! + 0.12, true);
+        this.traversal!.duration *= 0.9;
+        this.say("WINDOW DIVE · REACH, TUCK, ROLL");
+        return true;
+      }
+    }
+    if (action === "forward" && o?.feature) {
+      this.jump(action);
+      return true;
+    }
     if (
       o &&
       canMantle(o) &&
@@ -845,11 +1244,38 @@ export class Run {
       this.vy -= GRAVITY * (this.vy < 0 ? 1.18 : 1) * STEP;
       this.y += this.vy * STEP;
     }
-    const supports = supportSurfaces[this.upper ? "upper" : "lower"];
-    const support = supports.find(
-      (s) =>
-        this.x >= s.start && this.x < s.end && Math.abs(s.y - this.y) < 0.025,
+    const ramp = ramps.find(
+      (o) => this.applicable(o) && this.x >= o.x && this.x < o.x + o.width,
     );
+    let rampSupport = false;
+    if (ramp) {
+      const before = rampHeight(ramp, oldX),
+        after = rampHeight(ramp, this.x);
+      if (this.grounded && Math.abs(oldY - before) < 0.04) {
+        this.y = after;
+        // Climbing costs momentum; the ramp adds height, never a launch-speed bonus.
+        this.speed = Math.max(
+          0,
+          this.speed - GRAVITY * (ramp.height! / ramp.width) * 0.6 * STEP,
+        );
+        rampSupport = true;
+      } else if (
+        !this.grounded &&
+        this.vy <= 0 &&
+        oldY >= before &&
+        this.y <= after
+      ) {
+        this.land(after, ramp.route === "upper");
+        rampSupport = true;
+      }
+    }
+    const supports = supportSurfaces[this.upper ? "upper" : "lower"];
+    const support =
+      rampSupport ||
+      supports.find(
+        (s) =>
+          this.x >= s.start && this.x < s.end && Math.abs(s.y - this.y) < 0.025,
+      );
     if (this.grounded && !support) {
       if (this.move === "slide") this.slideExitAt = this.time;
       this.launchX = oldX;
@@ -858,6 +1284,32 @@ export class Run {
       this.dropFrom = this.y;
       this.vy = 0;
       this.setMove("fall");
+    }
+    // A bar can only be caught by an airborne runner within hand reach.
+    if (!this.grounded && this.time - this.jumpIntent < 0.65) {
+      const bar = obstacles.find(
+        (o, i) =>
+          isSwing(o.technique) &&
+          this.applicable(o) &&
+          !this.handled.has(i) &&
+          Math.abs(this.x - (o.x + o.width / 2)) < 0.6 &&
+          Math.abs(
+            this.y - ((o.route === "upper" ? 3.3 : 0) + (o.height ?? 3) - 1.8),
+          ) < 0.65,
+      );
+      if (bar) {
+        this.signature(bar, true);
+        const t = this.traversal!,
+          base = bar.route === "upper" ? 3.3 : 0;
+        t.y0 = base;
+        t.y1 = base;
+        t.contact = { x: bar.x + bar.width / 2, y: base + bar.height! };
+        t.duration = 0.9;
+        t.catchX = this.x;
+        t.catchY = this.y;
+        this.say("BAR CAUGHT · RIGHT TO RELEASE");
+        return;
+      }
     }
     // The upper route is a real slab: an early jump underneath hits its underside.
     if (!this.grounded && this.vy > 0) {
@@ -889,7 +1341,7 @@ export class Run {
         );
         if ("index" in landing) this.handled.add(Number(landing.index));
       } else if (this.time - this.jumpIntent < 0.18) {
-        const lip = surfaces.find(
+        const lip = supports.find(
           (s) =>
             oldX < s.start &&
             this.x + 0.3 >= s.start &&
@@ -912,6 +1364,7 @@ export class Run {
             move: "catch",
             contact: { x: lip.start, y: lip.y },
             vault: "safety",
+            upper: "upper" in lip ? Boolean(lip.upper) : lip.y > 2,
           };
           this.setMove("catch");
           this.recover("LEDGE SAVE · CLIMB", 3);
@@ -931,6 +1384,86 @@ export class Run {
         this.speed = 0;
       }
     }
+    // Thin service decks can be crossed underneath, but not through their fascia.
+    for (const deck of obstacles) {
+      if (deck.kind !== "ledge" || !this.applicable(deck)) continue;
+      const bodyHeight =
+        this.move === "slide" || this.move === "roll" ? 0.85 : 1.85;
+      const top = (deck.route === "upper" ? 3.3 : 0) + deck.height!;
+      if (
+        this.x + 0.22 < deck.x ||
+        this.x - 0.22 > deck.x + deck.width ||
+        this.y >= top - 0.025
+      )
+        continue;
+      if (
+        this.vy > 0 &&
+        oldY + bodyHeight <= top - 0.18 &&
+        this.y + bodyHeight >= top - 0.18
+      ) {
+        this.y = top - 0.18 - bodyHeight;
+        this.vy = 0;
+        this.setMove("fall");
+      } else if (oldX < deck.x && this.y + bodyHeight > top - 0.18) {
+        this.x = deck.x - 0.23;
+        this.speed = Math.min(this.speed, 3);
+      }
+    }
+    for (const glass of glassObstacles) {
+      if (
+        !this.applicable(glass) ||
+        this.x + 0.22 < glass.x ||
+        oldX - 0.22 > glass.x + glass.width
+      )
+        continue;
+      const top = (glass.route === "upper" ? 3.3 : 0) + glass.height!;
+      const underside =
+        (glass.route === "upper" ? 3.3 : 0) + (glass.openingTop ?? 0);
+      const bodyHeight =
+        this.move === "slide" || this.move === "roll" ? 0.85 : 1.85;
+      if (this.y < top && this.y + bodyHeight > underside) {
+        // A missed upper line must leave a recoverable lower route. Glass is
+        // never footing: return to the entry face, fall, then slide underneath.
+        this.x = glass.x - 0.23;
+        this.vy = Math.min(0, this.vy);
+        this.speed = Math.min(this.speed, 4.2);
+        const index = obstacles.indexOf(glass);
+        if (!this.headerHits.has(index)) {
+          this.headerHits.add(index);
+          this.recover("FRAME CONTACT · LAND THEN ↓ SLIDE UNDER", 2);
+        }
+        if (!this.grounded) this.setMove("fall");
+      }
+    }
+    for (const header of billboardHeaders) {
+      if (
+        header.upper !== this.upper ||
+        this.x + 0.22 < header.start ||
+        oldX - 0.22 > header.end
+      )
+        continue;
+      const underside = header.y - 0.55;
+      const bodyHeight =
+        this.move === "slide" || this.move === "roll" ? 0.85 : 1.85;
+      if (this.y + bodyHeight > underside && this.y < header.y) {
+        if (
+          oldY + bodyHeight <= underside ||
+          (oldX >= header.start && oldX <= header.end)
+        ) {
+          this.y = underside - bodyHeight;
+          this.vy = Math.min(0, this.vy);
+          this.setMove("fall");
+        } else {
+          this.x = Math.min(this.x, header.start - 0.23);
+          this.speed = 0;
+          this.vy = Math.min(0, this.vy);
+        }
+        if (!this.headerHits.has(header.index)) {
+          this.headerHits.add(header.index);
+          this.recover("FRAME CONTACT · KEEP THE JUMP LOW", 3);
+        }
+      }
+    }
     for (let i = 0; i < obstacles.length; i++) {
       const o = obstacles[i];
       if (this.handled.has(i) || !this.applicable(o)) continue;
@@ -938,6 +1471,15 @@ export class Run {
       const height =
         this.move === "slide" || this.move === "roll" ? 0.85 : 1.85;
       const overlaps = this.x + 0.22 >= o.x && oldX - 0.22 <= o.x + o.width;
+      if (
+        overlaps &&
+        o.kind === "signature" &&
+        !isSwing(o.technique) &&
+        this.grounded
+      ) {
+        this.signature(o, false);
+        break;
+      }
       if (
         overlaps &&
         o.kind === "vault" &&
@@ -986,7 +1528,9 @@ export class Run {
     if (this.move === "slide" || this.move === "stumble") {
       const ceiling = obstacles.some(
         (o) =>
-          o.kind === "slide" &&
+          (o.kind === "slide" ||
+            o.kind === "ledge" ||
+            (o.kind === "glass" && Boolean(o.openingTop))) &&
           this.applicable(o) &&
           this.x + 0.3 >= o.x &&
           this.x - 0.3 <= o.x + o.width &&
@@ -1029,7 +1573,7 @@ export class Run {
     if (this.traversal) {
       const t = this.traversal;
       const previousY = this.y;
-      t.elapsed += STEP;
+      t.elapsed += STEP * (t.released ? 1.35 : 1);
       const p = clamp(t.elapsed / t.duration, 0, 1);
       // Preserve traversal duration while easing over hand contact and accelerating out.
       const travel =
@@ -1043,7 +1587,10 @@ export class Run {
       // Quick rise, supported contact, then an extended exit: feet clear the actual obstacle.
       const lift = Math.sin(Math.PI * Math.pow(p, 0.78));
       this.y = t.y0 + (t.y1 - t.y0) * p + lift * t.arc;
-      if ((t.move === "vault" || t.move === "mantle") && t.obstacle) {
+      if (
+        (t.move === "vault" || t.move === "mantle" || t.move === "dive") &&
+        t.obstacle
+      ) {
         const rise = clamp(
           (this.x - t.start) / Math.max(0.1, t.obstacle.start - 0.25 - t.start),
           0,
@@ -1096,6 +1643,11 @@ export class Run {
           this.y = t.y0 + t.arc * (1 - release);
         }
       }
+      if (t.move === "wall-run") {
+        const rise = clamp(p / 0.26, 0, 1);
+        const kick = clamp((p - 0.68) / 0.32, 0, 1);
+        this.y = t.y0 + (t.y1 - t.y0) * rise + Math.sin(Math.PI * kick) * 0.35;
+      }
       if (t.move === "wall")
         this.y =
           t.y0 +
@@ -1134,9 +1686,111 @@ export class Run {
           this.y = lip - 0.55 + 0.55 * ease((p - 0.82) / 0.1);
         }
       }
+      if (t.move === "special" && t.contact) {
+        const smooth = (v: number) => {
+          const u = clamp(v, 0, 1);
+          return u * u * (3 - 2 * u);
+        };
+        if (isSwing(t.technique) || t.technique === "shimmy") {
+          const swing = clamp((p - 0.2) / 0.55, 0, 1);
+          const angle = -0.55 + swing * 1.1;
+          const cx =
+            t.contact.x +
+            (t.technique === "monkey" || t.technique === "shimmy"
+              ? (swing - 0.5) * 1.2
+              : 0);
+          const sx = cx + Math.sin(angle) * 0.9,
+            sy = Math.max(
+              t.y0,
+              t.contact.y - 1.8 + (1 - Math.cos(angle)) * 0.9,
+            );
+          if (p < 0.2) {
+            this.x = t.start + (sx - t.start) * smooth(p / 0.2);
+            this.y = t.y0 + (sy - t.y0) * smooth(p / 0.2);
+          } else if (p < 0.75) {
+            this.x = sx;
+            this.y = sy;
+          } else {
+            const u = smooth((p - 0.75) / 0.25);
+            this.x = sx + (t.end - sx) * u;
+            this.y = sy + (t.y1 - sy) * u;
+          }
+          if (t.technique === "monkey" || t.technique === "shimmy")
+            t.contact.x =
+              t.obstacle!.start + (t.obstacle!.end - t.obstacle!.start) / 2;
+        } else if (t.technique === "cat-leap" || t.technique === "wall-pop") {
+          const hang = Math.max(0.12, t.arc - 1.45);
+          const grip = t.contact.x - 0.35;
+          if (p < 0.2) {
+            this.x = t.start + (grip - t.start) * smooth(p / 0.2);
+            this.y = t.y0 + hang * smooth(p / 0.2);
+          } else if (p < 0.55) {
+            this.x = grip;
+            this.y = t.y0 + hang;
+          } else if (p < 0.8) {
+            this.x = grip + (t.end - 0.6 - grip) * smooth((p - 0.55) / 0.25);
+            this.y = t.y0 + hang + (t.arc - hang) * smooth((p - 0.55) / 0.25);
+          } else {
+            this.x = t.end - 0.6 + 0.6 * smooth((p - 0.8) / 0.2);
+            this.y = t.y0 + t.arc * (1 - smooth((p - 0.8) / 0.2));
+          }
+        } else if (t.technique === "tic-tac" || t.technique === "rebound") {
+          this.y = t.y0 + 0.35 * Math.sin(Math.PI * p);
+        } else if (t.technique === "duck" || t.technique === "squeeze") {
+          this.y = t.y0;
+        } else if (t.technique === "double-kong") {
+          this.y =
+            t.y0 +
+            t.arc * Math.sin(Math.PI * Math.min(1, p / 0.85)) +
+            0.25 * Math.abs(Math.sin(2 * Math.PI * p));
+          t.contact.x =
+            t.obstacle!.start +
+            (t.obstacle!.end - t.obstacle!.start) *
+              (0.25 + 0.5 * smooth((p - 0.4) / 0.2));
+        } else if (
+          t.technique === "canopy" ||
+          t.technique === "palm-drop" ||
+          t.technique === "drop-through"
+        ) {
+          this.y =
+            t.y0 +
+            t.arc * (p < 0.3 ? smooth(p / 0.3) : 1 - smooth((p - 0.3) / 0.7));
+        } else {
+          this.y = t.y0 + t.arc * Math.sin(Math.PI * p);
+        }
+      }
+      if (
+        t.move === "special" &&
+        t.obstacle &&
+        ["double-kong", "precision", "reverse", "transfer", "stride"].includes(
+          t.technique ?? "",
+        )
+      ) {
+        const rise = clamp(
+          (this.x - t.start) / Math.max(0.1, t.obstacle.start - 0.25 - t.start),
+          0,
+          1,
+        );
+        const exit = clamp(
+          (t.end - this.x) / Math.max(0.1, t.end - t.obstacle.end - 0.25),
+          0,
+          1,
+        );
+        this.y = t.y0 + t.arc * Math.sin((Math.PI / 2) * Math.min(rise, exit));
+      }
+      if (t.move === "special" && isSwing(t.technique) && t.contact) {
+        const angle = -0.5 + p * 1.3;
+        const sx = t.contact.x + Math.sin(angle) * 1.8,
+          sy = t.contact.y - Math.cos(angle) * 1.8;
+        const blend = clamp(p / 0.15, 0, 1);
+        this.x = (t.catchX ?? sx) + (sx - (t.catchX ?? sx)) * blend;
+        this.y = (t.catchY ?? sy) + (sy - (t.catchY ?? sy)) * blend;
+      }
       this.vy = (this.y - previousY) / STEP;
       if (p === 1) {
-        if (t.move === "catch" && t.contact) {
+        if (t.move === "special" && isSwing(t.technique)) {
+          this.tryAction("forward");
+        } else if (t.move === "catch" && t.contact) {
           this.traversal = {
             ...t,
             start: this.x,
@@ -1157,9 +1811,12 @@ export class Run {
           this.y = t.y1;
           this.grounded = true;
           this.lastGround = this.time;
-          this.upper = this.y > 2;
+          this.upper = t.upper ?? this.y > 2;
           this.vy = 0;
-          this.setMove("land", 0.09);
+          this.setMove(
+            t.move === "dive" ? "roll" : "land",
+            t.move === "dive" ? 0.4 : 0.09,
+          );
         }
       }
     } else this.physics();
@@ -1205,7 +1862,50 @@ export class Run {
       slideExitAge: Math.min(1, this.time - this.slideExitAt),
       lead: this.lead,
       longJump: this.longJump,
+      slope: this.grounded ? this.slope() : 0,
+      ...(this.traversal?.technique
+        ? { technique: this.traversal.technique }
+        : {}),
+      side: this.traversal?.side ?? 1,
+      lane:
+        this.traversal?.technique &&
+        ["tic-tac", "rebound", "wall-pop", "cat-leap"].includes(
+          this.traversal.technique,
+        )
+          ? 0.55 -
+            1.05 *
+              Math.sin(
+                (Math.PI * this.traversal.elapsed) / this.traversal.duration,
+              )
+          : this.x >= this.sideLaneStart && this.x < this.sideLaneEnd
+            ? 0.55 +
+              1.5 *
+                Math.min(
+                  1,
+                  (this.x - this.sideLaneStart) / 0.7,
+                  (this.sideLaneEnd - this.x) / 0.7,
+                )
+            : this.move === "wall-run"
+              ? 0.55 -
+                0.9 *
+                  Math.sin(
+                    Math.PI *
+                      Math.min(
+                        1,
+                        (this.traversal?.elapsed ?? 0) /
+                          Math.max(0.01, this.traversal?.duration ?? 1),
+                      ),
+                  )
+              : 0.55,
     };
+  }
+  private slope() {
+    const ramp = ramps.find(
+      (o) => this.applicable(o) && this.x >= o.x && this.x < o.x + o.width,
+    );
+    return ramp && Math.abs(this.y - rampHeight(ramp, this.x)) < 0.04
+      ? ramp.height! / ramp.width
+      : 0;
   }
   record(): RecordRun {
     return {

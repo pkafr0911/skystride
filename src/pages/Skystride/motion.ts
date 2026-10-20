@@ -854,9 +854,244 @@ function wallClimbPose(f: Frame): Pose {
   return p;
 }
 
+function divePose(f: Frame): Pose {
+  const load = lowPose(),
+    flight = basePose(),
+    tuck = lowPose();
+  flight.hip = [-0.25, 0.75, 0];
+  flight.chest = [0.3, 0.89, 0];
+  flight.head = [0.62, 1.02, 0];
+  flight.hands = [
+    [0.96, 0.95, -0.2],
+    [0.96, 0.95, 0.2],
+  ];
+  flight.feet = [
+    [-1, 0.68, -0.14],
+    [-0.9, 0.55, 0.14],
+  ];
+  flight.knees = [
+    [-0.6, 0.6, -0.14],
+    [-0.5, 0.5, 0.14],
+  ];
+  tuck.feet = [
+    [0.52, 0.1, -0.14],
+    [0.6, 0.1, 0.14],
+  ];
+  return sequence(
+    [
+      { at: 0, pose: runPose(f.x, f.speed) },
+      { at: 0.12, pose: load },
+      { at: 0.36, pose: flight },
+      { at: 0.65, pose: flight },
+      { at: 1, pose: tuck },
+    ],
+    f.progress,
+  );
+}
+function wallRunPose(f: Frame): Pose {
+  const p = runPose(f.x, f.speed),
+    kick = jumpPose({ ...f, vy: 5, moveTime: 0.2 });
+  p.chest[2] += 0.18;
+  p.head[2] += 0.24;
+  for (let i = 0; i < 2; i++) {
+    p.feet[i][1] += 0.28;
+    p.feet[i][2] = -0.3;
+    p.knees[i][2] = -0.15;
+  }
+  p.hands[0] = [0.35, 1.35, -0.35];
+  const entry = blend(
+    jumpPose({ ...f, vy: 7, moveTime: 0.12 }),
+    p,
+    smooth(0, 0.2, f.progress),
+  );
+  return blend(entry, kick, smooth(0.68, 0.94, f.progress));
+}
+
+/** Contact-driven signature poses share the same articulated runner and replay clock. */
+function specialPose(f: Frame): Pose {
+  const t = f.technique,
+    u = f.progress,
+    p = basePose();
+  const contact = f.contact
+    ? ([f.contact.x - f.x, f.contact.y - f.y, 0] as Point)
+    : ([0, 1.1, 0] as Point);
+  if (t === "double-kong") {
+    return vaultPose({
+      ...f,
+      move: "vault",
+      vault: "kong",
+      progress: u < 0.5 ? u * 2 : (u - 0.5) * 2,
+    });
+  }
+  if (t === "underbar" || t === "lache" || t === "monkey" || t === "shimmy") {
+    const swing = Math.sin((u - 0.2) * Math.PI * 2);
+    p.hip = [-0.12 * swing, 0.84, 0];
+    p.chest = [0.08 * swing, 1.4, 0];
+    p.head = [0.1 * swing, 1.7, 0];
+    p.hands = [
+      [contact[0], contact[1], -0.22],
+      [contact[0], contact[1], 0.22],
+    ];
+    if (t === "monkey" || t === "shimmy") {
+      const hand = Math.floor(u * 6) % 2;
+      p.hands[hand][0] += 0.32 * Math.sin(u * 6 * Math.PI);
+      p.hands[hand][1] -= 0.16 * Math.abs(Math.sin(u * 6 * Math.PI));
+    }
+    p.feet = [
+      [0.6 * swing, 0.2, -0.14],
+      [0.5 * swing, 0.3, 0.14],
+    ];
+    p.knees = [
+      [0.6, 0.7, -0.14],
+      [0.5, 0.8, 0.14],
+    ];
+    p.elbows = [
+      [-0.3, 1.5, -0.23],
+      [-0.3, 1.5, 0.23],
+    ];
+    return blend(
+      blend(runPose(f.x, f.speed), p, smooth(0, 0.2, u)),
+      lowPose(),
+      smooth(0.78, 1, u),
+    );
+  }
+  if (t === "duck" || t === "canopy") {
+    const low = lowPose();
+    if (t === "duck") {
+      low.feet[0][0] += 0.12 * Math.sin(u * 4 * Math.PI);
+      low.feet[1][0] -= 0.12 * Math.sin(u * 4 * Math.PI);
+      low.hip[1] += 0.12;
+    }
+    return sequence(
+      [
+        { at: 0, pose: runPose(f.x, f.speed) },
+        { at: 0.2, pose: low },
+        { at: 0.8, pose: low },
+        { at: 1, pose: runPose(f.x, f.speed) },
+      ],
+      u,
+    );
+  }
+  if (t === "cat-leap" || t === "wall-pop") {
+    const hold = basePose();
+    hold.hip = [-0.2, 0.8, 0];
+    hold.chest = [0.02, 1.3, 0];
+    hold.head = [0.04, 1.6, 0];
+    hold.hands = [
+      [contact[0], contact[1], -0.22],
+      [contact[0], contact[1], 0.22],
+    ];
+    hold.feet = [
+      [0.35, 0.5, -0.14],
+      [0.4, 0.35, 0.14],
+    ];
+    hold.knees = [
+      [0.65, 0.8, -0.14],
+      [0.65, 0.7, 0.14],
+    ];
+    return sequence(
+      [
+        { at: 0, pose: jumpPose({ ...f, vy: 7, moveTime: 0.15 }) },
+        { at: 0.35, pose: hold },
+        { at: 0.55, pose: hold },
+        { at: 0.8, pose: lowPose() },
+        { at: 1, pose: runPose(f.x, f.speed) },
+      ],
+      u,
+    );
+  }
+  if (t === "precision" || t === "stride") {
+    const land = lowPose();
+    land.feet = [
+      [0.3, 0.09, -0.14],
+      [0.34, 0.09, 0.14],
+    ];
+    land.hands = [
+      [-0.6, 1, -0.3],
+      [0.55, 1.15, 0.3],
+    ];
+    if (t === "stride") {
+      const side = Math.floor(u * 4) % 2;
+      land.feet[side][0] -= 0.5;
+      land.feet[side][1] += 0.35;
+      land.hip[1] += 0.15;
+    }
+    return sequence(
+      [
+        { at: 0, pose: jumpPose({ ...f, vy: 5, moveTime: 0.15 }) },
+        { at: 0.45, pose: land },
+        { at: 0.6, pose: land },
+        { at: 1, pose: runPose(f.x, f.speed) },
+      ],
+      u,
+    );
+  }
+  if (t === "palm-drop" || t === "drop-through") {
+    p.hands = [
+      [contact[0], contact[1], -0.22],
+      [contact[0] + 0.15, contact[1], 0.22],
+    ];
+    if (t === "palm-drop") p.hands[1] = [-0.4, 1.2, 0.22];
+    p.feet = [
+      [0.4, 0.12, -0.14],
+      [0.45, 0.12, 0.14],
+    ];
+    return sequence(
+      [
+        { at: 0, pose: runPose(f.x, f.speed) },
+        { at: 0.3, pose: p },
+        { at: 0.55, pose: p },
+        { at: 1, pose: lowPose() },
+      ],
+      u,
+    );
+  }
+  if (t === "tic-tac" || t === "rebound") {
+    p.feet[0] = [contact[0], contact[1], -0.35];
+    p.knees[0] = [0.7, 0.85, -0.15];
+    p.hands[0] = [0.4, 1.4, -0.4];
+    p.hands[1] = [-0.5, 1.3, 0.25];
+    p.chest[2] = 0.15;
+    p.head[2] = 0.2;
+    return sequence(
+      [
+        { at: 0, pose: runPose(f.x, f.speed) },
+        { at: 0.35, pose: p },
+        { at: 0.55, pose: p },
+        { at: 1, pose: jumpPose({ ...f, vy: -4, moveTime: 0.5 }) },
+      ],
+      u,
+    );
+  }
+  const rotate = (point: Point, a: number): Point => [
+    point[0] * Math.cos(a) - point[2] * Math.sin(a),
+    point[1],
+    point[0] * Math.sin(a) + point[2] * Math.cos(a),
+  ];
+  const pose =
+    t === "squeeze"
+      ? divePose(f)
+      : vaultPose({ ...f, move: "vault", vault: "lazy" });
+  const angle =
+    (t === "reverse"
+      ? Math.PI * 2 * u
+      : (Math.sin(Math.PI * u) * Math.PI) / 2) * (f.side ?? 1);
+  for (const key of ["hip", "chest", "head"] as const)
+    pose[key] = rotate(pose[key], angle);
+  for (const key of ["feet", "knees", "hands", "elbows"] as const)
+    pose[key] = pose[key].map((v) => rotate(v, angle));
+  return pose;
+}
+
 /** Pure animation sampling: seeking, ghost playback and live frames all evaluate identical poses. */
-export function poseFor(f: Frame): Pose {
+function flatPose(f: Frame): Pose {
   switch (f.move) {
+    case "special":
+      return specialPose(f);
+    case "dive":
+      return divePose(f);
+    case "wall-run":
+      return wallRunPose(f);
     case "run":
       if ((f.slideExitAge ?? 1) < 0.16)
         return blend(
@@ -914,7 +1149,63 @@ export function poseFor(f: Frame): Pose {
   }
 }
 
+export function poseFor(f: Frame): Pose {
+  const p = flatPose(f);
+  if (f.move === "vault" && f.side === -1) {
+    for (const point of [
+      p.hip,
+      p.chest,
+      p.head,
+      ...p.feet,
+      ...p.knees,
+      ...p.hands,
+      ...p.elbows,
+    ])
+      point[2] *= -1;
+    p.feet.reverse();
+    p.knees.reverse();
+    p.hands.reverse();
+    p.elbows.reverse();
+    p.footAngles.reverse();
+  }
+  const slope = f.grounded ? (f.slope ?? 0) : 0;
+  if (slope) {
+    for (const point of [
+      p.hip,
+      p.chest,
+      p.head,
+      ...p.feet,
+      ...p.knees,
+      ...p.hands,
+      ...p.elbows,
+    ])
+      point[1] += point[0] * slope;
+    for (let side = 0; side < 2; side++) {
+      p.feet[side][1] = Math.max(
+        p.feet[side][1],
+        0.09 - (f.y - (f.y >= 3.3 ? 3.3 : 0)),
+      );
+      p.footAngles[side] += Math.atan(slope);
+    }
+  }
+  return p;
+}
+
 export function motionPhase(f: Frame): string {
+  if (f.move === "special")
+    return `${f.technique?.replaceAll("-", " ").toUpperCase()} · ${f.progress < 0.25 ? "ENTRY" : f.progress < 0.7 ? "CONTACT & DRIVE" : "RELEASE & LAND"}`;
+  if (f.move === "dive")
+    return f.progress < 0.15
+      ? "LOAD & LAUNCH"
+      : f.progress < 0.65
+        ? "REACH THROUGH OPENING"
+        : "TUCK & ROLL";
+  if (f.move === "wall-run")
+    return f.progress < 0.2
+      ? "WALL ENTRY"
+      : f.progress < 0.68
+        ? "ALTERNATING WALL CONTACTS"
+        : "KICK TO LEDGE";
   if (f.move === "wall-climb")
     return f.progress < 0.35
       ? "APPROACH & FOOT PLANT"
@@ -981,6 +1272,8 @@ export function interpolateFrame(a: Frame, b: Frame, t: number): Frame {
     y: mix(a.y, b.y, t),
     speed: mix(a.speed, b.speed, t),
     vy: mix(a.vy, b.vy, t),
+    slope: mix(a.slope ?? 0, b.slope ?? 0, t),
+    lane: mix(a.lane ?? 0.55, b.lane ?? 0.55, t),
     moveTime: sameMove ? mix(a.moveTime, b.moveTime, t) : a.moveTime,
     progress: sameMove ? mix(a.progress, b.progress, t) : a.progress,
     landingAge:

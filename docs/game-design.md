@@ -1,5 +1,24 @@
 # Skystride — movement and course design
 
+## Current course update — creative obstacles (v8)
+
+Four authored encounter families now recur in the opening and three later rooftop blocks, for 24 interactive pieces:
+
+- **Split ventilation banks:** the first pair begins at 217 m. Up in the approach window performs Kong then dash; an earlier jump can land on the first unit, followed by another jump over its partner. The exposed tops are physical support surfaces.
+- **Solar launch ramps:** a 6 m panel incline rises 1.1 m into the gap at 240 m. Running follows the actual slope and costs uphill momentum. Jumping carries current speed from the raised launch point; the landing requires a timed roll. Feet and sole orientation follow the incline.
+- **Billboard openings:** at 402 m, a 0.85 m sill sits below a header with a 3.45 m underside. A contextual vault passes through; mistimed high jumps hit the header. Header collision remains active after its scoring event, and the sign top is also a physical landing surface.
+- **Pipe crossings:** at 424 m, dash the low pipe then slide beneath the raised pipe, or use an early jump to land on the first and jump onto the second. Flat service grating provides the top contact surface.
+
+The later blocks repeat these encounters at offsets of 1,480, 1,960 and 2,440 m. Filler is excluded from their decision approaches and between paired contacts. Early Up remains a normal jump; contextual Up selects a vault when close. Right can opt for a free momentum-based jump near these props.
+
+Clean simulation drivers finish in 238.59 seconds on normal (354 inputs) and 238.55 seconds on hard (350 inputs), with no forced recoveries. These are repeatable test-driver results, not optimal leaderboard times. Earlier v6/v7 metrics below describe previous course versions.
+
+Geometry uses shared boxes/cylinders and the existing material batching, spatial culling and disposal. Solar panel cells are geometry, not downloaded textures. No new runtime dependencies, postprocessing or input delay were introduced. Physics and meshes use the same obstacle dimensions; raycast tests verify their contact planes.
+
+![Offline render of the actual procedural obstacle meshes](creative-obstacles.png)
+
+This preview is an offline geometry study. Browser lighting, mobile readability and real-device play feel remain unverified. The v8 record key separates changed course physics from earlier local bests without deleting them.
+
 ## Visual reference
 
 The supplied Skystride / Urban Silhouette concept is the visual direction: peach sunset, a pale warm sun, layered mauve skyline, navy roof silhouettes, thin amber roof edges, cream shirt and warm shoe accents. The scene uses original procedural geometry, including towers, vents, bridge silhouettes and pipework. This pass keeps that palette and composition; it is not a pixel-exact reproduction.
@@ -34,7 +53,7 @@ Down on the roof starts a 0.62 second slide, extending the low stance until the 
 
 Right / D / swipe right performs a long jump when current speed is at least 11.5 units/s, using a 13.6 units/s vertical launch. At lower speed it performs a normal jump and shows a build-speed cue. It never adds horizontal speed on takeoff. Up/down remain the essential controls. Swipe recognition uses an adjustable 10–32 pixel threshold (18 default), before release, with one action per contact.
 
-## Sunset Relay v7
+## Sunset Relay v8
 
 The course is now 3,000 units long with boundaries at 1,000, 2,000 and 3,000. The extended spacing supports the faster pace. Two upper routes add wall steps, gaps, vaults and drops; the lower line uses barriers and ducts. Both clean routes are exercised end-to-end by simulation tests. Tests verify that the clean upper route beats the clean lower route. Repeated mistimed vault jumps can now lose enough momentum to fail a later gap; air acceleration does not rescue those attempts.
 
@@ -44,7 +63,7 @@ Practice starts from a sector boundary and continues to the end; it does not yet
 
 The camera renders interpolated player positions between simulation ticks, looks ahead and eases vertically with elevated routes. A branch approach adds a small upward anticipation. No shake or dramatic zoom. Touch keeps the full play area as its gesture surface. Native fullscreen and landscape locking are requested where supported; edge-to-edge browser play remains available. Rotation, focus loss and long frame stalls pause the run and remove personal-best eligibility.
 
-The HUD shows time, personal best, route, current speed and flow. Results include sector times and difference against the previous best. The new course key is skystride.sunset-relay-v7.best, keeping incompatible earlier records separate.
+The HUD shows time, personal best, route, current speed and flow. Results include sector times and difference against the previous best. The new course key is skystride.sunset-relay-v8.best, keeping incompatible earlier records separate.
 
 Records now contain tick-stamped inputs and sampled animation frames. Tests reconstruct a complete upper-route run from its recorded inputs and compare its entire resulting record. This is local reproducibility testing; no server validation or cross-device determinism certification is claimed. Local saved data is not trusted competition data.
 
@@ -82,7 +101,7 @@ The 500–1450 m district supplies 48 obstacles on each line, emphasizing the fo
 
 Roof trim, railings, water tanks and checkpoint posts have neutral edges. Amber strips mark interactive vault surfaces, ducts, branch lips, gap edges and drops. Background sunlight and the runner’s costume accents retain the concept palette. Static boxes are instanced by material within 80 m chunks so distant districts can be culled; skyline layers wrap beyond the old 480 m extent.
 
-The course/replay key is now v7 because layout, timing and traversal trajectories changed. Existing records are left in storage but are not compared against the new course. This pass was checked through simulation, type checking, lint, production compilation and a software-rendered character pose study. Browser gameplay and real-phone feel still need visual/device playtesting.
+The course/replay key is now v8 because layout, timing and traversal trajectories changed. Existing records are left in storage but are not compared against the new course. This pass was checked through simulation, type checking, lint, production compilation and a software-rendered character pose study. Browser gameplay and real-phone feel still need visual/device playtesting.
 
 ## Character surface refinement
 
@@ -151,3 +170,64 @@ Of 332 vault obstacles, 320 now use the four requested families: 86 speed, 76 Ko
 Background service props and water towers use lighter, desaturated unlit materials and sit farther behind the running lane. Interactive barriers retain darker dimensional faces; amber tops and duct undersides identify usable surfaces. Decorative objects have no amber interaction strips. No postprocessing, extra lighting passes or assets were added. Support arrays are built once rather than allocated in the 120 Hz loop.
 
 Verification includes late/airborne climbing, physical obstacle-top landing on both routes, immediate follow-up jumps, mantle interruption, gravity-driven exits, opposing arm swing, real dash hand contacts, full-course balance and deterministic replay. Offline geometry pose studies inspect sprint and dash poses; they do not verify browser lighting or real-device feel.
+
+## Creative encounter course — v9
+
+All ten families are authored into the opening district and its later repetitions. The route is still a deterministic 3,000 m time trial. Amber marks usable contacts; greenhouse glazing and background structure have no amber trim. A changed replay version separates these times from older courses.
+
+| Encounter | Animation and input sequence | Route choice |
+| --- | --- | --- |
+| Split ventilation bank | Up: leg-load, Kong hand plant/push, release; next Up: feet-forward dash | Early jump uses the first unit as a launch surface |
+| Solar frame | Feet align to the slope, upward momentum costs approach speed, jump from raised edge | Elevation helps the following gap; prepare a landing roll |
+| Tank cradle | Down: crouch/slide; Up: one-hand lazy vault in front of the support; Right: hand-supported platform climb | Slide, side brace or elevated launch |
+| Wall-run billboard | Up: knee-driven entry, alternating wall contacts, outward kick to the exit deck | Optional elevated line; Up again jumps from the deck |
+| Pipe crossing | Dash over the low pipe, absorb landing, crouch into overhead slide | Launch from a supported top to bypass the low line |
+| Broken bridge | Push-off, ballistic flight, feet-forward landing; late Up can catch the far lip | Clean jump or slower catch-and-climb recovery |
+| Construction window | Right at speed: leg load, horizontal reach, leg tuck, landing roll; Up: sill vault | Fast committed dive or supported vault |
+| Greenhouse | Planter vault, Up to service ledge, then jump before its edge | Clear the glazing; hitting glass ends the attempt |
+| Suspended scaffold | Descending landing on the small deck, impact absorption, immediate next jump; Up can catch its lip | Intermediate upper landing; normal lower course remains available |
+| Staggered balconies | Foot-driven high climb, hand catch, pull/press; repeated Up climbs the next ledge | Keep climbing or jump out toward the roof |
+
+Platforms retain their route ownership independently of their height. Thin decks have underside/fascia collision, and glass is excluded from support surfaces. A scaffold is suspended visually but deliberately stationary, so attempts do not depend on a moving-platform phase. Wall-run and dive are inspectable in the movement lab. The geometry sheet in `creative-obstacles.png` is an offline render of the actual shared Three.js meshes, not a screenshot of live gameplay.
+
+The fixed 120 Hz simulation, direct swipe handling and shared geometry/material resources remain in use. No physics package, postprocessing or new runtime dependency was added. New encounter regression tests cover three tank actions, billboard top-out, dive-to-roll, balcony chains, greenhouse collision, and both complete routes. Browser/mobile motion feel and final difficulty balance still require playtesting.
+
+## Greenhouse accessibility fix — v10
+
+The greenhouse no longer forces a service-ledge jump. Its glazing begins at 1.25 m, leaving a visible ground-level slide passage; the rear supports stay outside the running lane. The service ledge also respects the crouched collision height. Slide stays active while beneath the glass, including at low entry speed. The elevated jump remains available, with a dedicated edge-launch cue. Amber under the frame marks clearance, not a usable glass landing. Regression coverage exercises every repeated greenhouse at 5.5, 9, 12 and 14 m/s plus the low approach under its service ledge. Replay version advances because the available routes changed.
+
+## Greenhouse sequence recovery — v11
+
+Fixed a missing low-speed case: a slide now remains crouched beneath the service ledge until the runner clears its trailing edge. Previously its timer could expire inside the visible passage. The complete low line uses Down before the ledge and Down again before the greenhouse frame. Tests exercise that sequence across all repeated sections at 5.5–14 m/s, plus slower ledge crossings.
+
+Glass still cannot support the runner, but a missed upper jump now makes recoverable frame contact instead of immediately ending the attempt. The runner loses momentum, falls outside the entry face, and can slide underneath after landing. Contact is charged once per frame. A regression covers this failed-jump-to-slide recovery. This supersedes the v9 instant-failure behavior.
+
+## Course flow pass — v12
+
+Replaced the greenhouse's abrupt service-table climb with a closed 6 m ramp from x=271 to x=277 in each repeated district. The main sequence is now planter vault → continuous run up the ramp → jump over the greenhouse → prepared landing roll. The ramp is visibly solid, so it no longer suggests sliding beneath a table. The greenhouse's low passage remains a recovery option after missed upper-line contact. Earlier service-table/two-slide instructions are superseded.
+
+Course-wide review uses complete normal and hard runs with both 1.5 m and 2.2 m contextual approaches, in addition to the original 1.9 m driver. All finish without forced recoveries; separate jump/vault inputs retain at least 150 ms separation. Dedicated ramp checks cover every repeated greenhouse at 9, 12 and 13.5 m/s. These checks cover authored chains, generated filler contacts, technical sections, route joins and final gaps. They verify traversability/timing tolerance, not subjective controller feel.
+
+The HUD prioritizes landing-roll guidance during descending elevated/long jumps, rather than immediately displaying a later vault. This makes momentum loss from an unprepared landing more avoidable throughout the course. The 120 Hz physics and real momentum requirements remain unchanged. Versioned best times advance to v12 because the course geometry changed.
+
+## Authored combos and movement lab — v13
+
+The technical district now contains 20 named five-contact phrases on each route (100 authored contacts per route). These replace repetitive generated contacts in that district; the opening, later districts, greenhouse ramp and speed-dependent jumps remain. Names and per-chain contact numbers appear in the HUD. Deliberate spacing replaces the former 650 ms median-cadence target with an 800 ms limit, retaining at least 280 inputs over a complete route and a 3–5 minute run. No combo multiplier was added.
+
+All 20 designs have playable first-pass course interpretations: Vent Relay, Over–Under, Planter Slalom, Roof Transfer, Window Express, Wall Redirect, Scaffold Traverse, Rail Precision, Crane Reach, Descending Flow, Corner Cut, High-Line Escape, Gate Thread, Stride Stones, Wall Traverse, Rail Switch, Drop Through, Wall Pop, Beam Duck and Roof Rollout. Lower routes use compact supported crossings where overhead upper-roof clearance makes a gap jump unsuitable. Upper routes keep aerial crossings and replace selected ducts with Kong contacts. Landing corridors in Rail Precision and Beam Duck were lengthened after full-route checks found late contacts.
+
+Eighteen new procedural movement profiles cover tic-tac, underbar, double Kong, lache, rebound, precision, canopy slide, palm drop, monkey traverse, reverse vault, cat leap, squeeze, running strides, shimmy, lateral transfer, drop-through, wall pop and moving crouch. Their obstacle geometry is shared between the game and the lab; amber marks support/contact areas. These are authored contact trajectories on the existing articulated runner, not imported motion-capture clips or a general-purpose climbing physics system. The terrain motifs remain compact rooftop arrangements: multi-building crane branches, backward cat-leap escape routes and arbitrary lateral route switching are not implemented by this pass.
+
+Up initiates a contextual move. Right during a bar contact releases into the existing gravity simulation with current horizontal speed and timing-dependent vertical velocity; Down drops to the lower exit. Cat catches support Up top-out or Down drop. Unprompted bar contacts have a timed automatic exit, so a missed release does not trap the run. Release actions preserve position and do not reset momentum. Alternating planter vaults mirror the pose.
+
+Movement lab: every new technique is selectable, plus `CHAIN · …` previews for all 20 combinations. These previews replay scripted inputs through the real simulation; they are not player-controlled practice runs. Existing speed slider, freeze, scrub, slow playback and five-pose sheet remain. Bar release can be early, normal, late or automatic. A pure lab sampler is shared with regression tests so an empty or unfinished selection fails verification.
+
+Verification covers every authored signature on both routes, finite contact animation, all lab selections, full normal/hard routes at varied approach distances, deterministic replay, release continuity and controlled cat drops. Offline geometry studies can be exported with `node scripts/obstacle-study.cjs --signatures`. Browser/mobile animation feel and final visual contact polish remain to be playtested.
+
+## Airborne bar crossings — v14
+
+Underbar, lache and monkey-traverse contacts now span actual roof gaps on both routes. Up jumps from the approach; a catch requires an airborne runner within hand reach and a recent jump input. Walking off the bank cannot trigger an automatic traversal. The bar supports stand on the banks, and amber edge markers identify the crossing. Shimmy remains a supported wall contact.
+
+Right releases with current horizontal momentum into gravity; timing changes the release position and arc. Lower-route release arcs respect the upper deck's clearance. Down drops into the void, so it is no longer a safe shortcut beneath these bars. The timed automatic release remains as a fallback but also uses airborne physics rather than snapping onto invisible ground. A missed grab can lose the run.
+
+Movement-lab uses the same jump/catch simulation and visibly split roof banks, including full combo previews and release timing controls. Regression checks cover real support gaps, no walking grabs, airborne takeoff, far-bank landings, full-route completion and deterministic replay. Browser/mobile feel still needs hands-on playtesting.
