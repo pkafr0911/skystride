@@ -1,8 +1,16 @@
-import { comboCourse, isSwing, techniques, Technique } from "./combos";
+import {
+  SWING_GAP_EXTRA,
+  SWING_DURATION,
+  SWING_RELEASE_SPEED,
+  comboCourse,
+  isSwing,
+  techniques,
+  Technique,
+} from "./combos";
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v14";
+export const VERSION = "sunset-relay-v15";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -372,7 +380,7 @@ function cut(start: number, end: number, y: number, upper: boolean): Surface[] {
       item.x < end,
   )) {
     result.push({ start: cursor, end: o.x, y });
-    cursor = o.x + o.width + (isSwing(o.technique) ? 1.4 : 0);
+    cursor = o.x + o.width + (isSwing(o.technique) ? SWING_GAP_EXTRA : 0);
   }
   result.push({ start: cursor, end, y });
   return result;
@@ -569,7 +577,7 @@ export function readRecord(raw: string | null): RecordRun | null {
           f.y >= -9 &&
           f.y <= 20 &&
           f.speed >= 0 &&
-          f.speed <= 25 &&
+          f.speed <= SWING_RELEASE_SPEED &&
           f.progress >= 0 &&
           f.progress <= 1 &&
           typeof f.grounded === "boolean" &&
@@ -930,18 +938,17 @@ export class Run {
         this.launchX = this.x;
         this.launchY = this.y;
         this.dropFrom = this.y;
+        this.speed = Math.max(this.speed, SWING_RELEASE_SPEED);
         this.vy = 2.5 + clamp(t.elapsed / t.duration, 0, 1) * 1.5;
         if (!this.upper && t.obstacle) {
           // The lower exit passes below the upper deck: project a low arc
           // instead of driving the runner's head into its leading fascia.
           const flight = Math.max(
             0.05,
-            (t.obstacle.end + 1.4 - 0.23 - this.x) / Math.max(3, this.speed),
+            (t.obstacle.end + SWING_GAP_EXTRA - 0.23 - this.x) /
+              Math.max(3, this.speed),
           );
-          this.vy = Math.min(
-            this.vy,
-            (0.48 - this.y + GRAVITY * 0.5 * flight * flight) / flight,
-          );
+          this.vy = (0.3 - this.y + 33 * 0.5 * flight * flight) / flight;
         }
         this.traversal = null;
         this.grounded = false;
@@ -1304,7 +1311,7 @@ export class Run {
         t.y0 = base;
         t.y1 = base;
         t.contact = { x: bar.x + bar.width / 2, y: base + bar.height! };
-        t.duration = 0.9;
+        t.duration = SWING_DURATION;
         t.catchX = this.x;
         t.catchY = this.y;
         this.say("BAR CAUGHT · RIGHT TO RELEASE");

@@ -1,4 +1,4 @@
-import { isSwing } from "./combos";
+import { SWING_GAP_EXTRA, isSwing } from "./combos";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -1172,7 +1172,10 @@ test("swing crossings have real voids and cannot be caught by walking", () => {
     const base = o.route === "upper" ? 3.3 : 0;
     assert.ok(
       !surfaces.some(
-        (s) => s.y === base && s.start < o.x + o.width + 1.4 && s.end > o.x,
+        (s) =>
+          s.y === base &&
+          s.start < o.x + o.width + SWING_GAP_EXTRA &&
+          s.end > o.x,
       ),
     );
     const g = new Run();
@@ -1190,27 +1193,37 @@ test("swing crossings have real voids and cannot be caught by walking", () => {
 
 test("jump catch and manual release land across every bar gap", () => {
   for (const o of obstacles.filter((o) => isSwing(o.technique))) {
-    const g = new Run();
-    g.start();
-    g.upper = o.route === "upper";
-    g.x = o.x - 1.9;
-    g.y = g.upper ? 3.3 : 0;
-    g.speed = 12;
-    g.action("up");
-    g.step();
-    assert.equal(g.grounded, false);
-    assert.equal(g.traversal, null, "takeoff must precede the grab");
-    for (let i = 0; i < 100 && !g.traversal; i++) g.step();
-    assert.ok(g.traversal, o.technique);
-    while (g.traversal && g.frame().progress < 0.55) g.step();
-    g.action("forward");
-    g.step();
-    assert.equal(g.grounded, false);
-    for (let i = 0; i < 150 && !g.grounded && g.phase === "running"; i++)
+    for (const releaseAt of [0.4, 0.55, 0.7]) {
+      const g = new Run();
+      g.start();
+      g.upper = o.route === "upper";
+      g.x = o.x - 1.9;
+      g.y = g.upper ? 3.3 : 0;
+      g.speed = 12;
+      g.action("up");
       g.step();
-    assert.equal(g.phase, "running");
-    assert.equal(g.grounded, true, `${o.technique} ${o.route} far bank`);
-    assert.ok(g.x >= o.x + o.width + 1.4);
-    assert.equal(g.recoveries, 0);
+      assert.equal(g.grounded, false);
+      assert.equal(g.traversal, null, "takeoff must precede the grab");
+      for (let i = 0; i < 100 && !g.traversal; i++) g.step();
+      assert.ok(g.traversal, o.technique);
+      while (g.traversal && g.frame().progress < releaseAt) g.step();
+      g.action("forward");
+      g.step();
+      assert.equal(g.grounded, false);
+      for (let i = 0; i < 150 && !g.grounded && g.phase === "running"; i++)
+        g.step();
+      assert.equal(g.phase, "running");
+      assert.equal(g.grounded, true, `${o.technique} ${o.route} far bank`);
+      assert.ok(g.x >= o.x + o.width + SWING_GAP_EXTRA);
+      assert.equal(g.recoveries, 0);
+    }
+  }
+});
+
+test("bar gaps exceed the maximum ordinary long-jump range", () => {
+  // Even an ideal same-height jump at maximum running flow cannot bridge these banks.
+  const maxFlight = 13.6 / 30 + 13.6 / Math.sqrt(30 * 35.4);
+  for (const o of obstacles.filter((o) => isSwing(o.technique))) {
+    assert.ok(o.width + SWING_GAP_EXTRA > 13.5 * maxFlight + 0.44);
   }
 });

@@ -1,4 +1,4 @@
-import { isSwing } from "./combos";
+import { SWING_GAP_EXTRA, isSwing } from "./combos";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import {
@@ -312,7 +312,7 @@ export default function Scene({
         if (o.kind === "gap" || isSwing(o.technique))
           box(
             scene,
-            o.x + o.width + (isSwing(o.technique) ? 1.4 : 0) + 0.12,
+            o.x + o.width + (isSwing(o.technique) ? SWING_GAP_EXTRA : 0) + 0.12,
             y + 0.035,
             0,
             0.24,

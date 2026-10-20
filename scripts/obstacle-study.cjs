@@ -3,6 +3,7 @@ process.env.TS_NODE_PROJECT = "src/pages/Skystride/tsconfig.test.json";
 require("ts-node/register");
 const fs = require("node:fs");
 const THREE = require("three");
+const { SWING_GAP_EXTRA } = require("../src/pages/Skystride/combos");
 const { obstacles } = require("../src/pages/Skystride/model");
 const { creativeObstacle } = require("../src/pages/Skystride/obstacle-mesh");
 const box = new THREE.BoxGeometry(),
@@ -63,7 +64,7 @@ for (const [feature, title] of entries) {
   if (["underbar", "lache", "monkey"].includes(feature)) {
     for (const [a, b] of [
       [start - 3, start],
-      [end + 1.4, end + 4.4],
+      [end + SWING_GAP_EXTRA, end + SWING_GAP_EXTRA + 3],
     ]) {
       const bank = new THREE.Mesh(box, materials[1]);
       bank.position.set((a + b - start - end) / 2, -0.15, 0);
@@ -71,7 +72,7 @@ for (const [feature, title] of entries) {
       scene.add(bank);
     }
   } else if (feature !== "bridge" && feature !== "scaffold") scene.add(roof);
-  const width = Math.max(11, end - start + 3);
+  const width = Math.max(11, end - start + SWING_GAP_EXTRA + 6);
   const camera = new THREE.OrthographicCamera(
     -width / 2,
     width / 2,

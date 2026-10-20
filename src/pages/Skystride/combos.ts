@@ -23,6 +23,9 @@ export const techniques = [
 export type Technique = (typeof techniques)[number];
 export const isSwing = (t?: Technique) =>
   t === "underbar" || t === "lache" || t === "monkey";
+export const SWING_GAP_EXTRA = 10.2;
+export const SWING_RELEASE_SPEED = 30;
+export const SWING_DURATION = 0.55;
 export const comboNames = [
   "Vent Relay",
   "Over–Under",
@@ -76,6 +79,7 @@ const slide = (x: number): Obstacle => ({
 });
 /** Authored five-contact phrases. Their final run-out belongs to the next approach. */
 export function comboCourse(): Obstacle[] {
+  let crossingOffset = 0;
   return comboNames.flatMap((combo, i) => {
     let steps: Obstacle[];
     switch (i) {
@@ -275,6 +279,9 @@ export function comboCourse(): Obstacle[] {
           vault(36),
         ];
     }
+    const offset = crossingOffset;
+    const swing = steps.find((o) => isSwing(o.technique));
+    if (swing) crossingOffset += 8;
     return (["lower", "upper"] as const).flatMap((route) =>
       steps.map((o, contact) => ({
         ...(route === "lower" && (o.kind === "gap" || o.kind === "ramp")
@@ -288,7 +295,7 @@ export function comboCourse(): Obstacle[] {
               (o.technique === "cat-leap" || o.technique === "wall-pop")
             ? { height: 1.4 }
             : {}),
-        x: 512 + i * 44 + o.x,
+        x: 512 + i * 44 + offset + o.x + (swing && o.x > swing.x ? 8 : 0),
         route,
         combo,
         contact: contact + 1,

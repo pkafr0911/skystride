@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Frame, STEP } from "./model";
 import { options, Preview, framesFor, previewObstacles } from "./lab-model";
-import { techniques, isSwing, Technique } from "./combos";
+import { SWING_GAP_EXTRA, techniques, isSwing, Technique } from "./combos";
 import { creativeObstacle } from "./obstacle-mesh";
 import { makeRunner } from "./runner";
 import { interpolateFrame, motionPhase } from "./motion";
@@ -135,7 +135,7 @@ export default function MovementLab() {
           box((cursor + gap.x) / 2, base - 2, gap.x - cursor, 4);
           box((cursor + gap.x) / 2, base, gap.x - cursor, 0.035, amber);
         }
-        cursor = gap.x + gap.width + 1.4;
+        cursor = gap.x + gap.width + SWING_GAP_EXTRA;
       }
     }
     const cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);

@@ -67,3 +67,4 @@ Creative course encounters include ventilation chains, solar launch ramps, tank 
 Combo update: the technical district includes 20 named five-contact chains and 18 new procedural parkour profiles. In the movement lab, select an individual technique or a `CHAIN · …` preview; adjust entry speed and bar-release timing, scrub, freeze or inspect the pose sheet. Chain previews use scripted inputs through the same simulation as gameplay. Right releases a bar contact into flight; Down offers a controlled drop; Up tops out a cat catch. See the v13 game notes for current scope and limitations.
 
 Bar crossings (v14): jump into hand reach, catch, then release across a real roof gap. Movement-lab previews include the same gaps and airborne approach; walking into a bar no longer starts the move.
+Bar crossings v15 widen to 12.6 m with a faster 0.55 s swing, a stronger release impulse, and extended landing corridors. Movement-lab shares the updated geometry and physics.

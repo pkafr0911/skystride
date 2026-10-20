@@ -231,3 +231,9 @@ Underbar, lache and monkey-traverse contacts now span actual roof gaps on both r
 Right releases with current horizontal momentum into gravity; timing changes the release position and arc. Lower-route release arcs respect the upper deck's clearance. Down drops into the void, so it is no longer a safe shortcut beneath these bars. The timed automatic release remains as a fallback but also uses airborne physics rather than snapping onto invisible ground. A missed grab can lose the run.
 
 Movement-lab uses the same jump/catch simulation and visibly split roof banks, including full combo previews and release timing controls. Regression checks cover real support gaps, no walking grabs, airborne takeoff, far-bank landings, full-route completion and deterministic replay. Browser/mobile feel still needs hands-on playtesting.
+
+## Longer, faster bar crossings — v15
+
+Swing gaps expand from 3.8 m to 12.6 m, beyond an ordinary maximum-flow long jump including landing tolerance. The grab stays near the launch bank so takeoff remains reachable. The swing phase is shortened from 0.9 s to 0.55 s; release supplies a 30 m/s arcade carry impulse to cross the extended void, with normal grounded deceleration after landing. Lower-line release arcs are calculated for clearance beneath the upper roof. This impulse is deliberately stronger than running speed, rather than a physically passive pendulum.
+
+Each affected combo gains 8 m after its swing to retain the next approach and landing corridor. Later chains shift with it. Shared gap dimensions drive course support, roof markers, support posts, movement-lab floors and offline geometry studies. Record version advances because crossing timings and course layout changed.

@@ -1,3 +1,4 @@
+import { SWING_GAP_EXTRA } from "./combos";
 import * as THREE from "three";
 import { Obstacle } from "./model";
 
@@ -53,14 +54,24 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
     const edge = (x: number, y: number, width: number) =>
       box(x, y, 1.25, width, 0.045, 0.06, kit.amber);
     if (t === "underbar" || t === "lache" || t === "monkey" || t === "shimmy") {
-      for (const x of t === "shimmy" ? [0, w] : [-0.35, w + 1.75])
+      for (const x of t === "shimmy"
+        ? [0, w]
+        : [-0.35, w + SWING_GAP_EXTRA + 0.35])
         box(x, h / 2, -1.45, 0.12, h, 0.12, kit.trim);
       const count = t === "monkey" || t === "shimmy" ? 4 : 1;
       for (let n = 0; n < count; n++) {
         const x = count === 1 ? w / 2 : 0.2 + (n * (w - 0.4)) / (count - 1);
         box(x, h, 0, 0.09, 0.09, 2.8, kit.amber);
       }
-      box((w + 1.4) / 2, h, -1.45, w + 2.1, 0.14, 0.14, kit.face);
+      box(
+        (w + SWING_GAP_EXTRA) / 2,
+        h,
+        -1.45,
+        w + SWING_GAP_EXTRA + 0.7,
+        0.14,
+        0.14,
+        kit.face,
+      );
     } else if (
       t === "tic-tac" ||
       t === "rebound" ||
