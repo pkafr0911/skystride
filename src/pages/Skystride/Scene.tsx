@@ -14,6 +14,7 @@ import {
 } from "./model";
 import { creativeObstacle } from "./obstacle-mesh";
 import { makeRunner } from "./runner";
+import { speedZoom, easeZoom } from "./camera";
 import { interpolateFrame } from "./motion";
 
 export default function Scene({
@@ -47,6 +48,10 @@ export default function Scene({
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0xa59abb, 60, 170);
     const camera = new THREE.OrthographicCamera(-16, 16, 9, -9, 0.1, 240);
+    const motionPreference = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    );
+    camera.zoom = speedZoom(game.speed, motionPreference.matches);
     scene.add(new THREE.HemisphereLight(0xffd3b2, 0x25354e, 1.7));
     const sunlight = new THREE.DirectionalLight(0xffae6b, 1.6);
     sunlight.position.set(-12, 18, -9);
@@ -441,12 +446,25 @@ export default function Scene({
       const x = visual.x;
       const next = game.next();
       const anticipate = next?.kind === "branch" && next.x - x < 17 ? 0.5 : 0;
-      const targetHeight = 3.6 + Math.max(0, visual.y) * 0.32 + anticipate;
-      camera.position.set(
-        x + 9.5 + (visual.speed - 12) * 0.2,
-        camera.position.y || 5.2,
-        32,
+      const closeFraming = THREE.MathUtils.clamp(
+        (camera.zoom - 1) / 2.84,
+        0,
+        1,
       );
+      const targetHeight = THREE.MathUtils.lerp(
+        3.6 + Math.max(0, visual.y) * 0.32 + anticipate,
+        visual.y + 1.1,
+        closeFraming,
+      );
+      if (!game.paused) {
+        camera.zoom = easeZoom(
+          camera.zoom,
+          speedZoom(visual.speed, motionPreference.matches),
+          Math.min(dt, 0.05),
+        );
+        camera.updateProjectionMatrix();
+      }
+      camera.position.set(x + 9.5 / camera.zoom, camera.position.y || 5.2, 32);
       camera.position.y +=
         (targetHeight + 1.4 - camera.position.y) *
         (1 - Math.exp(-Math.min(dt, 0.05) * 4));

@@ -1,3 +1,4 @@
+import { speedZoom, easeZoom } from "./camera";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
@@ -632,4 +633,29 @@ test("movement lab samples every new technique and all 20 full chains", () => {
       `${name} preview did not finish`,
     );
   }
+});
+
+test("speed camera widens monotonically and preserves bounded framing", () => {
+  let prior = speedZoom(0);
+  for (let speed = 0; speed <= 60; speed++) {
+    const zoom = speedZoom(speed);
+    assert.ok(zoom <= prior && zoom >= 0.76 && zoom <= 3.84);
+    assert.equal(speedZoom(speed, true), speedZoom(0, true));
+    // Portrait's minimum 18m half-width keeps the runner and forward corridor visible.
+    assert.ok(18 / zoom - 9.5 / zoom > 2);
+    prior = zoom;
+  }
+});
+
+test("camera easing is independent of refresh rate and never overshoots", () => {
+  for (const target of [0.76, 3.84]) {
+    const sample = (hz: number) => {
+      let zoom = 1;
+      for (let i = 0; i < hz; i++) zoom = easeZoom(zoom, target, 1 / hz);
+      assert.ok(zoom >= Math.min(1, target) && zoom <= Math.max(1, target));
+      return zoom;
+    };
+    assert.ok(Math.abs(sample(60) - sample(144)) < 1e-10);
+  }
+  assert.equal(easeZoom(1, 0.76, 0), 1);
 });

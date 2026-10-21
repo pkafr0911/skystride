@@ -241,3 +241,9 @@ Each affected combo gains 8 m after its swing to retain the next approach and la
 ## Far-end bar grip — v16
 
 The airborne grab now targets the final 20 cm of the reachable bar section instead of its midpoint. Single crossbars move to that contact position; monkey traverse uses its final rung. The swing keeps this anchor through release, shared by gameplay and movement-lab. Gap width and swing duration remain unchanged.
+
+## Speed-responsive camera
+
+Gameplay uses smoothly eased orthographic zoom: 1.28× at rest, 1× at 12 m/s and 0.76× at 30 m/s. Acceleration opens the view faster than deceleration closes it. Look-ahead scales with the visible width, keeping the runner at a stable horizontal screen position and preserving the forward corridor on portrait displays. Pause freezes zoom; resize preserves it. Reduced-motion preference uses a stable wide view. Movement-lab retains its close inspection framing.
+
+Slow-speed framing now reaches 3.84× zoom (three times the previous 1.28× close view), easing back to 1× at running speed. Close framing also lowers the camera toward the runner's torso to keep the body visible. Fast-speed and reduced-motion framing remain unchanged.
