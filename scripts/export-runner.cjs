@@ -27,7 +27,7 @@ global.FileReader = class {
     part.name = `Runner_Part_${String(i).padStart(2, "0")}`;
   });
   model.group.userData = {
-    title: "Skystride / Silhouette Runner",
+    title: "Skystride / Rooftop Climber",
     author: "Skystride",
     rig: "Articulated mesh parts; runtime IK controller in runner.ts",
   };

@@ -60,7 +60,7 @@ See [game notes](docs/game-design.md) for mechanics, performance decisions, and 
 
 Character asset: `public/models/skystride-runner.glb`. Regenerate from the live geometry with `node scripts/export-runner.cjs`.
 
-The runner uses an original dark athletic silhouette with continuous limb surfaces and procedural contact animation. The movement lab includes an entry-speed slider, long-jump preview, and high-wall climb study. `node scripts/runner-study.cjs --wall` exports mesh triangles for offline inspection of the wall-climb poses.
+The default runner is Rooftop Climber, with a mustard hooded top, olive cargo shorts, wrist wraps, and burgundy shoes, using continuous limb surfaces and procedural contact animation. The movement lab includes an entry-speed slider, long-jump preview, and high-wall climb study. `node scripts/runner-study.cjs --wall` exports mesh triangles for offline inspection of the wall-climb poses.
 
 Creative course encounters include ventilation chains, solar launch ramps, tank cradles, wall-run billboards, pipe crossings, broken bridges, construction windows, greenhouses, suspended scaffolds and staggered balconies. Swipe Up for contextual contacts/climbs; swipe Right near a window for a fast dive or near a tank for its service platform. New wall-run and dive previews are in the movement lab. See the v9 section of the game notes for animation phases and route choices.
 
@@ -68,3 +68,5 @@ Combo update: the technical district includes 20 named five-contact chains and 1
 
 Bar crossings (v14): jump into hand reach, catch, then release across a real roof gap. Movement-lab previews include the same gaps and airborne approach; walking into a bar no longer starts the move.
 Bar crossings v15 widen to 12.6 m with a faster 0.55 s swing, a stronger release impulse, and extended landing corridors. Movement-lab shares the updated geometry and physics.
+
+Choose a character in the course or pause menu: Rooftop Courier, Rooftop Climber (default), Hop Bot, or Original Silhouette. The choice is saved on this device and applies to the runner and ghost. Available designs are registered in `src/pages/Skystride/characters.ts`.

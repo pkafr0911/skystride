@@ -1,3 +1,10 @@
+import CharacterPicker from "./CharacterPicker";
+import {
+  CharacterId,
+  DEFAULT_CHARACTER,
+  CHARACTER_STORAGE,
+  readCharacter,
+} from "./characters";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Frame, STEP } from "./model";
@@ -11,6 +18,17 @@ import styles from "./styles.less";
 /** Isolated animation inspection uses the same simulation and runner as the playable course. */
 export default function MovementLab() {
   const host = useRef<HTMLDivElement>(null);
+  const [character, setCharacter] = useState<CharacterId>(DEFAULT_CHARACTER);
+  const [storageNotice, setStorageNotice] = useState("");
+  const characterRef = useRef(character);
+  characterRef.current = character;
+  useEffect(() => {
+    try {
+      setCharacter(readCharacter(localStorage.getItem(CHARACTER_STORAGE)));
+    } catch {
+      /* Keep the default when storage is unavailable. */
+    }
+  }, []);
   const [move, setMove] = useState<Preview>("jump");
   const [playing, setPlaying] = useState(true);
   const [scrub, setScrub] = useState(0);
@@ -33,9 +51,12 @@ export default function MovementLab() {
     light.position.set(-3, 8, 6);
     scene.add(light);
     const camera = new THREE.OrthographicCamera(-6, 6, 4, -3, 0.1, 100);
-    const actor = makeRunner(scene),
-      samples = framesFor(move, entrySpeed, releaseAt);
-    const studies = Array.from({ length: 5 }, () => makeRunner(scene));
+    let activeCharacter = characterRef.current;
+    let actor = makeRunner(scene, false, activeCharacter);
+    const samples = framesFor(move, entrySpeed, releaseAt);
+    let studies = Array.from({ length: 5 }, () =>
+      makeRunner(scene, false, activeCharacter),
+    );
     const environment = new THREE.Group();
     scene.add(environment);
     const first = (predicate: (f: Frame) => boolean, fallback: number) => {
@@ -219,6 +240,15 @@ export default function MovementLab() {
       }
       if (layoutSheet !== controls.current.sheet) resize();
       const showSheet = controls.current.sheet;
+      if (activeCharacter !== characterRef.current) {
+        actor.dispose();
+        studies.forEach((study) => study.dispose());
+        activeCharacter = characterRef.current;
+        actor = makeRunner(scene, false, activeCharacter);
+        studies = Array.from({ length: 5 }, () =>
+          makeRunner(scene, false, activeCharacter),
+        );
+      }
       actor.group.visible = !showSheet;
       environment.visible = !showSheet;
       studyFloor.visible = showSheet;
@@ -279,6 +309,7 @@ export default function MovementLab() {
           ← Skystride
         </a>
         <strong>MOVEMENT & COMBO STUDY</strong>
+        {storageNotice && <small role="status">{storageNotice}</small>}
         <label>
           Move{" "}
           <select
@@ -368,7 +399,7 @@ export default function MovementLab() {
           />
         </label>
       </header>
-      <div ref={host} style={{ flex: 1, minHeight: 0 }} />
+      <div ref={host} style={{ flex: 1, minHeight: 220 }} />
       <p style={{ padding: "0 24px", fontSize: 12 }}>
         <strong style={{ color: "#ffcb8b", marginRight: 16 }}>
           {sheet
@@ -382,6 +413,18 @@ export default function MovementLab() {
         {slow ? "35% speed" : "Real speed"} · Same animation as the course.
         Freeze and scrub to inspect contact and weight.
       </p>
+      <CharacterPicker
+        value={character}
+        onChange={(value) => {
+          setCharacter(value);
+          try {
+            localStorage.setItem(CHARACTER_STORAGE, value);
+            setStorageNotice("");
+          } catch {
+            setStorageNotice("Character choice will last for this visit only.");
+          }
+        }}
+      />
     </main>
   );
 }

@@ -1,3 +1,10 @@
+import CharacterPicker from "./CharacterPicker";
+import {
+  CharacterId,
+  DEFAULT_CHARACTER,
+  CHARACTER_STORAGE,
+  readCharacter,
+} from "./characters";
 import { isSwing } from "./combos";
 import { Button, ConfigProvider, Select, theme } from "antd";
 import React, {
@@ -32,9 +39,25 @@ export default function Skystride() {
   const [, redraw] = useReducer((n) => n + 1, 0);
   const [best, setBest] = useState<RecordRun | null>(null);
   const [ghost, setGhost] = useState<RecordRun | null>(null);
+  const [storageNotice, setStorageNotice] = useState("");
+  const [character, setCharacter] = useState<CharacterId>(DEFAULT_CHARACTER);
+  useEffect(() => {
+    try {
+      setCharacter(readCharacter(localStorage.getItem(CHARACTER_STORAGE)));
+    } catch {
+      /* Use default when storage is unavailable. */
+    }
+  }, []);
+  const chooseCharacter = (value: CharacterId) => {
+    setCharacter(value);
+    try {
+      localStorage.setItem(CHARACTER_STORAGE, value);
+    } catch {
+      setStorageNotice("Character choice will last for this visit only.");
+    }
+  };
   const [expanded, setExpanded] = useState(false);
   const [practice, setPractice] = useState(-1);
-  const [storageNotice, setStorageNotice] = useState("");
   const stage = useRef<HTMLDivElement>(null);
   const pointer = useRef<number | null>(null);
   const saved = useRef(false);
@@ -277,7 +300,7 @@ export default function Skystride() {
               <div className={styles.loading}>BUILDING THE SKYLINE…</div>
             }
           >
-            <Scene game={game} ghost={ghost} />
+            <Scene game={game} ghost={ghost} character={character} />
           </Suspense>
           <div className={styles.grain} />
           <div className={styles.hud} data-ui>
@@ -494,6 +517,7 @@ export default function Skystride() {
                   · LONG JUMP AT 11.5 M/S &nbsp; R · RETRY
                 </small>
               </div>
+              <CharacterPicker value={character} onChange={chooseCharacter} />
             </div>
           )}
           <div className={styles.rotate}>

@@ -5,7 +5,11 @@ const THREE = require("three");
 const { makeRunner } = require("../src/pages/Skystride/runner");
 const { Run, obstacles } = require("../src/pages/Skystride/model");
 const scene = new THREE.Scene(),
-  runner = makeRunner(scene),
+  runner = makeRunner(
+    scene,
+    false,
+    process.argv.find((arg) => arg.startsWith("--character="))?.split("=")[1],
+  ),
   game = new Run();
 game.start();
 const panels = [];

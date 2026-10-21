@@ -1,3 +1,4 @@
+import { CharacterId } from "./characters";
 import { SWING_GAP_EXTRA, isSwing } from "./combos";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
@@ -20,12 +21,16 @@ import { interpolateFrame } from "./motion";
 export default function Scene({
   game,
   ghost,
+  character,
 }: {
+  character: CharacterId;
   game: Run;
   ghost: RecordRun | null;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(false);
+  const characterRef = useRef(character);
+  characterRef.current = character;
   const ghostRef = useRef(ghost);
   ghostRef.current = ghost;
   useEffect(() => {
@@ -44,6 +49,10 @@ export default function Scene({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setClearColor(0x000000, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
     container.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0xa59abb, 60, 170);
@@ -52,9 +61,22 @@ export default function Scene({
       "(prefers-reduced-motion: reduce)",
     );
     camera.zoom = speedZoom(game.speed, motionPreference.matches);
-    scene.add(new THREE.HemisphereLight(0xffd3b2, 0x25354e, 1.7));
+    scene.add(new THREE.HemisphereLight(0xffd3b2, 0x25354e, 1.25));
     const sunlight = new THREE.DirectionalLight(0xffae6b, 1.6);
     sunlight.position.set(-12, 18, -9);
+    sunlight.castShadow = true;
+    sunlight.shadow.mapSize.set(2048, 2048);
+    Object.assign(sunlight.shadow.camera, {
+      left: -42,
+      right: 42,
+      top: 28,
+      bottom: -28,
+      near: 0.5,
+      far: 100,
+    });
+    sunlight.shadow.normalBias = 0.035;
+    sunlight.shadow.bias = -0.0002;
+    scene.add(sunlight.target);
     scene.add(sunlight);
     const fill = new THREE.DirectionalLight(0x91a8db, 0.55);
     fill.position.set(0, 6, 15);
@@ -73,8 +95,8 @@ export default function Scene({
       materials.push(m);
       return m;
     };
-    const roof = material(0x13213a),
-      side = material(0x10203a),
+    const roof = material(0x35465a),
+      side = material(0x182a43),
       edge = material(0xf3ae65);
     const metal = material(0x40506a),
       black = material(0x101c2c);
@@ -84,6 +106,9 @@ export default function Scene({
     materials.push(decor, decorDark);
     const solar = material(0x203958),
       alloy = material(0x718097);
+    const seam = material(0x26374c),
+      windowGlass = material(0x49647b),
+      warmWindow = material(0xc99868);
     const chunks = new Map<number, THREE.Group>();
     const chunkFor = (x: number) => {
       const key = Math.floor(x / 80);
@@ -125,11 +150,11 @@ export default function Scene({
       });
       materials.push(mat, glass);
       for (let i = 0; i < 125; i++) {
-        const h = 3.2 + ((i * 13 + layer * 7) % 19) * 0.28;
+        const h = 7 + ((i * 13 + layer * 7) % 19) * 0.48;
         const x = i * 3.2 - 65 + layer * 1.1,
           z = -85 + layer * 25;
         const w = 2 + (i % 4) * 0.44,
-          base = -3 - layer * 0.5;
+          base = -1 - layer * 0.5 + z * 0.28;
         box(buildings, x, base + h / 2, z, w, h, 1.2, mat);
         box(buildings, x + 0.2, base + h + 0.25, z, w * 0.55, 0.5, 0.8, mat);
         if (i % 4 === 0)
@@ -154,7 +179,7 @@ export default function Scene({
     materials.push(sunMat);
     const sunGeometry = new THREE.CircleGeometry(2.3, 48);
     const sun = new THREE.Mesh(sunGeometry, sunMat);
-    sun.position.set(16, 4.5, -125);
+    sun.position.set(16, -30.5, -125);
     scene.add(sun);
     // Renderer and collision share these exact roof intervals.
     for (const slab of surfaces) {
@@ -173,6 +198,42 @@ export default function Scene({
       );
       box(scene, x, slab.y - 0.1, 0, w, 0.2, 4.15, roof);
       box(scene, x, slab.y + 0.025, 2.06, w, 0.055, 0.08, metal);
+      // Coping and cross-roof seams reveal the width of the running surface.
+      box(scene, x, slab.y - 0.23, 2.09, w, 0.16, 0.12, alloy);
+      box(scene, x, slab.y + 0.07, -2, w, 0.14, 0.16, metal);
+      for (let joint = slab.start + 1; joint < slab.end; joint += 3) {
+        box(scene, joint, slab.y + 0.006, 0, 0.025, 0.012, 3.95, seam);
+      }
+      if (!upper) {
+        for (
+          let column = slab.start + 1;
+          column < slab.end - 0.8;
+          column += 2.4
+        ) {
+          for (let row = 0; row < 3; row++) {
+            box(
+              scene,
+              column,
+              slab.y - 2 - row * 2.5,
+              2.025,
+              0.9,
+              1.25,
+              0.045,
+              (Math.floor(column) + row) % 7 === 0 ? warmWindow : windowGlass,
+            );
+            box(
+              scene,
+              column,
+              slab.y - 2.66 - row * 2.5,
+              2.07,
+              1.05,
+              0.09,
+              0.14,
+              metal,
+            );
+          }
+        }
+      }
       for (let panel = slab.start + 2; panel < slab.end; panel += 6) {
         box(scene, panel, slab.y - 4.2, 2.015, 0.035, 7, 0.025, metal);
         if (!upper) box(scene, panel + 1, -3.5, 2.035, 0.7, 1.1, 0.03, black);
@@ -332,6 +393,7 @@ export default function Scene({
     // Rooftop service details, kept behind the playable silhouette.
     for (let i = 0; i < Math.ceil(FINISH / 22); i++) {
       const x = i * 22 - 10;
+      box(scene, x + 2, -7, -11, 17, 14, 6, decorDark);
       box(scene, x, 1.1, -9, 0.12, 2.2, 0.12, decor);
       box(scene, x + 3, 1.1, -9, 0.12, 2.2, 0.12, decor);
       box(scene, x + 1.5, 2.1, -9, 3, 0.1, 0.1, decor);
@@ -406,8 +468,23 @@ export default function Scene({
       });
     };
     batch(scene);
-    const player = makeRunner(scene);
-    const rival = makeRunner(scene, true);
+    // Preserve shadows through instancing, including curved obstacle geometry.
+    const enableShadows = (root: THREE.Object3D) =>
+      root.traverse((object) => {
+        if (
+          object instanceof THREE.Mesh &&
+          object.material instanceof THREE.MeshStandardMaterial &&
+          !object.material.transparent
+        ) {
+          object.castShadow = true;
+          object.receiveShadow = true;
+        }
+      });
+    enableShadows(scene);
+    let activeCharacter = characterRef.current;
+    let player = makeRunner(scene, false, activeCharacter);
+    let rival = makeRunner(scene, true, activeCharacter);
+    enableShadows(player.group);
     rival.group.visible = false;
     let frame = 0,
       previous = performance.now(),
@@ -464,17 +541,33 @@ export default function Scene({
         );
         camera.updateProjectionMatrix();
       }
-      camera.position.set(x + 9.5 / camera.zoom, camera.position.y || 5.2, 32);
+      // A fixed oblique view exposes roof tops and obstacle side faces without
+      // changing the gameplay plane or rotating during jumps.
+      const focusX = x + 9.5 / camera.zoom;
+      camera.position.set(focusX - 6, camera.position.y || 13, 32);
       camera.position.y +=
-        (targetHeight + 1.4 - camera.position.y) *
+        (targetHeight + 9 - camera.position.y) *
         (1 - Math.exp(-Math.min(dt, 0.05) * 4));
-      camera.lookAt(camera.position.x, camera.position.y - 1.4, 0);
+      camera.lookAt(focusX, camera.position.y - 9, 0);
+      sunlight.position.set(x - 12, 22, 10);
+      sunlight.target.position.set(x + 5, 0, 0);
+      chunks.forEach((chunk, key) => {
+        chunk.visible = Math.abs(key * 80 + 40 - x) < 150;
+      });
       skylineLayers.forEach((layer, i) => {
         layer.position.x = x - ((x * (0.2 + i * 0.16)) % 260);
       });
       bridge.position.x = x * 0.48;
       sun.position.x = 16 + x * 0.99;
       const animationDt = game.paused ? 0 : Math.min(dt, 0.05);
+      if (activeCharacter !== characterRef.current) {
+        player.dispose();
+        rival.dispose();
+        activeCharacter = characterRef.current;
+        player = makeRunner(scene, false, activeCharacter);
+        enableShadows(player.group);
+        rival = makeRunner(scene, true, activeCharacter);
+      }
       player.pose(visual, game.time, animationDt);
       const replay = ghostRef.current;
       if (replay && !game.practice && game.phase !== "ready") {
@@ -528,6 +621,7 @@ export default function Scene({
       materials.forEach((m) => m.dispose());
       player.dispose();
       rival.dispose();
+      sunlight.shadow.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
