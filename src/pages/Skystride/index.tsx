@@ -336,31 +336,6 @@ export default function Skystride() {
               </Button>
             </div>
           </div>
-          <div className={styles.viewControls} data-ui>
-            <label>
-              View{" "}
-              <select
-                aria-label="Camera view"
-                value={view}
-                onChange={(event) => {
-                  setView(event.target.value as CameraView);
-                  setAutoView(false);
-                }}
-              >
-                <option value="2d">2D</option>
-                <option value="left">2.5D · Left</option>
-                <option value="right">2.5D · Right</option>
-              </select>
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={autoView}
-                onChange={(event) => setAutoView(event.target.checked)}
-              />{" "}
-              Auto cycle
-            </label>
-          </div>
           <div className={styles.progress}>
             <i style={{ width: `${(game.x / FINISH) * 100}%` }} />
             <b style={{ left: "33.33%" }} />
@@ -510,6 +485,31 @@ export default function Skystride() {
                     <small>Short ← → Deliberate</small>
                   </label>
                 )}
+                <div className={styles.viewControls} data-ui>
+                  <label>
+                    View{" "}
+                    <select
+                      aria-label="Camera view"
+                      value={view}
+                      onChange={(event) => {
+                        setView(event.target.value as CameraView);
+                        setAutoView(false);
+                      }}
+                    >
+                      <option value="2d">2D</option>
+                      <option value="left">2.5D · Left</option>
+                      <option value="right">2.5D · Right</option>
+                    </select>
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={autoView}
+                      onChange={(event) => setAutoView(event.target.checked)}
+                    />{" "}
+                    Auto cycle
+                  </label>
+                </div>
                 <div className={styles.buttons}>
                   {game.paused && (
                     <Button
