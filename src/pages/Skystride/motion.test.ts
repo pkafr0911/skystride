@@ -636,14 +636,14 @@ test("movement lab samples every new technique and all 20 full chains", () => {
 });
 
 test("speed camera widens monotonically and preserves bounded framing", () => {
-  assert.equal(speedZoom(0), 7.68);
-  assert.equal(speedZoom(12), 2);
-  assert.equal(speedZoom(30), 1.52);
-  assert.equal(speedZoom(0, true), 1.56);
+  assert.equal(speedZoom(0), 7.68 / 1.5);
+  assert.equal(speedZoom(12), 2 / 1.5);
+  assert.equal(speedZoom(30), 1.52 / 1.5);
+  assert.equal(speedZoom(0, true), 1.56 / 1.5);
   let prior = speedZoom(0);
   for (let speed = 0; speed <= 60; speed++) {
     const zoom = speedZoom(speed);
-    assert.ok(zoom <= prior && zoom >= 1.52 && zoom <= 7.68);
+    assert.ok(zoom <= prior && zoom >= 1.52 / 1.5 && zoom <= 7.68 / 1.5);
     assert.equal(speedZoom(speed, true), speedZoom(0, true));
     // Portrait's minimum 18m half-width keeps the runner and forward corridor visible.
     assert.ok(18 / zoom - 9.5 / zoom > 1);

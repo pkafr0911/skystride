@@ -535,7 +535,7 @@ export default function Scene({
       const next = game.next();
       const anticipate = next?.kind === "branch" && next.x - x < 17 ? 0.5 : 0;
       const closeFraming = THREE.MathUtils.clamp(
-        (camera.zoom / 2 - 1) / 2.84,
+        (camera.zoom / (2 / 1.5) - 1) / 2.84,
         0,
         1,
       );

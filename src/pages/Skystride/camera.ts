@@ -1,11 +1,13 @@
 /** Orthographic framing: slow movement is closer; fast traversal opens the view. */
 export function speedZoom(speed: number, reducedMotion = false) {
-  if (reducedMotion) return 1.56;
+  if (reducedMotion) return 1.56 / 1.5;
   const s = Math.max(0, Math.min(30, speed));
   const smooth = (t: number) => t * t * (3 - 2 * t);
-  return s <= 12
-    ? 7.68 - 5.68 * smooth(s / 12)
-    : 2 - 0.48 * smooth((s - 12) / 18);
+  return (
+    (s <= 12
+      ? 7.68 - 5.68 * smooth(s / 12)
+      : 2 - 0.48 * smooth((s - 12) / 18)) / 1.5
+  );
 }
 
 export function easeZoom(current: number, target: number, dt: number) {
