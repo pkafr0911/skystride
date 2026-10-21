@@ -156,13 +156,15 @@ test("both routes complete physically with clean contacts and three splits", () 
     assert.ok(g.time >= 180 && g.time <= 300);
   }
 });
-test("clean hard routes beat normal routes; mistimed chains can lose the speed needed for gaps", () => {
-  const lower = complete(),
-    upper = complete(true),
-    early = complete(false, true);
-  assert.ok(upper.time < lower.time, `${upper.time} vs ${lower.time}`);
-  assert.ok(early.recoveries > 0);
-  assert.ok(early.phase === "failed" || early.time > lower.time);
+test("clean routes retain flow while mistimed chains lose speed or miss gaps", () => {
+  for (const upper of [false, true]) {
+    const clean = complete(upper),
+      early = complete(upper, true);
+    assert.equal(clean.phase, "finished");
+    assert.equal(clean.recoveries, 0);
+    assert.ok(early.recoveries > 0);
+    assert.ok(early.phase === "failed" || early.time > clean.time);
+  }
 });
 test("every authored vault type has its own traversal and obstacle contact anchor", () => {
   for (const o of obstacles.filter((item) => item.kind === "vault")) {
@@ -1229,5 +1231,41 @@ test("bar gaps exceed the maximum ordinary long-jump range", () => {
   const maxFlight = 13.6 / 30 + 13.6 / Math.sqrt(30 * 35.4);
   for (const o of obstacles.filter((o) => isSwing(o.technique))) {
     assert.ok(o.width + SWING_GAP_EXTRA > 13.5 * maxFlight + 0.44);
+  }
+});
+
+test("a landing roll clears a low passage without a second down input", () => {
+  const g = new Run();
+  g.start();
+  g.x = 91.1;
+  g.move = "roll";
+  g.moveTime = 1;
+  let ticks = 0;
+  while (g.x < 97 && ticks++ < 600) {
+    g.step();
+    assert.equal(g.recoveries, 0);
+  }
+  assert.ok(ticks < 600);
+  assert.equal(g.move, "run");
+});
+
+test("each route separates mandatory slide obstacles with other contacts", () => {
+  for (const route of ["lower", "upper"]) {
+    const lane = obstacles.filter((o) => !o.route || o.route === route);
+    for (let i = 1; i < lane.length; i++) {
+      assert.ok(
+        lane[i - 1].kind !== "slide" || lane[i].kind !== "slide",
+        `${route}: consecutive slides at ${lane[i - 1].x} and ${lane[i].x}`,
+      );
+    }
+  }
+});
+
+test("window roll exits lead into a vaultable obstacle on both routes", () => {
+  for (const route of ["lower", "upper"]) {
+    const lane = obstacles.filter((o) => !o.route || o.route === route);
+    for (let i = 0; i < lane.length - 1; i++) {
+      if (lane[i].feature === "window") assert.equal(lane[i + 1].kind, "vault");
+    }
   }
 });

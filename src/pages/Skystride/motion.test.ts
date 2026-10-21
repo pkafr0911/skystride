@@ -1,4 +1,4 @@
-import { speedZoom, easeZoom } from "./camera";
+import { speedZoom, easeZoom, viewAngle, CAMERA_VIEWS } from "./camera";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
@@ -636,13 +636,17 @@ test("movement lab samples every new technique and all 20 full chains", () => {
 });
 
 test("speed camera widens monotonically and preserves bounded framing", () => {
+  assert.equal(speedZoom(0), 7.68);
+  assert.equal(speedZoom(12), 2);
+  assert.equal(speedZoom(30), 1.52);
+  assert.equal(speedZoom(0, true), 1.56);
   let prior = speedZoom(0);
   for (let speed = 0; speed <= 60; speed++) {
     const zoom = speedZoom(speed);
-    assert.ok(zoom <= prior && zoom >= 0.76 && zoom <= 3.84);
+    assert.ok(zoom <= prior && zoom >= 1.52 && zoom <= 7.68);
     assert.equal(speedZoom(speed, true), speedZoom(0, true));
     // Portrait's minimum 18m half-width keeps the runner and forward corridor visible.
-    assert.ok(18 / zoom - 9.5 / zoom > 2);
+    assert.ok(18 / zoom - 9.5 / zoom > 1);
     prior = zoom;
   }
 });
@@ -658,4 +662,21 @@ test("camera easing is independent of refresh rate and never overshoots", () => 
     assert.ok(Math.abs(sample(60) - sample(144)) < 1e-10);
   }
   assert.equal(easeZoom(1, 0.76, 0), 1);
+});
+
+test("camera cycle visits all three views, stays continuous, and holds manual selection", () => {
+  for (const view of CAMERA_VIEWS) {
+    const initial = viewAngle(view, 0, true);
+    assert.deepEqual(viewAngle(view, 17, true), initial);
+    assert.deepEqual(viewAngle(view, 90, true), initial);
+    assert.deepEqual(viewAngle(view, 75, false), initial);
+    const visited = new Set([0, 30, 60].map((t) => viewAngle(view, t, true).x));
+    assert.equal(visited.size, 3);
+    for (const boundary of [18, 30, 48, 60, 78, 90]) {
+      const before = viewAngle(view, boundary - 0.001, true);
+      const after = viewAngle(view, boundary + 0.001, true);
+      assert.ok(Math.abs(before.x - after.x) < 0.001);
+      assert.ok(Math.abs(before.elevation - after.elevation) < 0.001);
+    }
+  }
 });

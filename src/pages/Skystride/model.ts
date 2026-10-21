@@ -11,7 +11,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v16";
+export const VERSION = "sunset-relay-v17";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -349,6 +349,21 @@ export const obstacles: Obstacle[] = [
   ...denseLane(0, FINISH, "lower"),
   ...upperPlatforms.flatMap((p) => denseLane(p.start - 6, p.end, "upper")),
 ].sort((a, b) => a.x - b.x);
+
+// Check the finished lanes after filler filtering, which can remove a separating
+// vault near a landing zone. Replace the filler duct, preserving authored props.
+for (const route of ["lower", "upper"] as const) {
+  const lane = obstacles.filter((o) => !o.route || o.route === route);
+  for (let i = 1; i < lane.length; i++) {
+    if (lane[i - 1].kind !== "slide" || lane[i].kind !== "slide") continue;
+    const filler =
+      !lane[i - 1].feature && lane[i - 1].route ? lane[i - 1] : lane[i];
+    filler.kind = "vault";
+    filler.vault = "kong";
+    filler.height = 1.1;
+    filler.width = 2.4;
+  }
+}
 
 export function canMantle(o: Obstacle) {
   return (
@@ -1536,7 +1551,11 @@ export class Run {
           );
       }
     }
-    if (this.move === "slide" || this.move === "stumble") {
+    if (
+      this.move === "slide" ||
+      this.move === "roll" ||
+      this.move === "stumble"
+    ) {
       const ceiling = obstacles.some(
         (o) =>
           (o.kind === "slide" ||
@@ -1547,14 +1566,19 @@ export class Run {
           this.x - 0.3 <= o.x + o.width &&
           this.y < (o.route === "upper" ? 3.3 : 0) + 1.22,
       );
+      // A landing roll already supplies the low posture. Never stand up into
+      // a ceiling and demand another down input to finish the same passage.
+      if (
+        this.move === "roll" &&
+        this.moveTime > this.actionDuration &&
+        ceiling
+      )
+        this.setMove("slide", 0.1);
       if (this.moveTime > this.actionDuration && !ceiling) {
         this.slideExitAt = this.time;
         this.setMove(this.grounded ? "run" : "fall");
       }
-    } else if (
-      (this.move === "land" || this.move === "roll") &&
-      this.moveTime > this.actionDuration
-    )
+    } else if (this.move === "land" && this.moveTime > this.actionDuration)
       this.setMove("run");
     if (!this.grounded && this.vy < 0 && this.move === "jump")
       this.move = "fall";

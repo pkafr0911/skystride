@@ -1,3 +1,4 @@
+import { CameraView } from "./camera";
 import CharacterPicker from "./CharacterPicker";
 import {
   CharacterId,
@@ -56,6 +57,8 @@ export default function Skystride() {
       setStorageNotice("Character choice will last for this visit only.");
     }
   };
+  const [view, setView] = useState<CameraView>("left");
+  const [autoView, setAutoView] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [practice, setPractice] = useState(-1);
   const stage = useRef<HTMLDivElement>(null);
@@ -300,7 +303,13 @@ export default function Skystride() {
               <div className={styles.loading}>BUILDING THE SKYLINE…</div>
             }
           >
-            <Scene game={game} ghost={ghost} character={character} />
+            <Scene
+              game={game}
+              ghost={ghost}
+              character={character}
+              view={view}
+              autoView={autoView}
+            />
           </Suspense>
           <div className={styles.grain} />
           <div className={styles.hud} data-ui>
@@ -326,6 +335,31 @@ export default function Skystride() {
                 {expanded ? "Exit full" : "Fullscreen"}
               </Button>
             </div>
+          </div>
+          <div className={styles.viewControls} data-ui>
+            <label>
+              View{" "}
+              <select
+                aria-label="Camera view"
+                value={view}
+                onChange={(event) => {
+                  setView(event.target.value as CameraView);
+                  setAutoView(false);
+                }}
+              >
+                <option value="2d">2D</option>
+                <option value="left">2.5D · Left</option>
+                <option value="right">2.5D · Right</option>
+              </select>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={autoView}
+                onChange={(event) => setAutoView(event.target.checked)}
+              />{" "}
+              Auto cycle
+            </label>
           </div>
           <div className={styles.progress}>
             <i style={{ width: `${(game.x / FINISH) * 100}%` }} />

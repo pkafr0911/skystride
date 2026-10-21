@@ -15,14 +15,18 @@ import {
 } from "./model";
 import { creativeObstacle } from "./obstacle-mesh";
 import { makeRunner } from "./runner";
-import { speedZoom, easeZoom } from "./camera";
+import { CameraView, viewAngle, speedZoom, easeZoom } from "./camera";
 import { interpolateFrame } from "./motion";
 
 export default function Scene({
   game,
   ghost,
   character,
+  view,
+  autoView,
 }: {
+  view: CameraView;
+  autoView: boolean;
   character: CharacterId;
   game: Run;
   ghost: RecordRun | null;
@@ -31,6 +35,8 @@ export default function Scene({
   const [error, setError] = useState(false);
   const characterRef = useRef(character);
   characterRef.current = character;
+  const viewRef = useRef({ view, autoView });
+  viewRef.current = { view, autoView };
   const ghostRef = useRef(ghost);
   ghostRef.current = ghost;
   useEffect(() => {
@@ -440,7 +446,7 @@ export default function Scene({
       const brace = box(bridge, x + 4.5, -0.4, -47, 9, 0.13, 0.15, decor);
       brace.rotation.z = 0.3;
     }
-    // Batch static boxes by material inside spatial chunks. Distant districts are culled.
+    // Batch static boxes by material; Three culls each batch using its full bounds.
     const batches: THREE.InstancedMesh[] = [];
     const batch = (parent: THREE.Object3D) => {
       const byMaterial = new Map<THREE.Material, THREE.Mesh[]>();
@@ -505,6 +511,11 @@ export default function Scene({
     const observer = new ResizeObserver(resize);
     observer.observe(container);
     resize();
+    let activeView = viewRef.current.view;
+    let cycling = viewRef.current.autoView;
+    let viewStart = game.time;
+    let angle = viewAngle(activeView, 0, false);
+    let focusHeight = 3;
     const draw = (now: number) => {
       const dt = Math.max(0, (now - previous) / 1000);
       if (dt > 0.2 && game.phase === "running" && !game.paused) game.pause();
@@ -524,7 +535,7 @@ export default function Scene({
       const next = game.next();
       const anticipate = next?.kind === "branch" && next.x - x < 17 ? 0.5 : 0;
       const closeFraming = THREE.MathUtils.clamp(
-        (camera.zoom - 1) / 2.84,
+        (camera.zoom / 2 - 1) / 2.84,
         0,
         1,
       );
@@ -541,24 +552,46 @@ export default function Scene({
         );
         camera.updateProjectionMatrix();
       }
-      // A fixed oblique view exposes roof tops and obstacle side faces without
-      // changing the gameplay plane or rotating during jumps.
+      if (
+        activeView !== viewRef.current.view ||
+        cycling !== viewRef.current.autoView ||
+        game.time < viewStart
+      ) {
+        activeView = viewRef.current.view;
+        cycling = viewRef.current.autoView;
+        viewStart = game.time;
+      }
+      const desired = viewAngle(
+        activeView,
+        game.time - viewStart,
+        cycling && !motionPreference.matches,
+      );
+      const blend = motionPreference.matches
+        ? 1
+        : 1 - Math.exp(-Math.min(dt, 0.05) * 1.5);
+      {
+        angle.x += (desired.x - angle.x) * blend;
+        angle.elevation += (desired.elevation - angle.elevation) * blend;
+        focusHeight +=
+          (targetHeight - focusHeight) *
+          (1 - Math.exp(-Math.min(dt, 0.05) * 4));
+      }
       const focusX = x + 9.5 / camera.zoom;
-      camera.position.set(focusX - 6, camera.position.y || 13, 32);
-      camera.position.y +=
-        (targetHeight + 9 - camera.position.y) *
-        (1 - Math.exp(-Math.min(dt, 0.05) * 4));
-      camera.lookAt(focusX, camera.position.y - 9, 0);
+      camera.position.set(focusX + angle.x, focusHeight + angle.elevation, 32);
+      camera.lookAt(focusX, focusHeight, 0);
       sunlight.position.set(x - 12, 22, 10);
       sunlight.target.position.set(x + 5, 0, 0);
-      chunks.forEach((chunk, key) => {
-        chunk.visible = Math.abs(key * 80 + 40 - x) < 150;
-      });
+      // Use Three's geometry bounds for culling. A long roof can span many
+      // chunks: hiding it by its midpoint also hides the floor under the runner.
+      // Keep the skyline at the horizon as the camera elevation changes.
+      const horizonShift = angle.elevation / 32 - 0.28;
       skylineLayers.forEach((layer, i) => {
+        layer.position.y = (-85 + i * 25) * horizonShift;
         layer.position.x = x - ((x * (0.2 + i * 0.16)) % 260);
       });
       bridge.position.x = x * 0.48;
       sun.position.x = 16 + x * 0.99;
+      sun.position.y = 4.5 - (125 * angle.elevation) / 32;
       const animationDt = game.paused ? 0 : Math.min(dt, 0.05);
       if (activeCharacter !== characterRef.current) {
         player.dispose();
