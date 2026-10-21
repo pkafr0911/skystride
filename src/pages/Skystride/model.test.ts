@@ -1206,6 +1206,10 @@ test("jump catch and manual release land across every bar gap", () => {
       assert.equal(g.traversal, null, "takeoff must precede the grab");
       for (let i = 0; i < 100 && !g.traversal; i++) g.step();
       assert.ok(g.traversal, o.technique);
+      assert.ok(
+        Math.abs(g.frame().contact!.x - (o.x + o.width - 0.2)) < 1e-8,
+        "grip near the final rung",
+      );
       while (g.traversal && g.frame().progress < releaseAt) g.step();
       g.action("forward");
       g.step();

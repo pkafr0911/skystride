@@ -1,4 +1,4 @@
-import { SWING_GAP_EXTRA } from "./combos";
+import { SWING_GAP_EXTRA, swingGripOffset } from "./combos";
 import * as THREE from "three";
 import { Obstacle } from "./model";
 
@@ -60,7 +60,10 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
         box(x, h / 2, -1.45, 0.12, h, 0.12, kit.trim);
       const count = t === "monkey" || t === "shimmy" ? 4 : 1;
       for (let n = 0; n < count; n++) {
-        const x = count === 1 ? w / 2 : 0.2 + (n * (w - 0.4)) / (count - 1);
+        const x =
+          count === 1
+            ? swingGripOffset(w)
+            : 0.2 + (n * (w - 0.4)) / (count - 1);
         box(x, h, 0, 0.09, 0.09, 2.8, kit.amber);
       }
       box(

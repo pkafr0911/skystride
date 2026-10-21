@@ -25,6 +25,7 @@ export const isSwing = (t?: Technique) =>
   t === "underbar" || t === "lache" || t === "monkey";
 export const SWING_GAP_EXTRA = 10.2;
 export const SWING_RELEASE_SPEED = 30;
+export const swingGripOffset = (width: number) => width - 0.2;
 export const SWING_DURATION = 0.55;
 export const comboNames = [
   "Vent Relay",

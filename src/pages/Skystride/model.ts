@@ -1,4 +1,5 @@
 import {
+  swingGripOffset,
   SWING_GAP_EXTRA,
   SWING_DURATION,
   SWING_RELEASE_SPEED,
@@ -10,7 +11,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v15";
+export const VERSION = "sunset-relay-v16";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -1299,7 +1300,7 @@ export class Run {
           isSwing(o.technique) &&
           this.applicable(o) &&
           !this.handled.has(i) &&
-          Math.abs(this.x - (o.x + o.width / 2)) < 0.6 &&
+          Math.abs(this.x - (o.x + swingGripOffset(o.width))) < 0.6 &&
           Math.abs(
             this.y - ((o.route === "upper" ? 3.3 : 0) + (o.height ?? 3) - 1.8),
           ) < 0.65,
@@ -1310,7 +1311,10 @@ export class Run {
           base = bar.route === "upper" ? 3.3 : 0;
         t.y0 = base;
         t.y1 = base;
-        t.contact = { x: bar.x + bar.width / 2, y: base + bar.height! };
+        t.contact = {
+          x: bar.x + swingGripOffset(bar.width),
+          y: base + bar.height!,
+        };
         t.duration = SWING_DURATION;
         t.catchX = this.x;
         t.catchY = this.y;
@@ -1722,7 +1726,7 @@ export class Run {
             this.x = sx + (t.end - sx) * u;
             this.y = sy + (t.y1 - sy) * u;
           }
-          if (t.technique === "monkey" || t.technique === "shimmy")
+          if (t.technique === "shimmy")
             t.contact.x =
               t.obstacle!.start + (t.obstacle!.end - t.obstacle!.start) / 2;
         } else if (t.technique === "cat-leap" || t.technique === "wall-pop") {

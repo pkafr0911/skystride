@@ -237,3 +237,7 @@ Movement-lab uses the same jump/catch simulation and visibly split roof banks, i
 Swing gaps expand from 3.8 m to 12.6 m, beyond an ordinary maximum-flow long jump including landing tolerance. The grab stays near the launch bank so takeoff remains reachable. The swing phase is shortened from 0.9 s to 0.55 s; release supplies a 30 m/s arcade carry impulse to cross the extended void, with normal grounded deceleration after landing. Lower-line release arcs are calculated for clearance beneath the upper roof. This impulse is deliberately stronger than running speed, rather than a physically passive pendulum.
 
 Each affected combo gains 8 m after its swing to retain the next approach and landing corridor. Later chains shift with it. Shared gap dimensions drive course support, roof markers, support posts, movement-lab floors and offline geometry studies. Record version advances because crossing timings and course layout changed.
+
+## Far-end bar grip — v16
+
+The airborne grab now targets the final 20 cm of the reachable bar section instead of its midpoint. Single crossbars move to that contact position; monkey traverse uses its final rung. The swing keeps this anchor through release, shared by gameplay and movement-lab. Gap width and swing duration remain unchanged.
