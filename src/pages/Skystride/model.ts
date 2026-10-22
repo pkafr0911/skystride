@@ -11,7 +11,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v24";
+export const VERSION = "sunset-relay-v25";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -97,6 +97,7 @@ const opening: Obstacle[] = [
   { x: 67, width: 6.2, kind: "gap", feature: "bridge" },
   { x: 80, width: 5.5, kind: "gap" },
   { x: 91, width: 5.5, height: 1.65, kind: "slide", feature: "tank" },
+  { x: 102, width: 5.5, kind: "gap" },
   { x: 115, width: 5, height: 3.3, kind: "branch" },
   {
     x: 139,
@@ -141,6 +142,7 @@ const opening: Obstacle[] = [
     feature: "balcony",
   },
   { x: 195, width: 9, kind: "drop", route: "upper" },
+  { x: 206, width: 5, kind: "gap" },
   {
     x: 217,
     width: 1.8,
@@ -205,6 +207,7 @@ const opening: Obstacle[] = [
     route: "upper",
   },
   { x: 375, width: 9, kind: "drop", route: "upper" },
+  { x: 389, width: 5, kind: "gap" },
   {
     x: 402,
     width: 3.4,

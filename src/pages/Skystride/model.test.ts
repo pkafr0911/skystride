@@ -1433,3 +1433,34 @@ test("wall-pop obstacles are removed from both routes", () => {
     }
   }
 });
+
+test("each district adds three clear, jumpable building crossings", () => {
+  for (const offset of [0, 1480, 1960, 2440]) {
+    for (const local of [102, 206, 389]) {
+      const gap = obstacles.find(
+        (o) => o.kind === "gap" && o.x === offset + local,
+      )!;
+      assert.ok(gap);
+      assert.ok(
+        !surfaces.some(
+          (s) => !s.upper && s.start < gap.x + gap.width && s.end > gap.x,
+        ),
+      );
+      for (const speed of [10.8, 13.5]) {
+        const g = new Run();
+        g.start();
+        g.x = gap.x - 1.1;
+        g.y = ground(g.x, false);
+        g.speed = speed;
+        g.action("up");
+        g.step();
+        assert.equal(g.grounded, false);
+        for (let i = 0; i < 180 && !g.grounded && g.phase === "running"; i++)
+          g.step();
+        assert.equal(g.grounded, true, `gap ${gap.x}, speed ${speed}`);
+        assert.ok(g.x >= gap.x + gap.width);
+        assert.equal(g.recoveries, 0);
+      }
+    }
+  }
+});
