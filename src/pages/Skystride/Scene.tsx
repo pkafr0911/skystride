@@ -191,18 +191,31 @@ export default function Scene({
     for (const slab of surfaces) {
       const w = slab.end - slab.start,
         x = (slab.start + slab.end) / 2,
-        upper = slab.upper;
+        upper = slab.upper,
+        roofThickness = 0.2,
+        wallHeight = (upper ? 0.9 : 14) - roofThickness;
+      // End the building body at the underside of the roof. Coplanar top
+      // faces fight in the depth buffer and flicker as the camera moves.
       box(
         scene,
         x,
-        slab.y - (upper ? 0.45 : 7),
+        slab.y - roofThickness - wallHeight / 2,
         0,
         w,
-        upper ? 0.9 : 14,
+        wallHeight,
         4,
         side,
       );
-      box(scene, x, slab.y - 0.1, 0, w, 0.2, 4.15, roof);
+      box(
+        scene,
+        x,
+        slab.y - roofThickness / 2,
+        0,
+        w,
+        roofThickness,
+        4.15,
+        roof,
+      );
       box(scene, x, slab.y + 0.025, 2.06, w, 0.055, 0.08, metal);
       // Coping and cross-roof seams reveal the width of the running surface.
       box(scene, x, slab.y - 0.23, 2.09, w, 0.16, 0.12, alloy);
