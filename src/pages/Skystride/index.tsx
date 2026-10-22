@@ -29,16 +29,18 @@ import {
   Run,
   Swipe,
   LONG_JUMP_SPEED,
-  VERSION,
+  GameMode,
+  recordStorage,
 } from "./model";
 import styles from "./styles.less";
 const Scene = lazy(() => import("./Scene"));
-const STORAGE = `skystride.${VERSION}.best`;
 export default function Skystride() {
   const [game] = useState(() => new Run());
   const [gesture] = useState(() => new Swipe());
   const [, redraw] = useReducer((n) => n + 1, 0);
-  const [best, setBest] = useState<RecordRun | null>(null);
+  const [mode, setMode] = useState<GameMode>("standard");
+  const [bests, setBests] = useState<Partial<Record<GameMode, RecordRun>>>({});
+  const best = bests[mode] ?? null;
   const [ghost, setGhost] = useState<RecordRun | null>(null);
   const [storageNotice, setStorageNotice] = useState("");
   const [character, setCharacter] = useState<CharacterId>(DEFAULT_CHARACTER);
@@ -66,7 +68,15 @@ export default function Skystride() {
   const saved = useRef(false);
   useEffect(() => {
     try {
-      setBest(readRecord(localStorage.getItem(STORAGE)));
+      const loaded: Partial<Record<GameMode, RecordRun>> = {};
+      for (const key of ["standard", "hardcore"] as const) {
+        const record = readRecord(
+          localStorage.getItem(recordStorage(key)),
+          key,
+        );
+        if (record) loaded[key] = record;
+      }
+      setBests(loaded);
     } catch {
       setStorageNotice("Storage unavailable · best times last for this visit.");
     }
@@ -101,9 +111,12 @@ export default function Skystride() {
     saved.current = true;
     if (game.eligible && (!best || game.time < best.time)) {
       const record = game.record();
-      setBest(record);
+      setBests((previous) => ({ ...previous, [record.mode]: record }));
       try {
-        localStorage.setItem(STORAGE, JSON.stringify(record));
+        localStorage.setItem(
+          recordStorage(record.mode),
+          JSON.stringify(record),
+        );
       } catch {
         setStorageNotice(
           "Could not save on this device. Your best is kept for this visit.",
@@ -123,7 +136,7 @@ export default function Skystride() {
   const start = () => {
     saved.current = false;
     setGhost(best);
-    game.start(Math.max(0, practice), practice >= 0);
+    game.start(Math.max(0, practice), practice >= 0, mode);
     focus();
   };
   const fullscreen = async () => {
@@ -456,6 +469,41 @@ export default function Skystride() {
                       </div>
                     ))}
                   </div>
+                )}
+                {game.phase === "ready" && (
+                  <>
+                    <label htmlFor="game-mode">Game mode</label>
+                    <Select
+                      id="game-mode"
+                      aria-label="Game mode"
+                      value={mode}
+                      onChange={(value: GameMode) => {
+                        setMode(value);
+                        setGhost(null);
+                      }}
+                      options={[
+                        {
+                          value: "standard",
+                          label: "Standard · forgiving recovery",
+                        },
+                        {
+                          value: "hardcore",
+                          label: "Hardcore · crash penalties",
+                        },
+                      ]}
+                      style={{ width: "100%", marginBottom: 8 }}
+                    />
+                    <p>
+                      {mode === "hardcore"
+                        ? "Missed vaults and slides knock you down. Missed rolls cost momentum. Ledge saves need a quick Up press."
+                        : "Keep moving with assisted vault recovery and lighter landing penalties."}
+                    </p>
+                  </>
+                )}
+                {game.phase !== "ready" && (
+                  <span className={styles.eyebrow}>
+                    {game.mode === "hardcore" ? "HARDCORE" : "STANDARD"}
+                  </span>
                 )}
                 {game.phase === "ready" && (
                   <Select

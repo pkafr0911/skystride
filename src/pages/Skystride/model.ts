@@ -11,7 +11,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v26";
+export const VERSION = "sunset-relay-v27";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -19,6 +19,9 @@ export const GRAVITY = 30;
 export const JUMP_SPEED = 12.4;
 export const BUFFER = 0.12;
 export const COYOTE = 0.09;
+export type GameMode = "standard" | "hardcore";
+export const recordStorage = (mode: GameMode) =>
+  `skystride.${VERSION}.${mode}.best`;
 export type Action = "up" | "down" | "forward";
 export type Move =
   | "run"
@@ -550,6 +553,7 @@ export type Frame = {
 export type Sample = { time: number; frame: Frame };
 export type Input = { tick: number; action: Action };
 export type RecordRun = {
+  mode: GameMode;
   version: string;
   time: number;
   splits: number[];
@@ -586,12 +590,17 @@ const vaults: Vault[] = [
   "lazy",
   "kong",
 ];
-export function readRecord(raw: string | null): RecordRun | null {
+export function readRecord(
+  raw: string | null,
+  mode?: GameMode,
+): RecordRun | null {
   try {
     const r = JSON.parse(raw || "null") as RecordRun;
     if (
       !r ||
       r.version !== VERSION ||
+      !["standard", "hardcore"].includes(r.mode) ||
+      (mode !== undefined && r.mode !== mode) ||
       !Number.isFinite(r.time) ||
       r.time < 20 ||
       r.time > 600 ||
@@ -702,6 +711,7 @@ export type Traversal = {
 const clamp = (n: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, n));
 export class Run {
+  mode: GameMode = "standard";
   phase: "ready" | "running" | "finished" | "failed" = "ready";
   x = 0;
   y = 0;
@@ -751,7 +761,8 @@ export class Run {
   private longJump = false;
   private sideLaneStart = -10;
   private sideLaneEnd = -10;
-  start(sector = 0, practice = false) {
+  start(sector = 0, practice = false, mode: GameMode = this.mode) {
+    this.mode = mode;
     this.phase = "running";
     this.startSector = sector;
     this.x = sector * SECTOR;
@@ -909,7 +920,12 @@ export class Run {
             : "WALL STEP · HIGH LINE"
           : `${vault.replace("-", " ").toUpperCase()} · FLOW`,
       );
-    else {
+    else if (this.mode === "standard") {
+      this.recover(
+        wall ? "WALL CLIMB · LATE APPROACH" : "SAFETY VAULT · KEEP MOVING",
+        1.6,
+      );
+    } else {
       const entrySpeed = this.speed;
       this.recover(
         wall ? "WALL CLIMB · LATE APPROACH" : "CLIPPED VAULT · FLOW LOST",
@@ -1304,6 +1320,9 @@ export class Run {
       if (this.rollUntil >= this.time) {
         this.setMove("roll", 0.48);
         this.reward("SOFT ROLL · MOMENTUM KEPT");
+      } else if (this.mode === "standard") {
+        this.setMove("land", 0.38);
+        this.recover("HEAVY LANDING · SWIPE DOWN BEFORE CONTACT", 4.2);
       } else {
         this.setMove("heavy-land", 0.65);
         const entrySpeed = this.speed;
@@ -1460,7 +1479,11 @@ export class Run {
       if (landing) {
         this.land(landing.y, landing.upper);
         if ("index" in landing) this.handled.add(Number(landing.index));
-      } else if (this.time - this.ledgeIntent < 0.18) {
+      } else if (
+        this.time -
+          (this.mode === "hardcore" ? this.ledgeIntent : this.jumpIntent) <
+        0.18
+      ) {
         const lip = supports.find(
           (s) =>
             oldX < s.start &&
@@ -1608,16 +1631,44 @@ export class Run {
         this.y < base + (o.height || 1) &&
         this.y + height > base
       ) {
-        this.crash(o, false);
-        break;
+        if (this.mode === "hardcore") {
+          this.crash(o, false);
+          break;
+        }
+        this.handled.add(i);
+        this.recover("BARRIER CONTACT · SPEED LOST", 4);
+        this.traversal = {
+          start: this.x,
+          end: o.x + o.width + 0.7,
+          y0: this.y,
+          y1: base,
+          duration: (o.width + 1.2) / 5.5,
+          elapsed: 0,
+          arc: (o.height || 1) + 0.25,
+          move: "vault",
+          contact: { x: o.x + 0.3, y: base + (o.height || 1) },
+          vault: "safety",
+        };
+        this.vault = "safety";
+        this.grounded = false;
+        this.vy = 0;
+        this.setMove("vault");
       } else if (
         overlaps &&
         o.kind === "slide" &&
         this.y + height > base + 1.22 &&
         this.y < base + (o.height ?? 2.35)
       ) {
-        this.crash(o, true);
-        break;
+        if (this.mode === "hardcore") {
+          this.crash(o, true);
+          break;
+        }
+        this.handled.add(i);
+        this.recover("DUCT CONTACT · GET LOW", 4);
+        this.setMove("stumble", 0.55);
+        this.y = base;
+        this.vy = 0;
+        this.grounded = true;
       } else if (this.x > o.x + o.width + 0.25) {
         this.handled.add(i);
         if ((o.kind === "gap" || o.kind === "slide") && this.timed.has(i))
@@ -1917,12 +1968,16 @@ export class Run {
           this.setMove(
             t.move === "dive"
               ? "roll"
-              : t.move === "vault" && t.vault === "safety"
+              : this.mode === "hardcore" &&
+                  t.move === "vault" &&
+                  t.vault === "safety"
                 ? "stumble"
                 : "land",
             t.move === "dive"
               ? 0.4
-              : t.move === "vault" && t.vault === "safety"
+              : this.mode === "hardcore" &&
+                  t.move === "vault" &&
+                  t.vault === "safety"
                 ? 0.35
                 : 0.09,
           );
@@ -2020,6 +2075,7 @@ export class Run {
   record(): RecordRun {
     return {
       version: VERSION,
+      mode: this.mode,
       time: this.time,
       splits: [...this.splits],
       samples: [...this.samples],

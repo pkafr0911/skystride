@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   FINISH,
+  GameMode,
+  recordStorage,
   canMantle,
   timingWindow,
   timingRange,
@@ -21,9 +23,14 @@ import {
 function advance(g: Run, seconds: number) {
   for (let i = 0; i < Math.ceil(seconds / STEP); i++) g.step();
 }
-function complete(upper = false, early = false, approach = 1.9) {
+function complete(
+  upper = false,
+  early = false,
+  approach = 1.9,
+  mode: GameMode = "standard",
+) {
   const g = new Run();
-  g.start();
+  g.start(0, false, mode);
   const pressed = new Set<number>();
   const rolled = new Set<number>();
   for (let tick = 0; tick < 60000 && g.phase === "running"; tick++) {
@@ -193,7 +200,7 @@ test("a late vault selects safety recovery with real momentum loss", () => {
 });
 test("missing a barrier causes a recoverable contact instead of passing through", () => {
   const g = new Run();
-  g.start();
+  g.start(0, false, "hardcore");
   g.x = 26.7;
   g.y = ground(g.x, false);
   advance(g, 0.1);
@@ -1482,7 +1489,7 @@ test("each district adds three clear, jumpable building crossings", () => {
 
 test("missed slide knocks down without passing through or accepting an escape input", () => {
   const g = new Run();
-  g.start();
+  g.start(0, false, "hardcore");
   g.x = 90.75;
   g.speed = 12;
   g.flow = 8;
@@ -1505,7 +1512,7 @@ test("missed slide knocks down without passing through or accepting an escape in
 
 test("late vault loses thirty percent speed and exits into a stumble", () => {
   const g = new Run();
-  g.start();
+  g.start(0, false, "hardcore");
   g.x = 26.7;
   g.speed = 12;
   g.flow = 10;
@@ -1519,7 +1526,7 @@ test("late vault loses thirty percent speed and exits into a stumble", () => {
 
 test("heavy landing locks recovery and removes most momentum", () => {
   const g = new Run();
-  g.start();
+  g.start(0, false, "hardcore");
   g.x = 3;
   g.y = 0.05;
   g.vy = -17;
@@ -1537,7 +1544,7 @@ test("heavy landing locks recovery and removes most momentum", () => {
 test("a roof lip requires a recent Up, not Forward or no input", () => {
   for (const action of [undefined, "forward", "up"] as const) {
     const g = new Run();
-    g.start();
+    g.start(0, false, "hardcore");
     g.speed = 12;
     g.x = 70;
     g.y = 0;
@@ -1551,4 +1558,44 @@ test("a roof lip requires a recent Up, not Forward or no input", () => {
       assert.equal(g.phase, "failed");
     }
   }
+});
+
+test("standard keeps assisted vaults and lighter slide and landing penalties", () => {
+  for (const kind of ["vault", "slide", "landing"] as const) {
+    const g = new Run();
+    g.start();
+    g.x = kind === "vault" ? 26.75 : kind === "slide" ? 90.75 : 3;
+    g.y = ground(g.x, false);
+    g.speed = 12;
+    if (kind === "landing") {
+      g.y += 0.05;
+      g.vy = -17;
+      g.grounded = false;
+    }
+    g.step();
+    assert.equal(g.mode, "standard");
+    assert.equal(
+      g.move,
+      kind === "vault" ? "vault" : kind === "slide" ? "stumble" : "land",
+    );
+    assert.ok(g.speed >= 5.5);
+  }
+});
+
+test("hardcore clean routes finish and records stay isolated by game mode", () => {
+  for (const upper of [false, true]) {
+    const g = complete(upper, false, 1.9, "hardcore");
+    assert.equal(g.phase, "finished");
+    assert.equal(g.recoveries, 0);
+    const record = g.record();
+    assert.equal(record.mode, "hardcore");
+    assert.ok(readRecord(JSON.stringify(record), "hardcore"));
+    assert.equal(readRecord(JSON.stringify(record), "standard"), null);
+    g.start();
+    assert.equal(g.mode, "hardcore", "restart preserves the mode");
+    g.start(1, true, "standard");
+    assert.equal(g.mode, "standard");
+    assert.equal(g.practice, true);
+  }
+  assert.notEqual(recordStorage("standard"), recordStorage("hardcore"));
 });

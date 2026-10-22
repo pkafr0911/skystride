@@ -256,3 +256,8 @@ Late vaults now remove 30% of entry speed, reset flow and exit into a 350 ms stu
 Missing a required landing roll produces a hands-and-knees landing, removes 65% of entry momentum immediately and settles to a stop during 650 ms of recovery. Clean rolls preserve the existing behavior. Crash, backward knockdown and heavy landing have separate poses with impact, down and get-up phases. Airborne collisions continue falling under gravity before recovery begins on a real support surface.
 
 Missed jumps and bar grabs still fall into the void and fail. Reachable roof lips require Up within 180 ms of contact; Forward no longer doubles as a ledge-save input. A successful catch consumes that Up opportunity and climbs as before. Record version advances to keep earlier time trials separate. Regression coverage checks locked recovery, obstacle retries, speed/flow loss, clean routes, falls, ledge saves and finite rendered recovery poses. Browser/mobile feel still needs hands-on playtesting.
+
+
+## Selectable penalty mode — v27
+
+Course selection now offers Standard (default) and Hardcore independently of time trial or practice sector. Standard restores the earlier assisted barrier crossing, slide stumble, lighter heavy landing and Up/Forward ledge-save behavior. Hardcore contains the v26 crash penalties, locked recovery, 30% late-vault speed loss, and Up-only ledge saves. Both retain fatal missed jumps/bar grabs. Retries retain the chosen mode; returning to the course menu allows switching. Best times and ghosts are stored separately by mode, and records include a validated mode field. Earlier record keys remain untouched.
