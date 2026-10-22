@@ -11,7 +11,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v25";
+export const VERSION = "sunset-relay-v26";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -32,6 +32,9 @@ export type Move =
   | "catch"
   | "climb"
   | "roll"
+  | "crash"
+  | "knockback"
+  | "heavy-land"
   | "stumble"
   | "mantle"
   | "wall-run"
@@ -565,6 +568,9 @@ const moves: Move[] = [
   "catch",
   "climb",
   "roll",
+  "crash",
+  "knockback",
+  "heavy-land",
   "stumble",
   "mantle",
   "wall-run",
@@ -733,6 +739,7 @@ export class Run {
   private rollUntil = -1;
   private slideExitAt = -10;
   private jumpIntent = -1;
+  private ledgeIntent = -1;
   private actionDuration = 0;
   private dropFrom = 0;
   private launchX = 0;
@@ -774,6 +781,7 @@ export class Run {
     this.rollUntil = -1;
     this.slideExitAt = -10;
     this.jumpIntent = -1;
+    this.ledgeIntent = -1;
     this.actionDuration = 0;
     this.dropFrom = 0;
     this.launchX = this.x;
@@ -844,6 +852,28 @@ export class Run {
     this.speed = Math.max(5.5, this.speed - cost);
     this.say(label);
   }
+  private get recovering() {
+    return (
+      this.move === "crash" ||
+      this.move === "knockback" ||
+      this.move === "heavy-land"
+    );
+  }
+  private crash(o: Obstacle, backward: boolean) {
+    this.recoveries++;
+    this.flow = 0;
+    this.speed = 0;
+    this.x = Math.min(this.x, o.x - 0.4);
+    this.vy = Math.min(0, this.vy);
+    this.buffered = null;
+    this.rollUntil = -1;
+    this.setMove(backward ? "knockback" : "crash", backward ? 1.35 : 1.2);
+    this.say(
+      backward
+        ? "KNOCKDOWN · SLIDE UNDER ON RETRY"
+        : "CRASH · GET UP AND VAULT",
+    );
+  }
   action(action: Action) {
     if (this.phase === "running" && !this.paused && this.pending.length < 4)
       this.pending.push(action);
@@ -879,11 +909,14 @@ export class Run {
             : "WALL STEP · HIGH LINE"
           : `${vault.replace("-", " ").toUpperCase()} · FLOW`,
       );
-    else
+    else {
+      const entrySpeed = this.speed;
       this.recover(
-        wall ? "WALL CLIMB · LATE APPROACH" : "SAFETY VAULT · KEEP MOVING",
-        1.6,
+        wall ? "WALL CLIMB · LATE APPROACH" : "CLIPPED VAULT · FLOW LOST",
+        0,
       );
+      this.speed = entrySpeed * 0.7;
+    }
     this.traversal = {
       start: this.x,
       end,
@@ -982,6 +1015,7 @@ export class Run {
     this.say("LEDGE CONTACT · PULL, PRESS, EXIT");
   }
   private tryAction(action: Action): boolean {
+    if (this.recovering && this.moveTime < this.actionDuration) return false;
     const t = this.traversal;
     if (t) {
       if (
@@ -1261,18 +1295,34 @@ export class Run {
     this.grounded = true;
     this.lastGround = this.time;
     this.upper = upper;
+    if (this.recovering) {
+      this.moveTime = 0;
+      this.rollUntil = -1;
+      return;
+    }
     if (impact > 14 || this.dropFrom - y > 2) {
       if (this.rollUntil >= this.time) {
         this.setMove("roll", 0.48);
         this.reward("SOFT ROLL · MOMENTUM KEPT");
       } else {
-        this.setMove("land", 0.38);
-        this.recover("HEAVY LANDING · SWIPE DOWN BEFORE CONTACT", 4.2);
+        this.setMove("heavy-land", 0.65);
+        const entrySpeed = this.speed;
+        this.recover("HEAVY LANDING · SWIPE DOWN BEFORE CONTACT", 0);
+        this.speed = entrySpeed * 0.35;
       }
     } else this.setMove("land", 0.12);
     this.rollUntil = -1;
   }
   private physics() {
+    if (this.recovering && this.grounded) {
+      if (this.moveTime < this.actionDuration) {
+        // Recovery consumes real time. Inputs cannot cancel a knockdown.
+        if (this.move === "heavy-land")
+          this.speed = Math.max(0, this.speed - STEP * 8);
+        return;
+      }
+      this.setMove("run");
+    }
     const oldX = this.x,
       oldY = this.y;
     const target =
@@ -1410,7 +1460,7 @@ export class Run {
       if (landing) {
         this.land(landing.y, landing.upper);
         if ("index" in landing) this.handled.add(Number(landing.index));
-      } else if (this.time - this.jumpIntent < 0.18) {
+      } else if (this.time - this.ledgeIntent < 0.18) {
         const lip = supports.find(
           (s) =>
             oldX < s.start &&
@@ -1419,6 +1469,7 @@ export class Run {
             this.y > s.y - 1.6,
         );
         if (lip) {
+          this.ledgeIntent = -1;
           this.buffered = null;
           this.x = lip.start - 0.35;
           this.y = lip.y - 1.65;
@@ -1536,7 +1587,8 @@ export class Run {
     }
     for (let i = 0; i < obstacles.length; i++) {
       const o = obstacles[i];
-      if (this.handled.has(i) || !this.applicable(o)) continue;
+      if (this.recovering || this.handled.has(i) || !this.applicable(o))
+        continue;
       const base = ground(o.x, o.route === "upper");
       const height =
         this.move === "slide" || this.move === "roll" ? 0.85 : 1.85;
@@ -1556,37 +1608,16 @@ export class Run {
         this.y < base + (o.height || 1) &&
         this.y + height > base
       ) {
-        this.handled.add(i);
-        this.recover("BARRIER CONTACT · SPEED LOST", 4);
-        // A recoverable hand-assisted crossing begins at actual contact, with a large time cost.
-        this.traversal = {
-          start: this.x,
-          end: o.x + o.width + 0.7,
-          y0: this.y,
-          y1: base,
-          duration: (o.width + 1.2) / 5.5,
-          elapsed: 0,
-          arc: (o.height || 1) + 0.25,
-          move: "vault",
-          contact: { x: o.x + 0.3, y: base + (o.height || 1) },
-          vault: "safety",
-        };
-        this.vault = "safety";
-        this.grounded = false;
-        this.vy = 0;
-        this.setMove("vault");
+        this.crash(o, false);
+        break;
       } else if (
         overlaps &&
         o.kind === "slide" &&
         this.y + height > base + 1.22 &&
         this.y < base + (o.height ?? 2.35)
       ) {
-        this.handled.add(i);
-        this.recover("DUCT CONTACT · GET LOW", 4);
-        this.setMove("stumble", 0.55);
-        this.y = base;
-        this.vy = 0;
-        this.grounded = true;
+        this.crash(o, true);
+        break;
       } else if (this.x > o.x + o.width + 0.25) {
         this.handled.add(i);
         if ((o.kind === "gap" || o.kind === "slide") && this.timed.has(i))
@@ -1645,6 +1676,7 @@ export class Run {
     for (const action of this.pending) {
       this.inputs.push({ tick: this.ticks, action });
       if (action === "up" || action === "forward") this.jumpIntent = this.time;
+      if (action === "up") this.ledgeIntent = this.time;
       this.buffered = { action, until: this.time + BUFFER };
       if (this.tryAction(action)) this.buffered = null;
     }
@@ -1883,8 +1915,16 @@ export class Run {
           this.upper = t.upper ?? this.y > 2;
           this.vy = 0;
           this.setMove(
-            t.move === "dive" ? "roll" : "land",
-            t.move === "dive" ? 0.4 : 0.09,
+            t.move === "dive"
+              ? "roll"
+              : t.move === "vault" && t.vault === "safety"
+                ? "stumble"
+                : "land",
+            t.move === "dive"
+              ? 0.4
+              : t.move === "vault" && t.vault === "safety"
+                ? 0.35
+                : 0.09,
           );
         }
       }

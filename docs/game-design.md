@@ -247,3 +247,12 @@ The airborne grab now targets the final 20 cm of the reachable bar section inste
 Gameplay uses smoothly eased orthographic zoom: 1.28× at rest, 1× at 12 m/s and 0.76× at 30 m/s. Acceleration opens the view faster than deceleration closes it. Look-ahead scales with the visible width, keeping the runner at a stable horizontal screen position and preserving the forward corridor on portrait displays. Pause freezes zoom; resize preserves it. Reduced-motion preference uses a stable wide view. Movement-lab retains its close inspection framing.
 
 Slow-speed framing now reaches 3.84× zoom (three times the previous 1.28× close view), easing back to 1× at running speed. Close framing also lowers the camera toward the runner's torso to keep the body visible. Fast-speed and reduced-motion framing remain unchanged.
+
+
+## Missed-input penalties — v26
+
+Late vaults now remove 30% of entry speed, reset flow and exit into a 350 ms stumble. Missing a vault completely stops the runner on the near side with a 1.2 second fall/get-up animation; the obstacle remains active for a deliberate retry. Missing a slide causes a backward knockdown with 1.35 seconds of recovery. Neither knockdown can be cancelled by jumping or sliding; the normal final 120 ms input buffer remains available.
+
+Missing a required landing roll produces a hands-and-knees landing, removes 65% of entry momentum immediately and settles to a stop during 650 ms of recovery. Clean rolls preserve the existing behavior. Crash, backward knockdown and heavy landing have separate poses with impact, down and get-up phases. Airborne collisions continue falling under gravity before recovery begins on a real support surface.
+
+Missed jumps and bar grabs still fall into the void and fail. Reachable roof lips require Up within 180 ms of contact; Forward no longer doubles as a ledge-save input. A successful catch consumes that Up opportunity and climbs as before. Record version advances to keep earlier time trials separate. Regression coverage checks locked recovery, obstacle retries, speed/flow loss, clean routes, falls, ledge saves and finite rendered recovery poses. Browser/mobile feel still needs hands-on playtesting.

@@ -1092,6 +1092,48 @@ function flatPose(f: Frame): Pose {
       return mantlePose(f);
     case "slide":
       return slidePose(f);
+    case "crash":
+    case "knockback":
+    case "heavy-land": {
+      const down = basePose();
+      const back = f.move === "knockback";
+      down.hip = [back ? -0.28 : 0, 0.3, 0];
+      down.chest = [back ? -0.65 : 0.48, back ? 0.48 : 0.4, 0];
+      down.head = [back ? -0.86 : 0.77, back ? 0.65 : 0.48, 0];
+      down.hands = back
+        ? [
+            [-0.68, 0.08, -0.24],
+            [-0.42, 0.08, 0.24],
+          ]
+        : [
+            [0.72, 0.08, -0.24],
+            [0.64, 0.08, 0.24],
+          ];
+      down.feet = [
+        [-0.5, 0.08, -0.14],
+        [0.12, 0.08, 0.14],
+      ];
+      down.knees = [
+        [-0.15, 0.12, -0.14],
+        [0.32, 0.16, 0.14],
+      ];
+      down.elbows = [
+        [back ? -0.82 : 0.5, 0.3, -0.25],
+        [back ? -0.55 : 0.4, 0.3, 0.25],
+      ];
+      const brace = lowPose();
+      brace.hands = down.hands;
+      return sequence(
+        [
+          { at: 0, pose: f.move === "heavy-land" ? brace : runPose(f.x, 0) },
+          { at: 0.18, pose: down },
+          { at: 0.55, pose: down },
+          { at: 0.82, pose: brace },
+          { at: 1, pose: runPose(f.x, 0) },
+        ],
+        f.progress,
+      );
+    }
     case "stumble": {
       const low = lowPose();
       if (f.move === "stumble") {
@@ -1165,6 +1207,12 @@ export function poseFor(f: Frame): Pose {
 }
 
 export function motionPhase(f: Frame): string {
+  if (f.move === "crash" || f.move === "knockback" || f.move === "heavy-land")
+    return f.progress < 0.18
+      ? "IMPACT"
+      : f.progress < 0.55
+        ? "DOWN"
+        : "PUSH UP & RECOVER";
   if (f.move === "special")
     return `${f.technique?.replaceAll("-", " ").toUpperCase()} · ${f.progress < 0.25 ? "ENTRY" : f.progress < 0.7 ? "CONTACT & DRIVE" : "RELEASE & LAND"}`;
   if (f.move === "dive")

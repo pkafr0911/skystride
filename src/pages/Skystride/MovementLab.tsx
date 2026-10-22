@@ -64,7 +64,9 @@ export default function MovementLab() {
       return index < 0 ? fallback : index;
     };
     const landing = first(
-      (f) => f.move === "land" && (f.landingAge || 0) > 0.04,
+      (f) =>
+        (f.move === "land" || f.move === "heavy-land") &&
+        (f.landingAge || 0) > 0.04,
       120,
     );
     const atProgress = (kind: Frame["move"], value: number) =>

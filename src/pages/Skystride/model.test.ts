@@ -195,10 +195,25 @@ test("missing a barrier causes a recoverable contact instead of passing through"
   const g = new Run();
   g.start();
   g.x = 26.7;
+  g.y = ground(g.x, false);
   advance(g, 0.1);
   assert.equal(g.recoveries, 1);
-  assert.equal(g.vault, "safety");
-  assert.ok(g.traversal);
+  assert.equal(g.move, "crash");
+  assert.equal(g.traversal, null);
+  assert.equal(g.speed, 0);
+  assert.ok(g.x < 27);
+  const x = g.x;
+  g.action("up");
+  advance(g, 0.8);
+  assert.equal(g.x, x);
+  assert.equal(g.move, "crash");
+  advance(g, 0.4);
+  g.action("up");
+  g.step();
+  assert.ok(
+    g.traversal,
+    "the barrier remains available for a deliberate retry",
+  );
 });
 test("sliding stays low until the ceiling is clear", () => {
   const g = new Run();
@@ -1461,6 +1476,79 @@ test("each district adds three clear, jumpable building crossings", () => {
         assert.ok(g.x >= gap.x + gap.width);
         assert.equal(g.recoveries, 0);
       }
+    }
+  }
+});
+
+test("missed slide knocks down without passing through or accepting an escape input", () => {
+  const g = new Run();
+  g.start();
+  g.x = 90.75;
+  g.speed = 12;
+  g.flow = 8;
+  g.step();
+  assert.equal(g.move, "knockback");
+  assert.equal(g.speed, 0);
+  assert.equal(g.flow, 0);
+  assert.ok(g.x < 91);
+  const x = g.x;
+  g.action("down");
+  advance(g, 1);
+  assert.equal(g.x, x);
+  assert.equal(g.recoveries, 1);
+  advance(g, 0.36);
+  g.action("down");
+  advance(g, 0.2);
+  assert.equal(g.move, "slide");
+  assert.equal(g.recoveries, 1);
+});
+
+test("late vault loses thirty percent speed and exits into a stumble", () => {
+  const g = new Run();
+  g.start();
+  g.x = 26.7;
+  g.speed = 12;
+  g.flow = 10;
+  g.action("up");
+  g.step();
+  assert.ok(Math.abs(g.speed - 8.4) < 0.001);
+  assert.equal(g.flow, 0);
+  while (g.traversal) g.step();
+  assert.equal(g.move, "stumble");
+});
+
+test("heavy landing locks recovery and removes most momentum", () => {
+  const g = new Run();
+  g.start();
+  g.x = 3;
+  g.y = 0.05;
+  g.vy = -17;
+  g.grounded = false;
+  g.speed = 12;
+  g.step();
+  assert.equal(g.move, "heavy-land");
+  assert.ok(g.speed < 4.3);
+  g.action("up");
+  advance(g, 0.3);
+  assert.equal(g.move, "heavy-land");
+  assert.equal(g.grounded, true);
+});
+
+test("a roof lip requires a recent Up, not Forward or no input", () => {
+  for (const action of [undefined, "forward", "up"] as const) {
+    const g = new Run();
+    g.start();
+    g.speed = 12;
+    g.x = 70;
+    g.y = 0;
+    g.grounded = false;
+    advance(g, 26 * STEP);
+    if (action) g.action(action);
+    advance(g, 0.05);
+    if (action === "up") assert.equal(g.move, "catch");
+    else {
+      advance(g, 1.2);
+      assert.equal(g.phase, "failed");
     }
   }
 });

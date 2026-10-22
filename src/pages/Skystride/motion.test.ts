@@ -703,3 +703,27 @@ test("wall-pop is absent from movement-lab techniques, options, and chains", () 
     ),
   );
 });
+
+test("crash poses visibly fall, brace on the roof and return to standing", () => {
+  for (const move of ["crash", "knockback", "heavy-land"] as const) {
+    const f = { ...new Run().frame(), move, speed: 0 };
+    const down = poseFor({ ...f, progress: 0.4 });
+    const standing = poseFor({ ...f, progress: 1 });
+    assert.ok(down.hip[1] < standing.hip[1] - 0.4);
+    assert.ok(down.hands.every((hand) => hand[1] < 0.12));
+    assert.ok(
+      move === "knockback"
+        ? down.head[0] < down.hip[0]
+        : down.head[0] > down.hip[0],
+    );
+    const actor = makeRunner(new THREE.Scene());
+    for (let i = 0; i <= 20; i++) {
+      actor.pose({ ...f, progress: i / 20 }, i / 20, STEP);
+      actor.group.updateMatrixWorld(true);
+      actor.group.traverse((part) =>
+        assert.ok(part.matrixWorld.elements.every(Number.isFinite)),
+      );
+    }
+    actor.dispose();
+  }
+});
