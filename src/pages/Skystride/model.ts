@@ -440,6 +440,11 @@ export const surfaces: Surface[] = [
   ...cut(-30, FINISH + 25, 0, false),
   ...upperPlatforms.flatMap((p) => cut(p.start, p.end, 3.3, true)),
 ];
+export function ground(x: number, upper: boolean) {
+  return upper && upperPlatforms.some((p) => x >= p.start && x <= p.end)
+    ? roofHeight(x) + 3.3
+    : roofHeight(x);
+}
 /** Solid obstacle tops are support surfaces even after their scoring event is handled. */
 export const obstacleTops = obstacles.flatMap((o, index) =>
   o.kind === "vault" || o.kind === "slide" || o.kind === "ledge"
@@ -510,11 +515,6 @@ const supportSurfaces = {
     ...wallRunLedges.filter((s) => s.upper),
   ],
 };
-export function ground(x: number, upper: boolean) {
-  return upper && upperPlatforms.some((p) => x >= p.start && x <= p.end)
-    ? roofHeight(x) + 3.3
-    : roofHeight(x);
-}
 export type Contact = { x: number; y: number };
 export type Frame = {
   x: number;
