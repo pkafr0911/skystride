@@ -1181,10 +1181,11 @@ export function poseFor(f: Frame): Pose {
     ])
       point[1] += point[0] * slope;
     for (let side = 0; side < 2; side++) {
-      p.feet[side][1] = Math.max(
-        p.feet[side][1],
-        0.09 - (f.y - (f.y >= 3.3 ? 3.3 : 0)),
-      );
+      if (slope > 0)
+        p.feet[side][1] = Math.max(
+          p.feet[side][1],
+          0.09 - (f.y - (f.y >= 3.3 ? 3.3 : 0)),
+        );
       p.footAngles[side] += Math.atan(slope);
     }
   }

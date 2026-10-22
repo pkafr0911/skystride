@@ -130,6 +130,31 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
       if (t === "transfer" || t === "reverse")
         box(w * 0.8, h / 2, -1.6, 0.5, h, 1, kit.face);
     }
+  } else if (o.feature === "side-ramp") {
+    const angle = Math.atan2(h, w),
+      length = Math.hypot(w, h);
+    const lane = 2.9;
+    box(w / 2, h / 2 - 0.08, lane, length, 0.16, 1.5, kit.face).rotation.z =
+      angle;
+    for (const z of [lane - 0.78, lane + 0.78]) {
+      box(w / 2, h / 2 + 0.04, z, length, 0.12, 0.08, kit.amber).rotation.z =
+        angle;
+    }
+    for (let x = 1; x < w; x += 2.5) {
+      box(x, (h * x) / w - 0.22, 2.3, 0.12, 0.2, 2, kit.trim);
+      box(
+        x,
+        (h * x) / w + 0.015,
+        lane,
+        0.14,
+        0.025,
+        1.25,
+        kit.amber,
+      ).rotation.z = angle;
+    }
+    box(w - 0.15, h + 0.025, lane, 0.3, 0.05, 1.55, kit.amber);
+    // Short entry apron joins the rooftop to the facade chute.
+    box(0.4, -0.06, 1.9, 0.8, 0.12, 2.8, kit.face);
   } else if (o.kind === "ramp") {
     const angle = Math.atan2(h, w),
       length = Math.hypot(w, h);

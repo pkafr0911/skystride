@@ -380,7 +380,8 @@ test("up at a reachable lip catches it and climbs onto its real surface", () => 
   const g = new Run();
   g.start();
   g.speed = 12;
-  g.x = 70;
+  const gap = obstacles.find((o) => o.kind === "gap" && o.x === 67)!;
+  g.x = gap.x + gap.width - 3.2;
   g.grounded = false;
   advance(g, 26 * STEP);
   g.action("up");
@@ -422,6 +423,8 @@ test("jump distance carries takeoff speed and a long jump needs earned momentum"
 test("a slowed runner needs a sustained run-up to regain long-jump speed", () => {
   const g = new Run();
   g.start();
+  // Use the clear approach roof so this isolates acceleration from course gaps.
+  g.x = -10;
   g.speed = 6;
   advance(g, 1);
   assert.ok(g.speed > 8.9 && g.speed < 9.1);
@@ -821,7 +824,9 @@ test("pipe crossings support both dash-slide and a jump from the low pipe onto t
 });
 
 test("solar ramps raise actual support and allow momentum-carrying gap launches with landing rolls", () => {
-  for (const ramp of obstacles.filter((o) => !o.combo && o.kind === "ramp")) {
+  for (const ramp of obstacles.filter(
+    (o) => !o.combo && o.kind === "ramp" && o.feature !== "side-ramp",
+  )) {
     const g = new Run();
     g.start();
     g.x = ramp.x;
@@ -899,12 +904,13 @@ test("billboard sill vaults fit through the opening while high jumps hit the hea
   }
 });
 
-test("all ten creative encounter families exist in the authored course", () => {
+test("all creative encounter families exist in the authored course", () => {
   assert.deepEqual(
     [...new Set(obstacles.map((o) => o.feature).filter(Boolean))].sort(),
     [
       "vent-bank",
       "solar",
+      "side-ramp",
       "tank",
       "wall-billboard",
       "pipe",
@@ -1268,4 +1274,42 @@ test("window roll exits lead into a vaultable obstacle on both routes", () => {
       if (lane[i].feature === "window") assert.equal(lane[i + 1].kind, "vault");
     }
   }
+});
+
+test("side ramps sustain a downhill slide and launch across building gaps", () => {
+  for (const ramp of obstacles.filter((o) => o.feature === "side-ramp")) {
+    const g = new Run();
+    g.start();
+    g.x = ramp.x;
+    g.speed = 12;
+    while (g.x < ramp.x + ramp.width - 0.6) {
+      g.step();
+      assert.equal(g.grounded, true);
+      assert.equal(g.move, "slide");
+      assert.ok(g.frame().slope! < 0);
+    }
+    assert.ok(
+      g.moveTime > 1,
+      "slide persists beyond the normal slide duration",
+    );
+    assert.ok(g.y < -1);
+    g.action("forward");
+    g.step();
+    assert.ok(g.vy > 0);
+    for (let i = 0; i < 180 && !g.grounded && g.phase === "running"; i++)
+      g.step();
+    assert.equal(g.grounded, true);
+    assert.ok(g.x >= ramp.x + ramp.width + 8.4, "lands on the next building");
+  }
+});
+
+test("a side ramp requires a jump to reach the next building", () => {
+  const ramp = obstacles.find((o) => o.feature === "side-ramp")!;
+  const g = new Run();
+  g.start();
+  g.x = ramp.x;
+  g.speed = 12;
+  for (let i = 0; i < 600 && g.phase === "running"; i++) g.step();
+  assert.equal(g.phase, "failed");
+  assert.ok(g.x < ramp.x + ramp.width + 8.4);
 });

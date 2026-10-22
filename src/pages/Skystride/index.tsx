@@ -207,7 +207,9 @@ export default function Skystride() {
                                   : "↓ SLIDE"
                                 : next?.kind === "gap"
                                   ? game.frame().slope
-                                    ? "↑ RAMP LAUNCH / ↓ ROLL BEFORE LANDING"
+                                    ? game.frame().slope! < 0
+                                      ? "SLIDE DOWN → ↑ / → JUMP AT THE EDGE"
+                                      : "↑ RAMP LAUNCH / ↓ ROLL BEFORE LANDING"
                                     : "↑ GAP JUMP"
                                   : "↑ VAULT";
   const finished = game.phase === "finished";

@@ -11,7 +11,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v17";
+export const VERSION = "sunset-relay-v19";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -50,6 +50,7 @@ export type Feature =
   | "pipe"
   | "window"
   | "solar"
+  | "side-ramp"
   | "tank"
   | "wall-billboard"
   | "bridge"
@@ -84,6 +85,7 @@ export type Obstacle = {
   vault?: Vault;
 };
 const opening: Obstacle[] = [
+  { x: 14, width: 5.5, kind: "gap" },
   { x: 27, width: 0.7, height: 0.5, kind: "vault", vault: "speed" },
   {
     x: 46,
@@ -93,6 +95,7 @@ const opening: Obstacle[] = [
     feature: "wall-billboard",
   },
   { x: 67, width: 6.2, kind: "gap", feature: "bridge" },
+  { x: 80, width: 5.5, kind: "gap" },
   { x: 91, width: 5.5, height: 1.65, kind: "slide", feature: "tank" },
   { x: 115, width: 5, height: 3.3, kind: "branch" },
   {
@@ -241,7 +244,18 @@ const variants: Vault[] = [
 ];
 circuit.push(...comboCourse());
 const districts = [1480, 1960, 2440];
+const sideRamps: Obstacle[] = [0, ...districts].map((offset) => ({
+  x: 456 + offset,
+  width: 20,
+  height: -1.2,
+  kind: "ramp",
+  feature: "side-ramp",
+}));
 const courseAnchors: Obstacle[] = [
+  ...sideRamps,
+  ...sideRamps.map(
+    (r): Obstacle => ({ x: r.x + r.width, width: 8.4, kind: "gap" }),
+  ),
   ...opening,
   ...circuit,
   ...districts.flatMap((offset) =>
@@ -310,6 +324,10 @@ function denseLane(start: number, end: number, route: "upper" | "lower") {
     }
   }
   return additions.filter((o) => {
+    if (
+      sideRamps.some((r) => o.x + o.width > r.x - 2 && o.x < r.x + r.width + 12)
+    )
+      return false;
     if (
       route === "lower" &&
       upperPlatforms.some((p) => o.x >= p.end - 2 && o.x < p.end + 15)
@@ -1276,10 +1294,25 @@ export class Run {
         after = rampHeight(ramp, this.x);
       if (this.grounded && Math.abs(oldY - before) < 0.04) {
         this.y = after;
-        // Climbing costs momentum; the ramp adds height, never a launch-speed bonus.
+        if (ramp.feature === "side-ramp") {
+          if (this.move !== "slide") {
+            this.setMove("slide", 0.62);
+            this.say("SIDE RAMP · SLIDE DOWN → JUMP AT THE AMBER EDGE");
+          }
+          this.sideLaneStart = ramp.x;
+          this.sideLaneEnd = ramp.x + ramp.width + 8.4;
+        }
+        // Gravity adds downhill momentum; uphill ramps still cost speed.
         this.speed = Math.max(
           0,
-          this.speed - GRAVITY * (ramp.height! / ramp.width) * 0.6 * STEP,
+          Math.min(
+            16,
+            this.speed -
+              GRAVITY *
+                (ramp.height! / ramp.width) *
+                (ramp.feature === "side-ramp" ? 3 : 0.6) *
+                STEP,
+          ),
         );
         rampSupport = true;
       } else if (
@@ -1292,7 +1325,11 @@ export class Run {
         rampSupport = true;
       }
     }
-    const supports = supportSurfaces[this.upper ? "upper" : "lower"];
+    const routeSupports = supportSurfaces[this.upper ? "upper" : "lower"];
+    const supports =
+      ramp?.feature === "side-ramp"
+        ? routeSupports.filter((s) => s.y !== 0)
+        : routeSupports;
     const support =
       rampSupport ||
       supports.find(
@@ -1574,7 +1611,11 @@ export class Run {
         ceiling
       )
         this.setMove("slide", 0.1);
-      if (this.moveTime > this.actionDuration && !ceiling) {
+      if (
+        this.moveTime > this.actionDuration &&
+        !ceiling &&
+        !(rampSupport && ramp?.feature === "side-ramp")
+      ) {
         this.slideExitAt = this.time;
         this.setMove(this.grounded ? "run" : "fall");
       }
@@ -1914,11 +1955,14 @@ export class Run {
               )
           : this.x >= this.sideLaneStart && this.x < this.sideLaneEnd
             ? 0.55 +
-              1.5 *
+              (sideRamps.some((r) => r.x === this.sideLaneStart) ? 2.35 : 1.5) *
                 Math.min(
                   1,
                   (this.x - this.sideLaneStart) / 0.7,
-                  (this.sideLaneEnd - this.x) / 0.7,
+                  (this.sideLaneEnd - this.x) /
+                    (sideRamps.some((r) => r.x === this.sideLaneStart)
+                      ? 8.4
+                      : 0.7),
                 )
             : this.move === "wall-run"
               ? 0.55 -
