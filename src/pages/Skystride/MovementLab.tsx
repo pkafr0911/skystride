@@ -7,7 +7,7 @@ import {
 } from "./characters";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { Frame, STEP } from "./model";
+import { Frame, STEP, ground } from "./model";
 import { options, Preview, framesFor, previewObstacles } from "./lab-model";
 import { SWING_GAP_EXTRA, techniques, isSwing, Technique } from "./combos";
 import { creativeObstacle } from "./obstacle-mesh";
@@ -135,11 +135,11 @@ export default function MovementLab() {
     };
     const previewItems = previewObstacles(move),
       o = previewItems[0],
-      base = o?.route === "upper" ? 3.3 : 0;
+      base = o ? ground(o.x, o.route === "upper") : 0;
     const start = samples[0].x;
     if (move === "catch") {
-      box(82, -2, 17.6, 4);
-      box(82, 0, 17.6, 0.035, amber);
+      box(82, ground(74, false) - 2, 17.6, 4);
+      box(82, ground(74, false), 17.6, 0.035, amber);
     } else if (move === "roll" || move === "landing") {
       box(191, 1.3, 8, 4);
       box(206, -2, 22, 4);

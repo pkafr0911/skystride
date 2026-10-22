@@ -1,6 +1,6 @@
 import { SWING_GAP_EXTRA, swingGripOffset } from "./combos";
 import * as THREE from "three";
-import { Obstacle } from "./model";
+import { ground, Obstacle } from "./model";
 
 export type ObstacleKit = {
   box: THREE.BufferGeometry;
@@ -16,7 +16,7 @@ export type ObstacleKit = {
 export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
   const group = new THREE.Group();
   group.name = o.feature ?? "obstacle";
-  group.position.set(o.x, o.route === "upper" ? 3.3 : 0, 0);
+  group.position.set(o.x, ground(o.x, o.route === "upper"), 0);
   const box = (
     x: number,
     y: number,
@@ -75,12 +75,7 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
         0.14,
         kit.face,
       );
-    } else if (
-      t === "tic-tac" ||
-      t === "rebound" ||
-      t === "wall-pop" ||
-      t === "cat-leap"
-    ) {
+    } else if (t === "tic-tac" || t === "rebound") {
       box(w / 2, h / 2, -0.85, w, h, 0.16, kit.face);
       for (let y = 0.4; y < h; y += 0.5)
         box(w / 2, y, -0.75, 0.4, 0.055, 0.035, kit.amber);

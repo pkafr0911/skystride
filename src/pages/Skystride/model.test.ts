@@ -1,3 +1,4 @@
+import { ground } from "./model";
 import { SWING_GAP_EXTRA, isSwing } from "./combos";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -30,10 +31,10 @@ function complete(upper = false, early = false, approach = 1.9) {
     if (
       !g.grounded &&
       !g.traversal &&
-      frame.launchY! - (g.upper ? 3.3 : 0) > 0.5 &&
-      frame.launchY! - (g.upper ? 3.3 : 0) < 2 &&
+      frame.launchY! - ground(g.x, g.upper) > 0.5 &&
+      frame.launchY! - ground(g.x, g.upper) < 2 &&
       g.vy < -10 &&
-      g.y - (g.upper ? 3.3 : 0) < 1.1 &&
+      g.y - ground(g.x, g.upper) < 1.1 &&
       !rolled.has(frame.launchX!)
     ) {
       g.action("down");
@@ -171,7 +172,7 @@ test("every authored vault type has its own traversal and obstacle contact ancho
     const g = new Run();
     g.start();
     g.x = o.x - 1.8;
-    g.y = o.route === "upper" ? 3.3 : 0;
+    g.y = ground(o.x, o.route === "upper");
     g.upper = o.route === "upper";
     g.action("up");
     g.step();
@@ -347,7 +348,7 @@ test("vault feet clear the top for the entire obstacle width", () => {
     const g = new Run();
     g.start();
     g.x = o.x - 2;
-    g.y = o.route === "upper" ? 3.3 : 0;
+    g.y = ground(o.x, o.route === "upper");
     g.upper = o.route === "upper";
     const top = g.y + o.height!;
     g.action("up");
@@ -387,10 +388,10 @@ test("up at a reachable lip catches it and climbs onto its real surface", () => 
   g.action("up");
   advance(g, 0.05);
   assert.equal(g.move, "catch");
-  assert.equal(g.traversal?.contact?.y, 0);
+  assert.equal(g.traversal?.contact?.y, ground(gap.x + gap.width, false));
   advance(g, 0.8);
   assert.equal(g.grounded, true);
-  assert.equal(g.y, 0);
+  assert.equal(g.y, ground(g.x, false));
   assert.equal(g.recoveries, 1);
 });
 
@@ -494,7 +495,17 @@ test("technical district sustains more than a minute at maximum flow with all fo
     for (const vault of ["kong", "dash", "speed", "lazy"] as const)
       assert.ok(families.has(vault));
     assert.ok(![...families].some((v) => String(v).startsWith("step")));
-    assert.ok(segment.slice(1).every((o, i) => o.x - segment[i].x <= 20));
+    assert.ok(
+      segment.slice(1).every((o, i) => {
+        const previous = segment[i];
+        // Removing both wall contacts intentionally opens this approach.
+        const clearance =
+          o.combo === "High-Line Escape" && previous.combo === o.combo
+            ? 28
+            : 20;
+        return o.x - previous.x <= clearance;
+      }),
+    );
   }
 });
 test("normal and hard timing windows retain their duration at different speeds", () => {
@@ -565,7 +576,7 @@ test("up climbs a low uncovered duct more slowly than sliding under it", () => {
     const g = new Run();
     g.start();
     g.x = o.x - 1.9;
-    g.y = o.route === "upper" ? 3.3 : 0;
+    g.y = ground(o.x, o.route === "upper");
     g.upper = o.route === "upper";
     g.action(action);
     g.step();
@@ -667,7 +678,7 @@ test("descending onto barriers and ducts gives real support and immediate follow
     const g = new Run();
     g.start();
     g.upper = o.route === "upper";
-    const top = (g.upper ? 3.3 : 0) + (o.height ?? 2.35);
+    const top = ground(o.x, g.upper) + (o.height ?? 2.35);
     g.x = o.x + 0.12;
     g.y = top + 0.015;
     g.vy = -3;
@@ -696,6 +707,7 @@ test("mantle tops allow a supported jump or a feet-first edge exit", () => {
     const g = new Run();
     g.start();
     g.x = o.x - 1.7;
+    g.y = ground(g.x, o.route === "upper");
     g.speed = 8;
     g.action("up");
     g.step();
@@ -717,7 +729,7 @@ test("mantle tops allow a supported jump or a feet-first edge exit", () => {
       for (let i = 0; !g.grounded && g.phase === "running" && i < 200; i++)
         g.step();
       assert.equal(g.grounded, true);
-      assert.equal(g.y, 0);
+      assert.equal(g.y, ground(g.x, false));
     }
   }
 });
@@ -1086,22 +1098,31 @@ test("both full routes keep their flow across varied obstacle approach timings",
   }
 });
 
-test("all 20 authored combos have five distinct contacts on both routes", () => {
+test("all 20 authored combos retain distinct contacts on both routes", () => {
   const groups = new Map<string, number[]>();
   for (const o of obstacles.filter((o) => o.combo)) {
     const key = `${o.route}:${o.combo}`;
     groups.set(key, [...(groups.get(key) ?? []), o.contact!]);
   }
   assert.equal(groups.size, 40);
-  for (const contacts of groups.values())
-    assert.deepEqual(contacts, [1, 2, 3, 4, 5]);
+  for (const [key, contacts] of groups) {
+    const count = key.endsWith(":High-Line Escape")
+      ? 3
+      : /:(Wall Traverse|Monkey Relay)$/.test(key)
+        ? 4
+        : 5;
+    assert.deepEqual(
+      contacts,
+      Array.from({ length: count }, (_, i) => i + 1),
+    );
+  }
 });
 test("every signature responds on the next tick, preserves its route, and exits without a recovery", () => {
   for (const o of obstacles.filter((o) => o.kind === "signature")) {
     const g = new Run();
     g.start();
     g.x = o.x - 1.9;
-    g.y = o.route === "upper" ? 3.3 : 0;
+    g.y = ground(o.x, o.route === "upper");
     g.upper = o.route === "upper";
     g.speed = 12;
     g.action("up");
@@ -1158,23 +1179,6 @@ test("bar release changes exit timing without teleporting the runner", () => {
   assert.equal(runs[1].phase, "running");
 });
 
-test("cat catches offer a controlled lower exit", () => {
-  const o = obstacles.find((o) => o.technique === "cat-leap")!;
-  const g = new Run();
-  g.start();
-  g.x = o.x - 1.9;
-  g.action("up");
-  g.step();
-  while (g.traversal && g.frame().progress < 0.4) g.step();
-  g.action("down");
-  g.step();
-  assert.equal(g.traversal, null);
-  assert.equal(g.move, "fall");
-  advance(g, 0.5);
-  assert.equal(g.phase, "running");
-  assert.ok(g.grounded);
-});
-
 test("swing crossings have real voids and cannot be caught by walking", () => {
   for (const o of obstacles.filter((o) => isSwing(o.technique))) {
     const base = o.route === "upper" ? 3.3 : 0;
@@ -1206,7 +1210,7 @@ test("jump catch and manual release land across every bar gap", () => {
       g.start();
       g.upper = o.route === "upper";
       g.x = o.x - 1.9;
-      g.y = g.upper ? 3.3 : 0;
+      g.y = ground(g.x, g.upper);
       g.speed = 12;
       g.action("up");
       g.step();
@@ -1312,4 +1316,120 @@ test("a side ramp requires a jump to reach the next building", () => {
   for (let i = 0; i < 600 && g.phase === "running"; i++) g.step();
   assert.equal(g.phase, "failed");
   assert.ok(g.x < ramp.x + ramp.width + 8.4);
+});
+
+test("tic-tacs push off quickly and carry the wall drive into the exit", () => {
+  for (const o of obstacles.filter((o) => o.technique === "tic-tac")) {
+    const g = new Run();
+    g.start();
+    g.x = o.x - 1.9;
+    g.upper = o.route === "upper";
+    g.y = ground(g.x, g.upper);
+    g.speed = 12;
+    g.action("up");
+    g.step();
+    const t = g.traversal!;
+    assert.equal(t.technique, "tic-tac");
+    const entrySpeed = g.speed;
+    const ordinaryDuration = Math.max(0.48, (t.end - t.start) / entrySpeed);
+    assert.ok(Math.abs(t.duration - ordinaryDuration * 0.75) < 1e-9);
+    let previousX = g.x;
+    for (let tick = 0; tick < 120 && g.traversal; tick++) {
+      g.step();
+      assert.ok(g.x >= previousX && g.x - previousX < 0.5);
+      previousX = g.x;
+    }
+    assert.equal(g.traversal, null);
+    assert.ok(g.speed > entrySpeed + 1);
+    assert.equal(g.recoveries, 0);
+    assert.equal(g.upper, o.route === "upper");
+  }
+});
+
+test("district buildings alternate heights and lower roofs preserve the normal route", () => {
+  for (const offset of [0, 1480, 1960, 2440]) {
+    const raised = surfaces.find((s) => !s.upper && s.start === offset + 19.5)!;
+    const lowered = surfaces.find(
+      (s) => !s.upper && Math.abs(s.start - offset - 73.2) < 1e-6,
+    )!;
+    assert.ok(raised.y > 0 && lowered.y < raised.y);
+    for (const roof of [raised, lowered]) {
+      const g = new Run();
+      g.start();
+      g.x = roof.start + 0.5;
+      g.y = roof.y + 0.1;
+      g.vy = -3;
+      g.grounded = false;
+      for (let tick = 0; tick < 10 && !g.grounded; tick++) g.step();
+      assert.equal(g.grounded, true);
+      assert.equal(g.y, roof.y);
+      assert.equal(g.upper, false);
+    }
+  }
+});
+
+test("a raised building face blocks a jump below its roof", () => {
+  const g = new Run();
+  g.start();
+  g.x = 19.25;
+  g.y = -0.5;
+  g.grounded = false;
+  g.vy = 0;
+  g.speed = 12;
+  g.step();
+  assert.ok(g.x < 19.5);
+  assert.equal(g.speed, 0);
+  assert.equal(g.grounded, false);
+});
+
+test("the districts offer nine distinct base rooftop elevations", () => {
+  const heights = new Set(surfaces.filter((s) => !s.upper).map((s) => s.y));
+  assert.equal(heights.size, 9);
+  assert.ok(Math.min(...heights) < 0);
+  assert.ok(Math.max(...heights) > 1);
+});
+
+test("removed cat-leap encounters leave open space on both routes", () => {
+  assert.ok(obstacles.every((o) => String(o.technique) !== "cat-leap"));
+  for (const route of ["lower", "upper"] as const) {
+    for (const [combo, removedOffset] of [
+      ["High-Line Escape", 18],
+      ["Wall Traverse", 8],
+    ] as const) {
+      const first = obstacles.find(
+        (o) => o.combo === combo && o.route === route,
+      )!;
+      const removedStart = first.x + removedOffset;
+      assert.ok(
+        !obstacles.some(
+          (o) =>
+            (!o.route || o.route === route) &&
+            o.x < removedStart + 2.4 &&
+            o.x + o.width > removedStart,
+        ),
+        `${combo}: removed wall footprint must stay empty on ${route}`,
+      );
+    }
+  }
+});
+
+test("wall-pop obstacles are removed from both routes", () => {
+  assert.ok(obstacles.every((o) => String(o.technique) !== "wall-pop"));
+  for (const route of ["lower", "upper"] as const) {
+    for (const combo of ["High-Line Escape", "Monkey Relay"]) {
+      const first = obstacles.find(
+        (o) => o.combo === combo && o.route === route,
+      )!;
+      const removedStart = first.x + 8;
+      assert.ok(
+        !obstacles.some(
+          (o) =>
+            (!o.route || o.route === route) &&
+            o.x < removedStart + 2.4 &&
+            o.x + o.width > removedStart,
+        ),
+        `${combo}: former wall-pop footprint must stay empty on ${route}`,
+      );
+    }
+  }
 });

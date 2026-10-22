@@ -191,7 +191,7 @@ export default function Scene({
     for (const slab of surfaces) {
       const w = slab.end - slab.start,
         x = (slab.start + slab.end) / 2,
-        upper = slab.y > 0;
+        upper = slab.upper;
       box(
         scene,
         x,
@@ -242,7 +242,8 @@ export default function Scene({
       }
       for (let panel = slab.start + 2; panel < slab.end; panel += 6) {
         box(scene, panel, slab.y - 4.2, 2.015, 0.035, 7, 0.025, metal);
-        if (!upper) box(scene, panel + 1, -3.5, 2.035, 0.7, 1.1, 0.03, black);
+        if (!upper)
+          box(scene, panel + 1, slab.y - 3.5, 2.035, 0.7, 1.1, 0.03, black);
       }
     }
     obstacles.forEach((o) => {

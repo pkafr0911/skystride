@@ -11,7 +11,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v19";
+export const VERSION = "sunset-relay-v24";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -402,7 +402,24 @@ export function timingRange(o: Obstacle, speed: number) {
   const end = o.kind === "gap" ? 0.35 : 0.55;
   return { near: end, far: end + Math.max(5.5, speed) * timingWindow(o) };
 }
-export type Surface = { start: number; end: number; y: number };
+// Each district has its own raised and lowered roofs. Changes happen across
+// building gaps, with bounded steps so the authored jump sequences stay reachable.
+const elevationStages = [
+  { start: 0, high: 0.6, low: -0.35 },
+  { start: 1480, high: 1, low: -0.55 },
+  { start: 1960, high: 0.35, low: -0.8 },
+  { start: 2440, high: 1.2, low: 0.3 },
+];
+export function roofHeight(x: number) {
+  for (const stage of elevationStages) {
+    const local = x - stage.start;
+    // Tolerate round-off when a gap endpoint is translated into another district.
+    if (local >= 19.5 - 1e-8 && local < 73.2 - 1e-8) return stage.high;
+    if (local >= 73.2 - 1e-8 && local < 85.5 - 1e-8) return stage.low;
+  }
+  return 0;
+}
+export type Surface = { start: number; end: number; y: number; upper: boolean };
 function cut(start: number, end: number, y: number, upper: boolean): Surface[] {
   const result: Surface[] = [];
   let cursor = start;
@@ -413,10 +430,10 @@ function cut(start: number, end: number, y: number, upper: boolean): Surface[] {
       item.x >= start &&
       item.x < end,
   )) {
-    result.push({ start: cursor, end: o.x, y });
+    result.push({ start: cursor, end: o.x, y: y + roofHeight(cursor), upper });
     cursor = o.x + o.width + (isSwing(o.technique) ? SWING_GAP_EXTRA : 0);
   }
-  result.push({ start: cursor, end, y });
+  result.push({ start: cursor, end, y: y + roofHeight(cursor), upper });
   return result;
 }
 export const surfaces: Surface[] = [
@@ -431,7 +448,7 @@ export const obstacleTops = obstacles.flatMap((o, index) =>
           start: o.x,
           end: o.x + o.width,
           y:
-            (o.route === "upper" ? 3.3 : 0) +
+            ground(o.x, o.route === "upper") +
             (o.height ?? (o.kind === "slide" ? 2.35 : 1)),
           index,
           upper: o.route === "upper",
@@ -443,7 +460,7 @@ const glassObstacles = obstacles.filter((o) => o.kind === "glass");
 export const ramps = obstacles.filter((o) => o.kind === "ramp");
 export function rampHeight(o: Obstacle, x: number) {
   return (
-    (o.route === "upper" ? 3.3 : 0) +
+    ground(o.x, o.route === "upper") +
     Math.max(0, Math.min(1, (x - o.x) / o.width)) * (o.height ?? 1.1)
   );
 }
@@ -453,7 +470,7 @@ export const billboardHeaders = obstacles.flatMap((o, index) =>
         {
           start: o.x,
           end: o.x + o.width,
-          y: (o.route === "upper" ? 3.3 : 0) + o.openingTop! + 0.55,
+          y: ground(o.x, o.route === "upper") + o.openingTop! + 0.55,
           index,
           upper: o.route === "upper",
         },
@@ -466,7 +483,7 @@ export const wallRunLedges = obstacles.flatMap((o, index) =>
         {
           start: o.x + o.width,
           end: o.x + o.width + 3,
-          y: (o.route === "upper" ? 3.3 : 0) + o.height!,
+          y: ground(o.x, o.route === "upper") + o.height!,
           index,
           upper: o.route === "upper",
         },
@@ -495,8 +512,8 @@ const supportSurfaces = {
 };
 export function ground(x: number, upper: boolean) {
   return upper && upperPlatforms.some((p) => x >= p.start && x <= p.end)
-    ? 3.3
-    : 0;
+    ? roofHeight(x) + 3.3
+    : roofHeight(x);
 }
 export type Contact = { x: number; y: number };
 export type Frame = {
@@ -841,7 +858,7 @@ export class Run {
     const end = o.x + o.width + (wall ? 0.75 : 1.4);
     const contact = {
       x: o.x + Math.min(o.width * 0.4, 0.7),
-      y: (o.route === "upper" ? 3.3 : 0) + (o.height || 1.1),
+      y: ground(o.x, o.route === "upper") + (o.height || 1.1),
     };
     if (wall) {
       contact.x = o.x + o.width;
@@ -931,13 +948,15 @@ export class Run {
       isSwing(o.technique) ? 0.75 : 0.48,
       (t.end - t.start) / Math.max(3, this.speed),
     );
+    // A quick wall plant and drive keep tic-tacs from hanging on contact.
+    if (o.technique === "tic-tac") t.duration *= 0.75;
     t.contact = { x: o.x + o.width / 2, y: this.y + (o.height ?? 1.1) };
     this.say(
       `${o.combo ?? "PARKOUR"} · ${o.technique?.replaceAll("-", " ").toUpperCase()}`,
     );
   }
   private mount(o: Obstacle) {
-    const base = o.route === "upper" ? 3.3 : 0;
+    const base = ground(o.x, o.route === "upper");
     const top = base + o.height!;
     if (obstacles.indexOf(o) >= 0) this.handled.add(obstacles.indexOf(o));
     this.traversal = {
@@ -994,9 +1013,7 @@ export class Run {
       if (
         t.move === "special" &&
         action === "down" &&
-        (isSwing(t.technique) ||
-          t.technique === "cat-leap" ||
-          t.technique === "shimmy") &&
+        (isSwing(t.technique) || t.technique === "shimmy") &&
         t.elapsed / t.duration > 0.25
       ) {
         this.launchX = this.x;
@@ -1009,16 +1026,6 @@ export class Run {
         this.rollUntil = this.time + 0.5;
         this.setMove("fall");
         this.say("CONTROLLED DROP · LOW EXIT");
-        return true;
-      }
-      if (
-        t.move === "special" &&
-        action === "up" &&
-        (t.technique === "cat-leap" || t.technique === "wall-pop") &&
-        t.elapsed / t.duration >= 0.35
-      ) {
-        t.released = true;
-        this.say("PRESS UP · TOP OUT");
         return true;
       }
       const top = this.onObstacle();
@@ -1055,9 +1062,9 @@ export class Run {
               this.applicable(o) &&
               this.x < o.x &&
               o.x - this.x <= (this.grounded ? 1.9 : 0.8) &&
-              this.y < (o.route === "upper" ? 3.3 : 0) + o.height! &&
+              this.y < ground(o.x, o.route === "upper") + o.height! &&
               (this.grounded ||
-                this.y >= (o.route === "upper" ? 3.3 : 0) + o.height! - 1.65),
+                this.y >= ground(o.x, o.route === "upper") + o.height! - 1.65),
           )
         : undefined;
     if (ledge) {
@@ -1354,7 +1361,7 @@ export class Run {
           !this.handled.has(i) &&
           Math.abs(this.x - (o.x + swingGripOffset(o.width))) < 0.6 &&
           Math.abs(
-            this.y - ((o.route === "upper" ? 3.3 : 0) + (o.height ?? 3) - 1.8),
+            this.y - (ground(o.x, o.route === "upper") + (o.height ?? 3) - 1.8),
           ) < 0.65,
       );
       if (bar) {
@@ -1378,7 +1385,7 @@ export class Run {
     if (!this.grounded && this.vy > 0) {
       const ceiling = surfaces.find(
         (s) =>
-          s.y > 0 &&
+          s.upper &&
           this.x >= s.start &&
           this.x <= s.end &&
           oldY + 1.85 <= s.y - 0.9 &&
@@ -1398,10 +1405,7 @@ export class Run {
         )
         .sort((a, b) => b.y - a.y)[0];
       if (landing) {
-        this.land(
-          landing.y,
-          "upper" in landing ? Boolean(landing.upper) : landing.y > 2,
-        );
+        this.land(landing.y, landing.upper);
         if ("index" in landing) this.handled.add(Number(landing.index));
       } else if (this.time - this.jumpIntent < 0.18) {
         const lip = supports.find(
@@ -1427,7 +1431,7 @@ export class Run {
             move: "catch",
             contact: { x: lip.start, y: lip.y },
             vault: "safety",
-            upper: "upper" in lip ? Boolean(lip.upper) : lip.y > 2,
+            upper: lip.upper,
           };
           this.setMove("catch");
           this.recover("LEDGE SAVE · CLIMB", 3);
@@ -1440,7 +1444,7 @@ export class Run {
           oldX < s.start &&
           this.x + 0.22 >= s.start &&
           this.y < s.y - 0.1 &&
-          (s.y === 0 ? this.y > -14 : this.y + 1.85 > s.y - 0.9),
+          (!s.upper ? this.y > s.y - 14 : this.y + 1.85 > s.y - 0.9),
       );
       if (wall) {
         this.x = wall.start - 0.23;
@@ -1530,7 +1534,7 @@ export class Run {
     for (let i = 0; i < obstacles.length; i++) {
       const o = obstacles[i];
       if (this.handled.has(i) || !this.applicable(o)) continue;
-      const base = o.route === "upper" ? 3.3 : 0;
+      const base = ground(o.x, o.route === "upper");
       const height =
         this.move === "slide" || this.move === "roll" ? 0.85 : 1.85;
       const overlaps = this.x + 0.22 >= o.x && oldX - 0.22 <= o.x + o.width;
@@ -1601,7 +1605,7 @@ export class Run {
           this.applicable(o) &&
           this.x + 0.3 >= o.x &&
           this.x - 0.3 <= o.x + o.width &&
-          this.y < (o.route === "upper" ? 3.3 : 0) + 1.22,
+          this.y < ground(o.x, o.route === "upper") + 1.22,
       );
       // A landing roll already supplies the low posture. Never stand up into
       // a ceiling and demand another down input to finish the same passage.
@@ -1794,22 +1798,6 @@ export class Run {
           if (t.technique === "shimmy")
             t.contact.x =
               t.obstacle!.start + (t.obstacle!.end - t.obstacle!.start) / 2;
-        } else if (t.technique === "cat-leap" || t.technique === "wall-pop") {
-          const hang = Math.max(0.12, t.arc - 1.45);
-          const grip = t.contact.x - 0.35;
-          if (p < 0.2) {
-            this.x = t.start + (grip - t.start) * smooth(p / 0.2);
-            this.y = t.y0 + hang * smooth(p / 0.2);
-          } else if (p < 0.55) {
-            this.x = grip;
-            this.y = t.y0 + hang;
-          } else if (p < 0.8) {
-            this.x = grip + (t.end - 0.6 - grip) * smooth((p - 0.55) / 0.25);
-            this.y = t.y0 + hang + (t.arc - hang) * smooth((p - 0.55) / 0.25);
-          } else {
-            this.x = t.end - 0.6 + 0.6 * smooth((p - 0.8) / 0.2);
-            this.y = t.y0 + t.arc * (1 - smooth((p - 0.8) / 0.2));
-          }
         } else if (t.technique === "tic-tac" || t.technique === "rebound") {
           this.y = t.y0 + 0.35 * Math.sin(Math.PI * p);
         } else if (t.technique === "duck" || t.technique === "squeeze") {
@@ -1880,6 +1868,8 @@ export class Run {
           this.setMove("climb");
         } else {
           if (t.move === "wall-climb") this.speed *= 0.9;
+          if (t.technique === "tic-tac")
+            this.speed = Math.max(this.speed, Math.min(16, this.speed + 1.2));
           this.traversal = null;
           this.impact = t.move === "vault" ? 7 : 5;
           this.landX = this.x;
@@ -1945,9 +1935,7 @@ export class Run {
       side: this.traversal?.side ?? 1,
       lane:
         this.traversal?.technique &&
-        ["tic-tac", "rebound", "wall-pop", "cat-leap"].includes(
-          this.traversal.technique,
-        )
+        ["tic-tac", "rebound"].includes(this.traversal.technique)
           ? 0.55 -
             1.05 *
               Math.sin(

@@ -11,13 +11,11 @@ export const techniques = [
   "palm-drop",
   "monkey",
   "reverse",
-  "cat-leap",
   "squeeze",
   "stride",
   "shimmy",
   "transfer",
   "drop-through",
-  "wall-pop",
   "duck",
 ] as const;
 export type Technique = (typeof techniques)[number];
@@ -45,7 +43,7 @@ export const comboNames = [
   "Wall Traverse",
   "Rail Switch",
   "Drop Through",
-  "Wall Pop",
+  "Monkey Relay",
   "Beam Duck",
   "Roof Rollout",
 ] as const;
@@ -60,13 +58,7 @@ const vault = (x: number, type: Obstacle["vault"] = "speed"): Obstacle => ({
 const special = (x: number, technique: Technique): Obstacle => ({
   x,
   width: technique === "double-kong" ? 3.5 : 2.4,
-  height: isSwing(technique)
-    ? 3
-    : technique === "wall-pop" || technique === "cat-leap"
-      ? 2
-      : technique === "duck"
-        ? 1.3
-        : 1.1,
+  height: isSwing(technique) ? 3 : technique === "duck" ? 1.3 : 1.1,
   kind: "signature",
   feature: "signature",
   technique,
@@ -78,7 +70,7 @@ const slide = (x: number): Obstacle => ({
   kind: "slide",
   feature: "pipe",
 });
-/** Authored five-contact phrases. Their final run-out belongs to the next approach. */
+/** Authored contact phrases. Their final run-out belongs to the next approach. */
 export function comboCourse(): Obstacle[] {
   let crossingOffset = 0;
   return comboNames.flatMap((combo, i) => {
@@ -192,13 +184,7 @@ export function comboCourse(): Obstacle[] {
         ];
         break;
       case 11:
-        steps = [
-          vault(0),
-          special(8, "wall-pop"),
-          special(18, "cat-leap"),
-          special(28, "precision"),
-          vault(36),
-        ];
+        steps = [vault(0), special(28, "precision"), vault(36)];
         break;
       case 12:
         steps = [
@@ -221,7 +207,6 @@ export function comboCourse(): Obstacle[] {
       case 14:
         steps = [
           vault(0),
-          special(8, "cat-leap"),
           special(18, "shimmy"),
           special(28, "palm-drop"),
           vault(36),
@@ -254,13 +239,7 @@ export function comboCourse(): Obstacle[] {
         ];
         break;
       case 17:
-        steps = [
-          vault(0),
-          special(8, "wall-pop"),
-          special(18, "monkey"),
-          vault(28),
-          vault(36),
-        ];
+        steps = [vault(0), special(18, "monkey"), vault(28), vault(36)];
         break;
       case 18:
         steps = [
@@ -290,12 +269,7 @@ export function comboCourse(): Obstacle[] {
           : route === "upper" && o.kind === "slide"
             ? vault(o.x, "kong")
             : o),
-        ...(route === "lower" && isSwing(o.technique)
-          ? { height: 2.3 }
-          : route === "lower" &&
-              (o.technique === "cat-leap" || o.technique === "wall-pop")
-            ? { height: 1.4 }
-            : {}),
+        ...(route === "lower" && isSwing(o.technique) ? { height: 2.3 } : {}),
         x: 512 + i * 44 + offset + o.x + (swing && o.x > swing.x ? 8 : 0),
         route,
         combo,

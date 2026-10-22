@@ -1,3 +1,4 @@
+import { ground } from "./model";
 import { speedZoom, easeZoom, viewAngle, CAMERA_VIEWS } from "./camera";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -5,7 +6,7 @@ import * as THREE from "three";
 import { canMantle, Frame, obstacles, Run, STEP } from "./model";
 import { interpolateFrame, poseFor, runPose, STANCE, STRIDE } from "./motion";
 import { creativeObstacle } from "./obstacle-mesh";
-import { framesFor, previewObstacles } from "./lab-model";
+import { framesFor, previewObstacles, options } from "./lab-model";
 import { techniques, comboNames, isSwing } from "./combos";
 import { limbSurface } from "../../assets/limb-surface";
 import { LEG_LENGTHS, makeRunner, solveJoint } from "./runner";
@@ -162,7 +163,7 @@ test("all vaults remain finite through contact, clearance and release", () => {
     const g = new Run();
     g.start();
     g.x = obstacle.x - 2;
-    g.y = obstacle.route === "upper" ? 3.3 : 0;
+    g.y = ground(obstacle.x, obstacle.route === "upper");
     g.upper = obstacle.route === "upper";
     g.action("up");
     for (let tick = 0; tick < 90; tick++) {
@@ -286,7 +287,7 @@ test("Kong and low-duct climb put both reachable wrists on the obstacle", () => 
     const g = new Run();
     g.start();
     g.x = o.x - 1.9;
-    g.y = o.route === "upper" ? 3.3 : 0;
+    g.y = ground(o.x, o.route === "upper");
     g.upper = o.route === "upper";
     g.action("up");
     g.step();
@@ -434,7 +435,7 @@ test("dash wrists reach actual narrow and wide obstacle contact points", () => {
     g.x = o.x - 1.9;
     g.speed = 12;
     g.upper = o.route === "upper";
-    g.y = g.upper ? 3.3 : 0;
+    g.y = ground(g.x, g.upper);
     g.action("up");
     g.step();
     let contacts = 0;
@@ -627,9 +628,17 @@ test("movement lab samples every new technique and all 20 full chains", () => {
     const move = `combo:${name}` as const,
       frames = framesFor(move, 12),
       props = previewObstacles(move);
-    assert.equal(props.length, 5);
+    assert.equal(
+      props.length,
+      name === "High-Line Escape"
+        ? 3
+        : ["Wall Traverse", "Monkey Relay"].includes(name)
+          ? 4
+          : 5,
+    );
+    const last = props[props.length - 1];
     assert.ok(
-      frames[frames.length - 1].x > props[4].x + props[4].width,
+      frames[frames.length - 1].x > last.x + last.width,
       `${name} preview did not finish`,
     );
   }
@@ -679,4 +688,18 @@ test("camera cycle visits all three views, stays continuous, and holds manual se
       assert.ok(Math.abs(before.elevation - after.elevation) < 0.001);
     }
   }
+});
+
+test("cat-leap is absent from movement-lab techniques and options", () => {
+  assert.ok(techniques.every((technique) => String(technique) !== "cat-leap"));
+  assert.ok(options.every((option) => String(option) !== "cat-leap"));
+});
+
+test("wall-pop is absent from movement-lab techniques, options, and chains", () => {
+  assert.ok(techniques.every((t) => String(t) !== "wall-pop"));
+  assert.ok(
+    options.every(
+      (o) => !String(o).toLowerCase().replaceAll(" ", "-").includes("wall-pop"),
+    ),
+  );
 });

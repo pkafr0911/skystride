@@ -1,4 +1,4 @@
-import { Frame, obstacles, Run, canMantle } from "./model";
+import { Frame, obstacles, Run, canMantle, ground } from "./model";
 import { techniques, isSwing, comboNames } from "./combos";
 
 export const options = [
@@ -56,6 +56,7 @@ export function framesFor(
     const g = new Run();
     g.start();
     g.x = group[0].x - 3;
+    g.y = ground(g.x, false);
     g.speed = entrySpeed;
     const frames: Frame[] = [],
       pressed = new Set<number>();
@@ -115,7 +116,7 @@ export function framesFor(
   );
   if (o) {
     g.x = o.x - (isSwing(o.technique) ? 3.1 : 2);
-    g.y = o.route === "upper" ? 3.3 : 0;
+    g.y = ground(o.x, o.route === "upper");
     g.upper = o.route === "upper";
   }
   if (move === "slide") g.x = 88.8;

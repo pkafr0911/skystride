@@ -972,34 +972,6 @@ function specialPose(f: Frame): Pose {
       u,
     );
   }
-  if (t === "cat-leap" || t === "wall-pop") {
-    const hold = basePose();
-    hold.hip = [-0.2, 0.8, 0];
-    hold.chest = [0.02, 1.3, 0];
-    hold.head = [0.04, 1.6, 0];
-    hold.hands = [
-      [contact[0], contact[1], -0.22],
-      [contact[0], contact[1], 0.22],
-    ];
-    hold.feet = [
-      [0.35, 0.5, -0.14],
-      [0.4, 0.35, 0.14],
-    ];
-    hold.knees = [
-      [0.65, 0.8, -0.14],
-      [0.65, 0.7, 0.14],
-    ];
-    return sequence(
-      [
-        { at: 0, pose: jumpPose({ ...f, vy: 7, moveTime: 0.15 }) },
-        { at: 0.35, pose: hold },
-        { at: 0.55, pose: hold },
-        { at: 0.8, pose: lowPose() },
-        { at: 1, pose: runPose(f.x, f.speed) },
-      ],
-      u,
-    );
-  }
   if (t === "precision" || t === "stride") {
     const land = lowPose();
     land.feet = [

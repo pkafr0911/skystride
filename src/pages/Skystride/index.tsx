@@ -160,7 +160,7 @@ export default function Skystride() {
     ((motionFrame.launchY ?? 0) > 0.5 || Boolean(motionFrame.longJump));
   const cue =
     game.move === "special"
-      ? `${motionFrame.technique?.replaceAll("-", " ").toUpperCase()} · ${isSwing(motionFrame.technique) ? "→ RELEASE / ↓ DROP" : motionFrame.technique === "cat-leap" ? "↑ TOP OUT / ↓ DROP" : motionFrame.technique === "wall-pop" ? "↑ TOP OUT" : motionFrame.technique === "shimmy" ? "↓ DROP" : "CONTACT → EXIT"}`
+      ? `${motionFrame.technique?.replaceAll("-", " ").toUpperCase()} · ${isSwing(motionFrame.technique) ? "→ RELEASE / ↓ DROP" : motionFrame.technique === "shimmy" ? "↓ DROP" : "CONTACT → EXIT"}`
       : next?.kind === "signature"
         ? isSwing(next.technique)
           ? "↑ JUMP & CATCH BAR → RIGHT TO CROSS GAP"
