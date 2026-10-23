@@ -49,6 +49,30 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
   };
   const h = o.height ?? 1.1,
     w = o.width;
+  if (o.landmark === "crane" && o.technique === "lache") {
+    // A recognizable tower, trussed jib and suspended grip at the real catch point.
+    const span = w + SWING_GAP_EXTRA + 4;
+    for (const x of [-2, -0.8]) box(x, 3.7, -2.2, 0.18, 7.4, 0.2, kit.amber);
+    box(span / 2 - 2, 7.2, -2.2, span + 5, 0.25, 0.6, kit.amber);
+    box(span / 2 - 2, 6.4, -2.2, span + 5, 0.15, 0.5, kit.trim);
+    for (let x = -3; x < span; x += 1.8) {
+      const brace = box(x, 6.8, -2.2, 1.2, 0.09, 0.3, kit.amber);
+      brace.rotation.z = 0.65;
+    }
+    box(-3.2, 6.5, -2.2, 2.5, 1.2, 1.6, kit.dark);
+    for (const z of [-1.25, 1.25])
+      box(swingGripOffset(w), (7.1 + h) / 2, z, 0.04, 7.1 - h, 0.04, kit.trim);
+  }
+  if (o.landmark === "skylights" && o.kind === "gap") {
+    // Glass sits beside and below the solid beam line; it is never footing.
+    for (const z of [-1.35, 1.35]) {
+      box(w / 2, -0.35, z, w, 0.09, 1.6, kit.panel);
+      for (const x of [0, w / 2, w])
+        box(x, -0.27, z, 0.06, 0.08, 1.7, kit.trim);
+      box(w / 2, -0.27, z + 0.8, w, 0.08, 0.06, kit.trim);
+      box(w / 2, -0.27, z - 0.8, w, 0.08, 0.06, kit.trim);
+    }
+  }
   if (o.kind === "signature") {
     const t = o.technique;
     const edge = (x: number, y: number, width: number) =>
@@ -224,6 +248,14 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
     box(0.65, 0.425, 2, 1.3, 0.85, 0.25, kit.face);
     box(0.65, 0.87, 2, 1.3, 0.04, 0.28, kit.amber);
   } else if (o.feature === "wall-billboard") {
+    if (o.wallGap) {
+      // Bank-mounted supports leave the running lane and the void unobstructed.
+      for (const x of [0.65, w + 0.35]) {
+        box(x, 0.8, -1.15, 0.2, 5.2, 0.25, kit.trim);
+      }
+      box(0.65, 0.025, 0, 0.12, 0.05, 2.6, kit.amber);
+      box(w + 0.15, h + 0.025, 0, 0.12, 0.05, 2.6, kit.amber);
+    }
     box(w / 2, 2, -0.8, w, 4, 0.18, kit.panel);
     for (let x = 0.1; x < w; x += 1.2) {
       box(x, 2, -0.95, 0.08, 4.3, 0.14, kit.trim);

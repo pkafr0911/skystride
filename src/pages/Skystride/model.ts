@@ -11,7 +11,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v28";
+export const VERSION = "sunset-relay-v30";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -64,7 +64,11 @@ export type Feature =
   | "scaffold"
   | "balcony"
   | "signature";
+export type Landmark = "crane" | "billboard" | "skylights";
 export type Obstacle = {
+  /** The wall spans a real void, starting one metre after the approach marker. */
+  wallGap?: boolean;
+  landmark?: Landmark;
   x: number;
   width: number;
   height?: number;
@@ -99,6 +103,7 @@ const opening: Obstacle[] = [
     height: 1.4,
     kind: "encounter",
     feature: "wall-billboard",
+    wallGap: true,
   },
   { x: 67, width: 6.2, kind: "gap", feature: "bridge" },
   { x: 80, width: 5.5, kind: "gap" },
@@ -468,14 +473,14 @@ function cut(start: number, end: number, y: number, upper: boolean): Surface[] {
   let cursor = start;
   for (const o of obstacles.filter(
     (item) =>
-      (item.kind === "gap" || isSwing(item.technique)) &&
+      (item.kind === "gap" || isSwing(item.technique) || item.wallGap) &&
       (upper ? item.route === "upper" : item.route !== "upper") &&
       item.x >= start &&
       item.x < end,
   )) {
     result.push({
       start: cursor,
-      end: o.x,
+      end: o.x + (o.wallGap ? 1 : 0),
       y: y + districtRoofHeight(cursor),
       upper,
     });
@@ -509,6 +514,17 @@ export const surfaces: Surface[] = [
   }),
   ...upperPlatforms.flatMap((p) => cut(p.start, p.end, 3.3, true)),
 ];
+export const craneRecovery = obstacles
+  .filter((o) => o.landmark === "crane" && isSwing(o.technique))
+  .map(
+    (o): Surface => ({
+      start: o.x + 3,
+      end: o.x + o.width + SWING_GAP_EXTRA + 4,
+      y: 0,
+      upper: false,
+    }),
+  );
+surfaces.push(...craneRecovery);
 export function ground(x: number, upper: boolean) {
   return upper && upperPlatforms.some((p) => x >= p.start && x <= p.end)
     ? districtRoofHeight(x) + 3.3
@@ -586,6 +602,8 @@ const supportSurfaces = {
 };
 export type Contact = { x: number; y: number };
 export type Frame = {
+  chain?: number;
+  anticipation?: number;
   x: number;
   y: number;
   speed: number;
@@ -710,6 +728,12 @@ export function readRecord(
           f.progress >= 0 &&
           f.progress <= 1 &&
           typeof f.grounded === "boolean" &&
+          (f.anticipation === undefined ||
+            (Number.isFinite(f.anticipation) &&
+              f.anticipation >= 0 &&
+              f.anticipation <= 1)) &&
+          (f.chain === undefined ||
+            (Number.isInteger(f.chain) && f.chain >= 0 && f.chain <= 20000)) &&
           (f.slope === undefined || Math.abs(f.slope) <= 1) &&
           (f.longJump === undefined || typeof f.longJump === "boolean") &&
           [
@@ -765,6 +789,7 @@ export type Traversal = {
   technique?: Technique;
   side?: 1 | -1;
   released?: boolean;
+  landmark?: Landmark;
   catchX?: number;
   catchY?: number;
 };
@@ -792,6 +817,7 @@ export class Run {
   recoveries = 0;
   flow = 0;
   bestFlow = 0;
+  feedback = { id: 0, time: -10, kind: "clean", strength: 0 };
   splits: number[] = [];
   samples: Sample[] = [];
   inputs: Input[] = [];
@@ -842,6 +868,7 @@ export class Run {
     this.recoveries = 0;
     this.flow = 0;
     this.bestFlow = 0;
+    this.feedback = { id: 0, time: -10, kind: "clean", strength: 0 };
     this.splits = [];
     this.samples = [];
     this.inputs = [];
@@ -910,14 +937,25 @@ export class Run {
     this.moveTime = 0;
     this.actionDuration = duration;
   }
+  private feedbackEvent(kind: string, strength = 1) {
+    this.feedback = {
+      id: this.feedback.id + 1,
+      time: this.time,
+      kind,
+      strength,
+    };
+  }
   private reward(label: string) {
     this.clean++;
     this.flow++;
     this.bestFlow = Math.max(this.bestFlow, this.flow);
     if (this.grounded) this.speed = Math.min(14, this.speed + 0.35);
-    this.say(label);
+    const milestone = this.flow > 0 && this.flow % 5 === 0;
+    this.feedbackEvent(milestone ? "chain" : "clean", milestone ? 1.5 : 0.5);
+    this.say(milestone ? `PERFECT CHAIN ×${this.flow} · FLOW SURGE` : label);
   }
   private recover(label: string, cost = 2.8) {
+    this.feedbackEvent("impact");
     this.recoveries++;
     this.flow = 0;
     this.speed = Math.max(5.5, this.speed - cost);
@@ -931,6 +969,7 @@ export class Run {
     );
   }
   private crash(o: Obstacle, backward: boolean) {
+    this.feedbackEvent("impact");
     this.recoveries++;
     this.flow = 0;
     this.speed = 0;
@@ -1012,6 +1051,7 @@ export class Run {
       move,
       contact,
       vault,
+      landmark: o.landmark,
       obstacle: { start: o.x, end: o.x + o.width },
       side: o.side ?? 1,
     };
@@ -1104,7 +1144,11 @@ export class Run {
         this.launchX = this.x;
         this.launchY = this.y;
         this.dropFrom = this.y;
-        this.speed = Math.max(this.speed, SWING_RELEASE_SPEED);
+        const releasePhase = t.elapsed / t.duration;
+        const perfect =
+          t.landmark === "crane" && releasePhase >= 0.5 && releasePhase <= 0.72;
+        const recovery = t.landmark === "crane" && !perfect;
+        this.speed = recovery ? 18 : Math.max(this.speed, SWING_RELEASE_SPEED);
         this.vy = 2.5 + clamp(t.elapsed / t.duration, 0, 1) * 1.5;
         if (!this.upper && t.obstacle) {
           // The lower exit passes below the upper deck: project a low arc
@@ -1116,11 +1160,21 @@ export class Run {
           );
           this.vy = (0.3 - this.y + 33 * 0.5 * flight * flight) / flight;
         }
+        if (recovery) {
+          this.vy = -2;
+          this.flow = 0;
+          this.feedbackEvent("impact", 0.5);
+        } else if (perfect) this.reward("PERFECT RELEASE · FAST EXIT");
         this.traversal = null;
         this.grounded = false;
         this.lastGround = -1;
         this.setMove("jump");
-        this.say("RELEASE · CARRY INTO THE NEXT CONTACT");
+        if (!perfect)
+          this.say(
+            recovery
+              ? "LATE / EARLY RELEASE · LOWER SCAFFOLD RECOVERY"
+              : "RELEASE · CARRY INTO THE NEXT CONTACT",
+          );
         return true;
       }
       if (
@@ -1307,7 +1361,11 @@ export class Run {
         this.traversal!.end = o.x + o.width + 0.8;
         this.traversal!.upper = this.upper;
         this.traversal!.contact = { x: o.x + o.width, y: this.y + o.height! };
-        this.say("WALL RUN · DRIVE, TRANSFER, LAND");
+        this.say(
+          o.wallGap
+            ? "GAP WALL RUN · CONTACT → CROSS → FAR ROOF"
+            : "WALL RUN · DRIVE, TRANSFER, LAND",
+        );
         return true;
       }
       if (
@@ -1364,6 +1422,7 @@ export class Run {
   private land(y: number, upper = y > 2) {
     const impact = -this.vy;
     this.impact = impact;
+    if (impact > 8) this.feedbackEvent("land", Math.min(1.5, impact / 16));
     this.landX = this.x;
     this.landedAt = this.time;
     this.y = y;
@@ -2097,13 +2156,24 @@ export class Run {
     if (this.ticks % 6 === 0) this.onChange();
   }
   frame(): Frame {
+    const next = this.grounded && this.move === "run" ? this.next() : undefined;
+    const anticipate =
+      next &&
+      (next.kind === "gap" ||
+        next.kind === "branch" ||
+        next.landmark ||
+        next.wallGap)
+        ? clamp(1 - (next.x - this.x) / 7, 0, 1)
+        : 0;
     return {
+      anticipation: anticipate,
       x: this.x,
       y: this.y,
       speed: this.speed,
       vy: this.vy,
       move: this.move,
       moveTime: this.moveTime,
+      chain: this.flow,
       progress: this.traversal
         ? clamp(this.traversal.elapsed / this.traversal.duration, 0, 1)
         : this.actionDuration

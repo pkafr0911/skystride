@@ -273,3 +273,19 @@ Long continuous roof surfaces are now rendered as adjoining buildings, usually 1
 This replaces the rear-wing-only interpretation above. Eight lower-route stretches now contain actual lower buildings, 0.7–1.4 m below their neighbors, joined by 3 m ramps. Four occur in the repeated districts and four in the long technical district. The shared surface definitions drive rendered rooftop slopes, foot support, landing collision and runner tilt. Obstacles use the new roof elevations; upper routes retain their independent height. Practice spawns use the physical roof height. Extra rear wings from the previous visual pass have been removed; contrasting adjoining facades remain. Replay version advances for the changed physical course.
 
 Full-route checks cover both routes, varied input timing, Standard and Hardcore. Additional checks walk each new building and both ramp seams against the shared height function and verify practice spawning on the roof.
+
+
+## Cinematic feedback and upper landmarks — v29
+
+Large gaps now open camera framing over the final 28 m of approach and retain the wider framing through flight. The runner leans into upcoming gaps and landmark approaches without delaying inputs. Landings and crashes receive a brief, small camera impact response; reduced-motion keeps stable wide framing and disables the impact nudge. Strong impacts and sustained clean flow produce fuller landing dust. Clean contacts play rising synthesized tones, five-contact milestones play a three-note reward, and impacts play a low thud. Sound starts only after player interaction and can be disabled in the menu. Audio resources are disposed with the scene.
+
+Consecutive clean movements use the existing earned momentum/flow system, with explicit perfect-chain milestones every five contacts and stronger sound/visual feedback. No sudden extra acceleration is injected into authored jump approaches. Any existing recovery resets flow.
+
+Three upper-route phrases now have distinct landmarks: Crane Reach has a tower and trussed jib with a suspended bar and narrow scaffold exit. Manual release at 50–72% of the swing retains the fast upper exit and rewards a clean release; early, late or automatic release drops toward a slower lower scaffold recovery. The HUD indicates the release window. High-Line Escape now wall-runs a large billboard, crosses its supported frame and leaps a 10 m gap, with a roll required on the lower-height destination roof. Stride Stones becomes a glass-gallery crossing with three fixed 4 m gaps and narrow solid beams. Decorative glass sits off the running line and below the beam tops; there is no destructible-glass simulation. Lower-route contact chains remain available. Beneath the billboard, a duct and low passage make the ground route slower than the clean frame shortcut.
+
+The record version advances for these encounter and reward changes. Full-route simulation covers both routes and both penalty modes, with appropriate roll input on the billboard landing. Targeted tests cover crane release outcomes, fixed skylight footing, chain reset and anticipatory camera behavior.
+
+
+## Building-to-building wall runs — v30
+
+The four district billboard wall runs and the upper billboard shortcut now cross real five-metre building gaps. Up on approach starts the takeoff/contact/crossing sequence and transfers the runner to the existing elevated far-bank deck; another Up can launch from that deck. Shared surface cuts remove the roof and facade beneath the crossing. Bank-mounted supports and amber takeoff/landing marks identify the wall connection. Missing the wall run leaves the runner falling into the gap, with lower-route recovery possible where a real lower surface exists. These crossings also trigger the pre-jump camera pullback. Replay version advances for the new physical voids.

@@ -346,7 +346,7 @@ export function makeRunner(
     lastLand = -1,
     cursor = 0;
   const burst = (x: number, y: number, time: number, impact: number) => {
-    const count = impact > 13 ? 6 : 4;
+    const count = impact > 13 ? 10 : 4;
     for (let i = 0; i < count && dust.length; i++) {
       const p = dust[cursor++ % dust.length];
       p.born = time;
@@ -501,8 +501,18 @@ export function makeRunner(
       if (dt > 0 && dt < 0.3) {
         if (f.move === "jump" && previousMove !== "jump" && f.moveTime < 0.1)
           burst(f.launchX ?? f.x, f.launchY ?? f.y, time, 9);
+        if (
+          (f.move === "crash" || f.move === "knockback") &&
+          previousMove !== f.move
+        )
+          burst(f.x, f.y, time, 18);
         if ((f.landingAge ?? 1) < 0.05 && lastLand !== f.landX) {
-          burst(f.landX ?? f.x, f.y, time, f.impact ?? 9);
+          burst(
+            f.landX ?? f.x,
+            f.y,
+            time,
+            (f.chain ?? 0) >= 5 ? 18 : (f.impact ?? 9),
+          );
           lastLand = f.landX ?? f.x;
         }
       }

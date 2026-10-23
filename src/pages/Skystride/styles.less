@@ -755,3 +755,36 @@
     accent-color: #f3ae65;
   }
 }
+
+.chainBurst {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  color: #ffe2a9;
+  text-shadow: 0 2px 10px #172638;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  animation: chain-reward 0.7s ease-out both;
+}
+@keyframes chain-reward {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.94);
+  }
+  18%,
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(1.04);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chainBurst {
+    animation: none;
+  }
+}

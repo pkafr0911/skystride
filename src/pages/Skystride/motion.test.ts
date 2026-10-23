@@ -1,5 +1,11 @@
 import { ground } from "./model";
-import { speedZoom, easeZoom, viewAngle, CAMERA_VIEWS } from "./camera";
+import {
+  speedZoom,
+  easeZoom,
+  viewAngle,
+  CAMERA_VIEWS,
+  traversalZoom,
+} from "./camera";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
@@ -630,11 +636,7 @@ test("movement lab samples every new technique and all 20 full chains", () => {
       props = previewObstacles(move);
     assert.equal(
       props.length,
-      name === "High-Line Escape"
-        ? 3
-        : ["Wall Traverse", "Monkey Relay"].includes(name)
-          ? 4
-          : 5,
+      ["Wall Traverse", "Monkey Relay"].includes(name) ? 4 : 5,
     );
     const last = props[props.length - 1];
     assert.ok(
@@ -726,4 +728,13 @@ test("crash poses visibly fall, brace on the roof and return to standing", () =>
     }
     actor.dispose();
   }
+});
+
+test("large-jump framing opens before the edge and stays wide in flight", () => {
+  const far = traversalZoom(12, 28, 12, false);
+  const near = traversalZoom(12, 5, 12, false);
+  assert.ok(near < far);
+  assert.equal(traversalZoom(12, 40, 12, true), near);
+  assert.equal(traversalZoom(12, 1, 12, false, true), speedZoom(12, true));
+  assert.equal(traversalZoom(12, 1, 4, false), speedZoom(12));
 });

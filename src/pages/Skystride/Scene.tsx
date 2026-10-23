@@ -1,3 +1,4 @@
+import { TraversalAudio } from "./audio";
 import { CharacterId } from "./characters";
 import { SWING_GAP_EXTRA, isSwing } from "./combos";
 import React, { useEffect, useRef, useState } from "react";
@@ -15,7 +16,13 @@ import {
 } from "./model";
 import { creativeObstacle } from "./obstacle-mesh";
 import { makeRunner } from "./runner";
-import { CameraView, viewAngle, speedZoom, easeZoom } from "./camera";
+import {
+  CameraView,
+  viewAngle,
+  speedZoom,
+  easeZoom,
+  traversalZoom,
+} from "./camera";
 import { interpolateFrame } from "./motion";
 
 export default function Scene({
@@ -24,13 +31,17 @@ export default function Scene({
   character,
   view,
   autoView,
+  sound,
 }: {
+  sound: boolean;
   view: CameraView;
   autoView: boolean;
   character: CharacterId;
   game: Run;
   ghost: RecordRun | null;
 }) {
+  const soundRef = useRef(sound);
+  soundRef.current = sound;
   const host = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(false);
   const characterRef = useRef(character);
@@ -41,6 +52,17 @@ export default function Scene({
   ghostRef.current = ghost;
   useEffect(() => {
     const container = host.current!;
+    const audio = new TraversalAudio();
+    audio.setEnabled(soundRef.current);
+    const unlockAudio = () => {
+      audio.setEnabled(soundRef.current);
+      audio.unlock();
+    };
+    window.addEventListener("pointerdown", unlockAudio);
+    window.addEventListener("keydown", unlockAudio);
+    let feedbackId = -1;
+    let feedbackTime = -1;
+    let flightGap = 0;
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({
@@ -49,6 +71,9 @@ export default function Scene({
         powerPreference: "high-performance",
       });
     } catch {
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+      audio.dispose();
       setError(true);
       return;
     }
@@ -194,9 +219,51 @@ export default function Scene({
     const sun = new THREE.Mesh(sunGeometry, sunMat);
     sun.position.set(16, -30.5, -125);
     scene.add(sun);
+    const crane = obstacles.find(
+      (o) => o.landmark === "crane" && isSwing(o.technique),
+    );
+    const skylights = obstacles.filter((o) => o.landmark === "skylights");
+    const skyStart = skylights[0]?.x ?? Infinity;
+    const skyEnd = skylights.length
+      ? skylights[skylights.length - 1].x + 4
+      : -Infinity;
+    const craneBank = crane
+      ? crane.x + crane.width + SWING_GAP_EXTRA
+      : Infinity;
+    const narrowRanges = [
+      [skyStart, skyEnd],
+      [craneBank, craneBank + 5],
+    ];
+    const renderSurfaces = surfaces.flatMap((slab) => {
+      if (!slab.upper) return [slab];
+      const boundaries = [
+        slab.start,
+        slab.end,
+        ...narrowRanges.flat().filter((x) => x > slab.start && x < slab.end),
+      ].sort((a, b) => a - b);
+      return boundaries
+        .slice(0, -1)
+        .map((start, i) => ({ ...slab, start, end: boundaries[i + 1] }));
+    });
     // Physical roof heights and connecting ramps come from the collision surfaces.
-    for (const slab of surfaces) {
+    for (const slab of renderSurfaces) {
       const upper = slab.upper;
+      const narrow =
+        upper &&
+        narrowRanges.some(
+          ([start, end]) => slab.start >= start && slab.end <= end,
+        );
+      if (narrow) {
+        const width = slab.end - slab.start;
+        const x = (slab.start + slab.end) / 2;
+        box(scene, x, slab.y - 0.45, 0, width, 0.9, 0.85, metal);
+        box(scene, x, slab.y + 0.02, 0.43, width, 0.04, 0.05, edge);
+        box(scene, x, slab.y + 0.02, -0.43, width, 0.04, 0.05, edge);
+        for (const end of [slab.start + 0.15, slab.end - 0.15]) {
+          box(scene, end, slab.y - 1.8, -0.5, 0.12, 2.7, 0.12, alloy);
+        }
+        continue;
+      }
       if (slab.endY !== undefined) {
         const width = slab.end - slab.start;
         const x = (slab.start + slab.end) / 2;
@@ -628,6 +695,30 @@ export default function Scene({
       const visual: Frame = interpolateFrame(game.previous, current, alpha);
       const x = visual.x;
       const next = game.next();
+      audio.setEnabled(soundRef.current);
+      if (game.time < feedbackTime) feedbackId = -1;
+      feedbackTime = game.time;
+      if (
+        !game.paused &&
+        game.phase === "running" &&
+        game.feedback.id !== feedbackId
+      ) {
+        feedbackId = game.feedback.id;
+        if (game.time - game.feedback.time < 0.25)
+          audio.play(game.feedback.kind, game.feedback.strength, game.flow);
+      }
+      const aheadGap = obstacles.find(
+        (o) =>
+          (o.kind === "gap" || isSwing(o.technique) || o.wallGap) &&
+          (o.route === undefined || (o.route === "upper") === game.upper) &&
+          o.x >= x - 1 &&
+          o.x - x < 28,
+      );
+      if (visual.grounded)
+        flightGap = aheadGap
+          ? aheadGap.width + (isSwing(aheadGap.technique) ? SWING_GAP_EXTRA : 0)
+          : 0;
+      const anticipationDistance = aheadGap ? aheadGap.x - x : 28;
       const anticipate = next?.kind === "branch" && next.x - x < 17 ? 0.5 : 0;
       const closeFraming = THREE.MathUtils.clamp(
         (camera.zoom / (2 / 1.5) - 1) / 2.84,
@@ -642,7 +733,13 @@ export default function Scene({
       if (!game.paused) {
         camera.zoom = easeZoom(
           camera.zoom,
-          speedZoom(visual.speed, motionPreference.matches),
+          traversalZoom(
+            visual.speed,
+            anticipationDistance,
+            flightGap,
+            !visual.grounded,
+            motionPreference.matches,
+          ),
           Math.min(dt, 0.05),
         );
         camera.updateProjectionMatrix();
@@ -673,6 +770,18 @@ export default function Scene({
       }
       const focusX = x + 9.5 / camera.zoom;
       camera.position.set(focusX + angle.x, focusHeight + angle.elevation, 32);
+      const impactAge = game.time - game.feedback.time;
+      const impactNudge =
+        !motionPreference.matches &&
+        !game.paused &&
+        (game.feedback.kind === "impact" || game.feedback.kind === "land") &&
+        impactAge >= 0 &&
+        impactAge < 0.22
+          ? Math.sin((impactAge / 0.22) * Math.PI) *
+            0.08 *
+            game.feedback.strength
+          : 0;
+      camera.position.y -= impactNudge;
       camera.lookAt(focusX, focusHeight, 0);
       sunlight.position.set(x - 12, 22, 10);
       sunlight.target.position.set(x + 5, 0, 0);
@@ -750,6 +859,9 @@ export default function Scene({
       player.dispose();
       rival.dispose();
       sunlight.shadow.dispose();
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+      audio.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };

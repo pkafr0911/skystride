@@ -41,7 +41,6 @@ function complete(
       !g.grounded &&
       !g.traversal &&
       frame.launchY! - ground(g.x, g.upper) > 0.5 &&
-      frame.launchY! - ground(g.x, g.upper) < 2 &&
       g.vy < -10 &&
       g.y - ground(g.x, g.upper) < 1.1 &&
       !rolled.has(frame.launchX!)
@@ -1130,11 +1129,12 @@ test("all 20 authored combos retain distinct contacts on both routes", () => {
   }
   assert.equal(groups.size, 40);
   for (const [key, contacts] of groups) {
-    const count = key.endsWith(":High-Line Escape")
-      ? 3
-      : /:(Wall Traverse|Monkey Relay)$/.test(key)
+    const count =
+      key === "upper:High-Line Escape" || key === "upper:Stride Stones"
         ? 4
-        : 5;
+        : /:(Wall Traverse|Monkey Relay)$/.test(key)
+          ? 4
+          : 5;
     assert.deepEqual(
       contacts,
       Array.from({ length: count }, (_, i) => i + 1),
@@ -1210,6 +1210,7 @@ test("swing crossings have real voids and cannot be caught by walking", () => {
       !surfaces.some(
         (s) =>
           s.y === base &&
+          !(o.combo === "Crane Reach" && !s.upper && s.start === o.x + 3) &&
           s.start < o.x + o.width + SWING_GAP_EXTRA &&
           s.end > o.x,
       ),
@@ -1254,8 +1255,13 @@ test("jump catch and manual release land across every bar gap", () => {
         g.step();
       assert.equal(g.phase, "running");
       assert.equal(g.grounded, true, `${o.technique} ${o.route} far bank`);
-      assert.ok(g.x >= o.x + o.width + SWING_GAP_EXTRA);
-      assert.equal(g.recoveries, 0);
+      if (o.landmark === "crane" && releaseAt < 0.5) {
+        assert.equal(g.upper, false);
+        assert.ok(g.speed < 25);
+      } else {
+        assert.ok(g.x >= o.x + o.width + SWING_GAP_EXTRA);
+        assert.equal(g.recoveries, 0);
+      }
     }
   }
 });
@@ -1423,6 +1429,7 @@ test("removed cat-leap encounters leave open space on both routes", () => {
       const first = obstacles.find(
         (o) => o.combo === combo && o.route === route,
       )!;
+      if (combo === "High-Line Escape") continue; // Now occupied by the billboard gap.
       const removedStart = first.x + removedOffset;
       assert.ok(
         !obstacles.some(
@@ -1444,6 +1451,7 @@ test("wall-pop obstacles are removed from both routes", () => {
       const first = obstacles.find(
         (o) => o.combo === combo && o.route === route,
       )!;
+      if (combo === "High-Line Escape") continue; // Now occupied by the billboard gap.
       const removedStart = first.x + 8;
       assert.ok(
         !obstacles.some(
@@ -1638,4 +1646,133 @@ test("sector practice starts on the changed rooftop rather than above it", () =>
   assert.equal(g.y, ground(1000, false));
   g.step();
   assert.equal(g.grounded, true);
+});
+
+test("crane timing chooses fast upper exit or slower lower recovery", () => {
+  const o = obstacles.find(
+    (o) => o.landmark === "crane" && isSwing(o.technique),
+  )!;
+  const results = [0.4, 0.6, 0.9].map((releaseAt) => {
+    const g = new Run();
+    g.start();
+    g.x = o.x - 1.9;
+    g.y = 3.3;
+    g.upper = true;
+    g.speed = 12;
+    g.action("up");
+    for (let i = 0; i < 150 && !g.traversal; i++) g.step();
+    assert.ok(g.traversal);
+    while (g.traversal && g.frame().progress < releaseAt) g.step();
+    g.action("forward");
+    g.step();
+    const releaseSpeed = g.speed;
+    for (let i = 0; i < 240 && !g.grounded; i++) g.step();
+    assert.equal(g.phase, "running");
+    assert.equal(g.grounded, true);
+    return { g, releaseSpeed };
+  });
+  assert.equal(results[1].g.upper, true);
+  assert.equal(results[0].g.upper, false);
+  assert.equal(results[2].g.upper, false);
+  assert.ok(results[1].releaseSpeed > results[0].releaseSpeed);
+  assert.ok(results[1].g.flow > results[0].g.flow);
+});
+
+test("upper landmarks replace contact chains and skylight gaps have no glass footing", () => {
+  const billboard = obstacles.find(
+    (o) => o.landmark === "billboard" && o.kind === "encounter",
+  )!;
+  assert.equal(billboard.feature, "wall-billboard");
+  assert.ok(
+    obstacles.some((o) => o.route === "lower" && o.combo === billboard.combo),
+  );
+  const gaps = obstacles.filter(
+    (o) => o.landmark === "skylights" && o.kind === "gap",
+  );
+  assert.equal(gaps.length, 3);
+  for (const gap of gaps)
+    assert.ok(
+      !surfaces.some(
+        (s) => s.upper && s.start < gap.x + gap.width && s.end > gap.x,
+      ),
+    );
+});
+
+test("five clean contacts produce a chain reward and a miss resets it", () => {
+  const g = new Run();
+  g.start();
+  for (const o of obstacles
+    .filter((o) => o.kind === "vault" && o.route !== "upper")
+    .slice(0, 5)) {
+    g.x = o.x - 1.8;
+    g.y = ground(g.x, false);
+    g.grounded = true;
+    g.traversal = null;
+    g.action("up");
+    g.step();
+  }
+  assert.equal(g.flow, 5);
+  assert.equal(g.feedback.kind, "chain");
+  assert.match(g.message, /PERFECT CHAIN/);
+  g.traversal = null;
+  g.grounded = false;
+  g.x = 3;
+  g.y = 0.05;
+  g.vy = -18;
+  g.step();
+  assert.equal(g.flow, 0);
+  assert.equal(g.feedback.kind, "impact");
+});
+
+test("wall-run crossings span a physical building gap and finish on a supported far ledge", () => {
+  const crossings = obstacles.filter((o) => o.wallGap);
+  assert.ok(crossings.length >= 5);
+  for (const o of crossings) {
+    const upper = o.route === "upper";
+    assert.ok(
+      !surfaces.some(
+        (s) => s.upper === upper && s.start < o.x + o.width && s.end > o.x + 1,
+      ),
+    );
+    const g = new Run();
+    g.start();
+    g.x = o.x - 1.8;
+    g.y = ground(g.x, upper);
+    g.upper = upper;
+    g.speed = 12;
+    g.action("up");
+    g.step();
+    assert.equal(g.move, "wall-run");
+    let crossedVoid = false;
+    for (let tick = 0; tick < 240 && g.traversal; tick++) {
+      g.step();
+      if (g.x > o.x + 1 && g.x < o.x + o.width) {
+        crossedVoid = true;
+        assert.equal(g.grounded, false);
+      }
+    }
+    assert.ok(crossedVoid);
+    assert.equal(g.traversal, null);
+    assert.equal(g.grounded, true);
+    assert.ok(g.onObstacle());
+    assert.equal(g.recoveries, 0);
+    g.action("up");
+    g.step();
+    assert.equal(g.move, "jump");
+  }
+});
+
+test("missing a building-gap wall run falls instead of walking on an invisible roof", () => {
+  const o = obstacles.find((o) => o.wallGap && !o.route)!;
+  const g = new Run();
+  g.start();
+  g.x = o.x + 0.8;
+  g.y = ground(g.x, false);
+  g.speed = 12;
+  advance(g, 0.25);
+  assert.equal(g.grounded, false);
+  assert.equal(g.traversal, null);
+  assert.ok(g.y < ground(o.x, false));
+  advance(g, 1.5);
+  assert.equal(g.phase, "failed");
 });

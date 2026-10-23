@@ -263,7 +263,42 @@ export function comboCourse(): Obstacle[] {
     const swing = steps.find((o) => isSwing(o.technique));
     if (swing) crossingOffset += 8;
     return (["lower", "upper"] as const).flatMap((route) =>
-      steps.map((o, contact) => ({
+      (route === "upper" && i === 11
+        ? [
+            {
+              x: 0,
+              width: 6,
+              height: 2.4,
+              kind: "encounter",
+              feature: "wall-billboard",
+              wallGap: true,
+            } as Obstacle,
+            { x: 9, width: 10, kind: "gap", feature: "bridge" } as Obstacle,
+            special(28, "precision"),
+            vault(36),
+          ]
+        : route === "upper" && i === 13
+          ? [
+              vault(0),
+              ...[8, 20, 32].map(
+                (x): Obstacle => ({
+                  x,
+                  width: 4,
+                  kind: "gap",
+                  feature: "bridge",
+                }),
+              ),
+            ]
+          : route === "lower" && i === 11
+            ? [
+                vault(0),
+                slide(4),
+                special(22, "duck"),
+                special(28, "precision"),
+                vault(36),
+              ]
+            : steps
+      ).map((o, contact) => ({
         ...(route === "lower" && (o.kind === "gap" || o.kind === "ramp")
           ? vault(o.x, "dash")
           : route === "upper" && o.kind === "slide"
@@ -272,6 +307,16 @@ export function comboCourse(): Obstacle[] {
         ...(route === "lower" && isSwing(o.technique) ? { height: 2.3 } : {}),
         x: 512 + i * 44 + offset + o.x + (swing && o.x > swing.x ? 8 : 0),
         route,
+        landmark:
+          route === "upper"
+            ? i === 8
+              ? "crane"
+              : i === 11
+                ? "billboard"
+                : i === 13
+                  ? "skylights"
+                  : undefined
+            : undefined,
         combo,
         contact: contact + 1,
         side: (i === 2 && contact === 1 ? -1 : 1) as 1 | -1,

@@ -150,7 +150,18 @@ export default function MovementLab() {
         40,
         (previewItems.at(-1)?.x ?? start) - start + 18,
       );
-      const gaps = previewItems.filter((item) => isSwing(item.technique));
+      const gaps = previewItems
+        .filter(
+          (item) =>
+            isSwing(item.technique) || item.wallGap || item.kind === "gap",
+        )
+        .map((item) => ({
+          x: item.x + (item.wallGap ? 1 : 0),
+          width:
+            item.width +
+            (isSwing(item.technique) ? SWING_GAP_EXTRA : 0) -
+            (item.wallGap ? 1 : 0),
+        }));
       let cursor = start - 8;
       const floorEnd = start + floorLength - 8;
       for (const gap of [...gaps, { x: floorEnd, width: 0 }]) {
@@ -158,7 +169,7 @@ export default function MovementLab() {
           box((cursor + gap.x) / 2, base - 2, gap.x - cursor, 4);
           box((cursor + gap.x) / 2, base, gap.x - cursor, 0.035, amber);
         }
-        cursor = gap.x + gap.width + SWING_GAP_EXTRA;
+        cursor = gap.x + gap.width;
       }
     }
     const cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);

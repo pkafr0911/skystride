@@ -41,3 +41,21 @@ export function viewAngle(
     elevation: from.elevation + (to.elevation - from.elevation) * blend,
   };
 }
+
+/** Open the view before takeoff and keep the far bank visible during flight. */
+export function traversalZoom(
+  speed: number,
+  distance: number,
+  gapWidth: number,
+  airborne: boolean,
+  reducedMotion = false,
+) {
+  if (reducedMotion) return speedZoom(speed, true);
+  const base = speedZoom(speed);
+  if (gapWidth < 5) return base;
+  const anticipation = airborne
+    ? 1
+    : Math.max(0, Math.min(1, (28 - distance) / 20));
+  const wide = gapWidth >= 10 ? 0.85 : 1.02;
+  return base + (Math.min(base, wide) - base) * anticipation;
+}

@@ -1165,6 +1165,13 @@ function flatPose(f: Frame): Pose {
 
 export function poseFor(f: Frame): Pose {
   const p = flatPose(f);
+  if (f.move === "run" && (f.anticipation ?? 0) > 0) {
+    const prepare = f.anticipation!;
+    p.chest[0] += prepare * 0.1;
+    p.head[0] += prepare * 0.12;
+    p.hands[0][0] -= prepare * 0.12;
+    p.hands[1][0] -= prepare * 0.12;
+  }
   if (f.move === "vault" && f.side === -1) {
     for (const point of [
       p.hip,
