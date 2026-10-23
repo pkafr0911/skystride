@@ -261,3 +261,8 @@ Missed jumps and bar grabs still fall into the void and fail. Reachable roof lip
 ## Selectable penalty mode — v27
 
 Course selection now offers Standard (default) and Hardcore independently of time trial or practice sector. Standard restores the earlier assisted barrier crossing, slide stumble, lighter heavy landing and Up/Forward ledge-save behavior. Hardcore contains the v26 crash penalties, locked recovery, 30% late-vault speed loss, and Up-only ledge saves. Both retain fatal missed jumps/bar grabs. Retries retain the chosen mode; returning to the course menu allows switching. Best times and ghosts are stored separately by mode, and records include a validated mode field. Earlier record keys remain untouched.
+
+
+## Connected building blocks
+
+Long continuous roof surfaces are now rendered as adjoining buildings, usually 16–32 m wide. Facade colors, window proportions, floor bands, depth and party-wall piers vary between buildings. Rear wings have staggered rooflines from 1.4 m below to 5.2 m above the running terrace, with occasional rooftop service housings. Wings remain behind the obstacle corridor. The connected running terraces retain the existing shared collision heights and authored gaps; this is an architectural visual change, not a new course layout. Existing geometry/material reuse, culling and disposal remain in place.

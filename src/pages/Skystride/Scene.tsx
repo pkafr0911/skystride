@@ -115,6 +115,13 @@ export default function Scene({
     const seam = material(0x26374c),
       windowGlass = material(0x49647b),
       warmWindow = material(0xc99868);
+    const buildingFaces = [
+      side,
+      material(0x24364b),
+      material(0x303c50),
+      material(0x1c3040),
+    ];
+    const buildingCaps = [roof, material(0x455063), material(0x394c59), metal];
     const chunks = new Map<number, THREE.Group>();
     const chunkFor = (x: number) => {
       const key = Math.floor(x / 80);
@@ -187,76 +194,183 @@ export default function Scene({
     const sun = new THREE.Mesh(sunGeometry, sunMat);
     sun.position.set(16, -30.5, -125);
     scene.add(sun);
-    // Renderer and collision share these exact roof intervals.
+    // A continuous playable terrace can belong to several adjoining buildings.
+    // Keep its roof at the collision height; stagger the wings behind the lane.
     for (const slab of surfaces) {
-      const w = slab.end - slab.start,
-        x = (slab.start + slab.end) / 2,
-        upper = slab.upper,
-        roofThickness = 0.2,
-        wallHeight = (upper ? 0.9 : 14) - roofThickness;
-      // End the building body at the underside of the roof. Coplanar top
-      // faces fight in the depth buffer and flicker as the camera moves.
-      box(
-        scene,
-        x,
-        slab.y - roofThickness - wallHeight / 2,
-        0,
-        w,
-        wallHeight,
-        4,
-        side,
-      );
-      box(
-        scene,
-        x,
-        slab.y - roofThickness / 2,
-        0,
-        w,
-        roofThickness,
-        4.15,
-        roof,
-      );
-      box(scene, x, slab.y + 0.025, 2.06, w, 0.055, 0.08, metal);
-      // Coping and cross-roof seams reveal the width of the running surface.
-      box(scene, x, slab.y - 0.23, 2.09, w, 0.16, 0.12, alloy);
-      box(scene, x, slab.y + 0.07, -2, w, 0.14, 0.16, metal);
-      for (let joint = slab.start + 1; joint < slab.end; joint += 3) {
-        box(scene, joint, slab.y + 0.006, 0, 0.025, 0.012, 3.95, seam);
-      }
-      if (!upper) {
-        for (
-          let column = slab.start + 1;
-          column < slab.end - 0.8;
-          column += 2.4
-        ) {
-          for (let row = 0; row < 3; row++) {
+      const upper = slab.upper;
+      let start = slab.start;
+      let part = 0;
+      while (start < slab.end) {
+        const seed = Math.abs(Math.floor(slab.start * 13) + part * 17);
+        const remaining = slab.end - start;
+        const nominal = upper ? 14 + (seed % 9) : 16 + (seed % 17);
+        const width = remaining < nominal + 7 ? remaining : nominal;
+        const end = start + width;
+        const x = (start + end) / 2;
+        const variant = seed % buildingFaces.length;
+        const face = buildingFaces[variant];
+        const cap = buildingCaps[variant];
+        const depth = 4 + (seed % 3) * 0.22;
+        const thickness = 0.2;
+        const wallHeight = upper ? 0.7 : 13.8 + (seed % 4);
+        const group = chunkFor(x);
+        box(
+          group,
+          x,
+          slab.y - thickness - wallHeight / 2,
+          0,
+          width,
+          wallHeight,
+          depth,
+          face,
+        );
+        // Contiguous slabs have no fake jump gaps or raised collisionless lips.
+        box(
+          group,
+          x,
+          slab.y - thickness / 2,
+          0,
+          width,
+          thickness,
+          depth + 0.15,
+          cap,
+        );
+        box(
+          group,
+          x,
+          slab.y + 0.025,
+          depth / 2 + 0.06,
+          width,
+          0.055,
+          0.08,
+          metal,
+        );
+        box(
+          group,
+          x,
+          slab.y - 0.23,
+          depth / 2 + 0.09,
+          width,
+          0.16,
+          0.12,
+          alloy,
+        );
+        for (let joint = start + 3; joint < end; joint += 4) {
+          box(group, joint, slab.y + 0.006, 0, 0.025, 0.012, depth - 0.1, seam);
+        }
+        if (!upper) {
+          // Recessed party-wall joints and contrasting end piers identify each property.
+          for (const boundary of [start + 0.12, end - 0.12]) {
             box(
-              scene,
-              column,
-              slab.y - 2 - row * 2.5,
-              2.025,
-              0.9,
-              1.25,
-              0.045,
-              (Math.floor(column) + row) % 7 === 0 ? warmWindow : windowGlass,
+              group,
+              boundary,
+              slab.y - 6.5,
+              depth / 2 + 0.055,
+              0.18,
+              12.5,
+              0.15,
+              black,
+            );
+          }
+          const spacing = variant === 1 ? 3.2 : 2.6;
+          for (let column = start + 1.3; column < end - 1; column += spacing) {
+            for (let row = 0; row < 3; row++) {
+              const y = slab.y - 2 - row * 2.5;
+              const windowWidth = variant === 1 ? 1.65 : 0.85;
+              box(
+                group,
+                column,
+                y,
+                depth / 2 + 0.025,
+                windowWidth,
+                variant === 2 ? 1.6 : 1.2,
+                0.045,
+                (Math.floor(column) + row) % 7 === 0 ? warmWindow : windowGlass,
+              );
+              box(
+                group,
+                column,
+                y - 0.7,
+                depth / 2 + 0.07,
+                windowWidth + 0.15,
+                0.09,
+                0.14,
+                metal,
+              );
+            }
+          }
+          if (variant === 1 || variant === 3) {
+            for (let row = 0; row < 3; row++) {
+              box(
+                group,
+                x,
+                slab.y - 3.1 - row * 2.5,
+                depth / 2 + 0.06,
+                width - 0.35,
+                0.12,
+                0.12,
+                cap,
+              );
+            }
+          }
+          // These wings stay behind the full running/obstacle corridor. Their
+          // staggered rooflines read as a city block, not one endless extrusion.
+          const rise = [-1.4, 2.8, 5.2, 0.7, 3.8][seed % 5];
+          const wingWidth = Math.max(1, width - 1.2);
+          const top = slab.y + rise;
+          const wingHeight = 14 + rise;
+          const wingZ = -5.5 - (seed % 2) * 0.6;
+          box(
+            group,
+            x,
+            top - wingHeight / 2,
+            wingZ,
+            wingWidth,
+            wingHeight,
+            4.4,
+            face,
+          );
+          box(group, x, top + 0.09, wingZ, wingWidth + 0.15, 0.18, 4.55, cap);
+          box(group, x, top + 0.25, wingZ - 2.15, wingWidth, 0.3, 0.18, metal);
+          if (rise > 1) {
+            for (let column = start + 2; column < end - 2; column += 3) {
+              box(
+                group,
+                column,
+                top - 1.1,
+                wingZ + 2.22,
+                1.2,
+                0.95,
+                0.045,
+                windowGlass,
+              );
+            }
+          }
+          if (width > 12 && seed % 3 === 0) {
+            box(
+              group,
+              x + width * 0.18,
+              top + 0.65,
+              wingZ,
+              2.6,
+              1.1,
+              1.8,
+              metal,
             );
             box(
-              scene,
-              column,
-              slab.y - 2.66 - row * 2.5,
-              2.07,
-              1.05,
-              0.09,
-              0.14,
-              metal,
+              group,
+              x + width * 0.18,
+              top + 1.23,
+              wingZ,
+              2.85,
+              0.1,
+              2,
+              alloy,
             );
           }
         }
-      }
-      for (let panel = slab.start + 2; panel < slab.end; panel += 6) {
-        box(scene, panel, slab.y - 4.2, 2.015, 0.035, 7, 0.025, metal);
-        if (!upper)
-          box(scene, panel + 1, slab.y - 3.5, 2.035, 0.7, 1.1, 0.03, black);
+        start = end;
+        part++;
       }
     }
     obstacles.forEach((o) => {
