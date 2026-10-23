@@ -1,5 +1,6 @@
 import { SWING_GAP_EXTRA, swingGripOffset } from "./combos";
 import * as THREE from "three";
+import { equipmentObstacle } from "./equipment-mesh";
 import { ground, Obstacle } from "./model";
 
 export type ObstacleKit = {
@@ -14,6 +15,7 @@ export type ObstacleKit = {
 
 /** Shared by the course and offline studies; every mesh uses caller-owned resources. */
 export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
+  if (o.design) return equipmentObstacle(o, kit);
   const group = new THREE.Group();
   group.name = o.feature ?? "obstacle";
   group.position.set(o.x, ground(o.x, o.route === "upper"), 0);
@@ -243,8 +245,6 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
     tank.position.set(w / 2, h + 1.2, -1.9);
     tank.scale.set(1.2, 2.4, 1.2);
     group.add(tank);
-    for (const y of [h + 0.12, h + 2.3])
-      box(w / 2, y, -1.9, 2.5, 0.1, 2.5, kit.trim);
     box(0.65, 0.425, 2, 1.3, 0.85, 0.25, kit.face);
     box(0.65, 0.87, 2, 1.3, 0.04, 0.28, kit.amber);
   } else if (o.feature === "wall-billboard") {
@@ -358,6 +358,141 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
       box(x, h / 2, 1.23, 0.05, h * 0.8, 0.035, kit.trim);
     // A second service enclosure on the back makes these read as ventilation banks.
     box(w * 0.5, h * 0.45, -1.4, w * 0.8, h * 0.9, 0.35, kit.dark);
+  }
+  // Small construction details make the silhouettes read as working rooftop equipment.
+  // They use the shared kit so the scene can still batch by geometry/material.
+  const upright = (
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    height: number,
+    material: THREE.Material,
+  ) => {
+    const mesh = new THREE.Mesh(kit.cylinder, material);
+    mesh.position.set(x, y, z);
+    mesh.scale.set(radius, height, radius);
+    group.add(mesh);
+    return mesh;
+  };
+  const brace = (x: number, y: number, z: number, dx: number, dy: number) => {
+    const beam = box(x, y, z, Math.hypot(dx, dy), 0.055, 0.055, kit.trim);
+    beam.rotation.z = Math.atan2(dy, dx);
+  };
+  if (o.feature === "vent-bank") {
+    // Folded sheet-metal cabinet, recessed louver bays and service-door fasteners.
+    box(w / 2, 0.055, 0, w + 0.12, 0.11, 2.52, kit.dark);
+    box(w / 2, h - 0.035, 0, w + 0.12, 0.07, 2.52, kit.trim);
+    const bays = Math.max(1, Math.ceil(w / 1.2));
+    for (let i = 0; i < bays; i++) {
+      const x = ((i + 0.5) * w) / bays;
+      box(x, h / 2, 1.235, w / bays - 0.14, h * 0.68, 0.025, kit.dark);
+      for (let y = 0.22; y < h - 0.16; y += 0.14)
+        box(x, y, 1.27, w / bays - 0.2, 0.045, 0.08, kit.trim).rotation.x =
+          -0.3;
+      for (const y of [0.14, h - 0.14])
+        box(x - w / bays / 2 + 0.1, y, 1.29, 0.035, 0.035, 0.025, kit.trim);
+    }
+  }
+  if (o.feature === "solar" && o.kind === "ramp") {
+    const angle = Math.atan2(h, w);
+    // Individual photovoltaic modules with a fine silver cell grid.
+    for (let x = 0.35; x < w - 0.15; x += 0.6)
+      for (const z of [-1.05, -0.35, 0.35, 1.05]) {
+        const cell = box(
+          x,
+          (h * x) / w + 0.004,
+          z,
+          0.53 / Math.cos(angle),
+          0.014,
+          0.62,
+          kit.panel,
+        );
+        cell.rotation.z = angle;
+        const bus = box(
+          x,
+          (h * x) / w + 0.008,
+          z,
+          0.012,
+          0.012,
+          0.62,
+          kit.trim,
+        );
+        bus.rotation.z = angle;
+      }
+  }
+  if (o.feature === "pipe") {
+    const bottom = o.kind === "slide" ? 1.25 : 0.12;
+    const radius = (h - bottom) / 2;
+    for (const x of [0.12, w - 0.12]) {
+      pipe(x, bottom + radius, 0.55, 0.09, radius + 0.1, kit.trim);
+      for (let n = 0; n < 8; n++) {
+        const a = (n * Math.PI) / 4;
+        pipe(
+          x,
+          bottom + radius + Math.cos(a) * (radius + 0.065),
+          0.55 + Math.sin(a) * (radius + 0.065),
+          0.14,
+          0.025,
+          kit.dark,
+        );
+      }
+    }
+    // A rear riser and valve connect the crossing to the building services.
+    upright(w * 0.7, bottom + radius + 0.2, -0.55, 0.07, 0.4, kit.trim);
+    pipe(w * 0.7, bottom + radius + 0.4, -0.55, 0.3, 0.04, kit.amber);
+  }
+  if (o.feature === "tank") {
+    // Cylindrical lid and wraparound retaining hoops, instead of square collars.
+    for (const y of [h + 0.12, h + 1.1, h + 2.3])
+      upright(w / 2, y, -1.9, 1.23, 0.075, kit.trim);
+    upright(w / 2, h + 2.43, -1.9, 1.24, 0.08, kit.trim);
+    upright(w / 2, h + 2.51, -1.9, 0.28, 0.12, kit.dark);
+    for (const x of [w / 2 - 0.45, w / 2 + 0.45])
+      box(x, h + 1.1, -0.65, 0.045, 2.2, 0.045, kit.trim);
+    for (let y = h + 0.15; y < h + 2.2; y += 0.28)
+      box(w / 2, y, -0.65, 0.9, 0.045, 0.045, kit.trim);
+  }
+  if (o.feature === "scaffold") {
+    // Suspended work platform: timber deck seams, toe board and rear guardrail.
+    for (let x = 0.25; x < w; x += 0.45)
+      box(x, h + 0.005, 0, 0.025, 0.015, 2.5, kit.dark);
+    box(w / 2, h + 0.12, -1.32, w, 0.24, 0.07, kit.amber);
+    for (const y of [h + 0.5, h + 1])
+      box(w / 2, y, -1.4, w, 0.055, 0.055, kit.trim);
+    brace(w / 2, h + 0.5, -1.41, w - 0.2, 0.9);
+    brace(w / 2, h + 0.5, -1.41, w - 0.2, -0.9);
+  }
+  if (o.feature === "balcony") {
+    box(w / 2, h - 0.2, 1.3, w, 0.24, 0.12, kit.trim);
+    for (const y of [h + 0.5, h + 1])
+      box(w / 2, y, -1.25, w, 0.055, 0.055, kit.trim);
+    for (let x = 0.15; x < w; x += 0.45)
+      box(x, h + 0.5, -1.25, 0.04, 1, 0.04, kit.trim);
+    for (const x of [0.3, w - 0.3]) brace(x, h - 0.4, -0.65, 0.35, 0.65);
+  }
+  if (
+    o.kind === "signature" &&
+    ![
+      "underbar",
+      "lache",
+      "monkey",
+      "shimmy",
+      "tic-tac",
+      "rebound",
+      "duck",
+      "squeeze",
+      "canopy",
+      "stride",
+      "drop-through",
+    ].includes(o.technique ?? "")
+  ) {
+    // Vault boxes become shipping crates with corner protectors and plank seams.
+    for (const x of [0.08, w - 0.08])
+      box(x, h / 2, 1.22, 0.12, h, 0.06, kit.trim);
+    for (let y = 0.2; y < h; y += 0.22)
+      box(w / 2, y, 1.215, Math.max(0.05, w - 0.22), 0.018, 0.025, kit.dark);
+    brace(w / 2, h / 2, 1.26, Math.max(0.1, w - 0.2), h - 0.16);
   }
   return group;
 }

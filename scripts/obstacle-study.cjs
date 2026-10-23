@@ -22,29 +22,43 @@ const kit = {
 };
 const panels = [];
 const signatureStudy = process.argv.includes("--signatures");
-const entries = signatureStudy
-  ? require("../src/pages/Skystride/combos").techniques.map((t) => [
-      t,
-      t.replaceAll("-", " ").toUpperCase(),
-    ])
-  : [
-      ["vent-bank", "SPLIT VENTILATION BANK"],
-      ["pipe", "PIPE CROSSING"],
-      ["solar", "SOLAR LAUNCH RAMP"],
-      ["window", "CONSTRUCTION WINDOW"],
-      ["tank", "WATER-TANK CRADLE"],
-      ["wall-billboard", "WALL-RUN BILLBOARD"],
-      ["bridge", "BROKEN MAINTENANCE BRIDGE"],
-      ["greenhouse", "GREENHOUSE SERVICE LINE"],
-      ["scaffold", "HANGING SCAFFOLD"],
-      ["balcony", "STAGGERED BALCONIES"],
-    ];
+const equipmentStudy = process.argv.includes("--equipment");
+const entries = equipmentStudy
+  ? [
+      ["ac-condenser", "AC CONDENSER"],
+      ["cable-reels", "CABLE REELS"],
+      ["utility-cabinet", "UTILITY CABINET"],
+      ["maintenance-cart", "MAINTENANCE CART"],
+      ["roof-hatch", "ROOF ACCESS HATCH"],
+      ["duct-elbow", "DUCT ELBOW"],
+      ["safety-barricade", "SAFETY BARRICADE"],
+      ["antenna-base", "ANTENNA BASE"],
+    ]
+  : signatureStudy
+    ? require("../src/pages/Skystride/combos").techniques.map((t) => [
+        t,
+        t.replaceAll("-", " ").toUpperCase(),
+      ])
+    : [
+        ["vent-bank", "SPLIT VENTILATION BANK"],
+        ["pipe", "PIPE CROSSING"],
+        ["solar", "SOLAR LAUNCH RAMP"],
+        ["window", "CONSTRUCTION WINDOW"],
+        ["tank", "WATER-TANK CRADLE"],
+        ["wall-billboard", "WALL-RUN BILLBOARD"],
+        ["bridge", "BROKEN MAINTENANCE BRIDGE"],
+        ["greenhouse", "GREENHOUSE SERVICE LINE"],
+        ["scaffold", "HANGING SCAFFOLD"],
+        ["balcony", "STAGGERED BALCONIES"],
+      ];
 for (const [feature, title] of entries) {
-  const pieces = signatureStudy
-    ? obstacles
-        .filter((o) => o.technique === feature && o.route === "lower")
-        .slice(0, 1)
-    : obstacles.filter((o) => o.feature === feature && o.x < 480);
+  const pieces = equipmentStudy
+    ? obstacles.filter((o) => o.design === feature).slice(0, 1)
+    : signatureStudy
+      ? obstacles
+          .filter((o) => o.technique === feature && o.route === "lower")
+          .slice(0, 1)
+      : obstacles.filter((o) => o.feature === feature && o.x < 480);
   const start = pieces[0].x,
     end =
       pieces.at(-1).x +
@@ -71,7 +85,12 @@ for (const [feature, title] of entries) {
       bank.scale.set(b - a, 0.3, 4);
       scene.add(bank);
     }
-  } else if (feature !== "bridge" && feature !== "scaffold") scene.add(roof);
+  } else if (
+    feature !== "bridge" &&
+    feature !== "scaffold" &&
+    feature !== "roof-hatch"
+  )
+    scene.add(roof);
   const width = Math.max(11, end - start + SWING_GAP_EXTRA + 6);
   const camera = new THREE.OrthographicCamera(
     -width / 2,

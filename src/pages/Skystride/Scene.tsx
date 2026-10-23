@@ -413,7 +413,7 @@ export default function Scene({
           ? 3.3
           : 0
         : ground(o.x, o.route === "upper");
-      if (o.feature) {
+      if (o.feature || o.design) {
         chunkFor(o.x).add(
           creativeObstacle(o, {
             box: boxGeometry,

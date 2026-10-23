@@ -738,3 +738,78 @@ test("large-jump framing opens before the edge and stays wide in flight", () => 
   assert.equal(traversalZoom(12, 1, 12, false, true), speedZoom(12, true));
   assert.equal(traversalZoom(12, 1, 4, false), speedZoom(12));
 });
+
+test("equipment designs keep solid tops, slide clearance and hatch void aligned with gameplay", () => {
+  const box = new THREE.BoxGeometry();
+  const cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const kit = {
+    box,
+    cylinder,
+    face: material,
+    dark: material,
+    trim: material,
+    amber: material,
+    panel: material,
+  };
+  const designs = new Set<string>();
+  try {
+    for (const o of obstacles.filter((o) => o.design)) {
+      designs.add(o.design!);
+      const mesh = creativeObstacle(o, kit);
+      mesh.updateMatrixWorld(true);
+      const floor = ground(o.x, o.route === "upper");
+      const height = o.height ?? (o.kind === "slide" ? 2.35 : 1);
+      for (const fraction of [0.1, 0.5, 0.9]) {
+        const x = o.x + o.width * fraction;
+        const ray = new THREE.Raycaster(
+          new THREE.Vector3(x, floor + 8, 0),
+          new THREE.Vector3(0, -1, 0),
+        );
+        const hits = ray.intersectObject(mesh, true);
+        if (o.kind === "gap") {
+          assert.equal(
+            hits.length,
+            0,
+            "hatch must leave the running lane empty",
+          );
+        } else {
+          assert.ok(hits.length, o.design);
+          assert.ok(
+            Math.abs(hits[0].point.y - floor - height) < 0.025,
+            `${o.design}: top matches support`,
+          );
+        }
+        if (o.kind === "slide") {
+          ray.set(new THREE.Vector3(x, floor, 0), new THREE.Vector3(0, 1, 0));
+          const underside = ray.intersectObject(mesh, true)[0];
+          assert.ok(underside);
+          assert.ok(
+            Math.abs(underside.point.y - floor - 1.25) < 0.025,
+            "duct leaves 1.25m slide clearance",
+          );
+        }
+      }
+      mesh.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+          assert.ok(
+            object.scale.x > 0 && object.scale.y > 0 && object.scale.z > 0,
+          );
+          assert.ok(
+            object.geometry === box || object.geometry === cylinder,
+            "uses shared geometry",
+          );
+        }
+      });
+    }
+    assert.equal(
+      designs.size,
+      8,
+      "all eight concepts are present on the course",
+    );
+  } finally {
+    box.dispose();
+    cylinder.dispose();
+    material.dispose();
+  }
+});

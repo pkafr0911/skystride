@@ -64,10 +64,21 @@ export type Feature =
   | "scaffold"
   | "balcony"
   | "signature";
+export type ObstacleDesign =
+  | "ac-condenser"
+  | "cable-reels"
+  | "utility-cabinet"
+  | "maintenance-cart"
+  | "roof-hatch"
+  | "duct-elbow"
+  | "safety-barricade"
+  | "antenna-base";
 export type Landmark = "crane" | "billboard" | "skylights";
 export type Obstacle = {
   /** The wall spans a real void, starting one metre after the approach marker. */
   wallGap?: boolean;
+  /** Visual equipment design; collision and traversal still use the authored kind. */
+  design?: ObstacleDesign;
   landmark?: Landmark;
   x: number;
   width: number;
@@ -96,7 +107,14 @@ export type Obstacle = {
 };
 const opening: Obstacle[] = [
   { x: 14, width: 5.5, kind: "gap" },
-  { x: 27, width: 0.7, height: 0.5, kind: "vault", vault: "speed" },
+  {
+    x: 27,
+    width: 0.7,
+    height: 0.5,
+    kind: "vault",
+    vault: "speed",
+    design: "safety-barricade",
+  },
   {
     x: 46,
     width: 6,
@@ -112,13 +130,14 @@ const opening: Obstacle[] = [
   { x: 115, width: 5, height: 3.3, kind: "branch" },
   {
     x: 139,
+    design: "maintenance-cart",
     width: 1.5,
     height: 1.05,
     kind: "vault",
     vault: "speed",
     route: "lower",
   },
-  { x: 153, width: 6, kind: "slide", route: "lower" },
+  { x: 153, width: 6, kind: "slide", route: "lower", design: "duct-elbow" },
   { x: 148, width: 6.5, kind: "gap", route: "upper" },
   {
     x: 150.5,
@@ -153,7 +172,7 @@ const opening: Obstacle[] = [
     feature: "balcony",
   },
   { x: 195, width: 9, kind: "drop", route: "upper" },
-  { x: 206, width: 5, kind: "gap" },
+  { x: 206, width: 5, kind: "gap", design: "roof-hatch" },
   {
     x: 217,
     width: 1.8,
@@ -164,6 +183,7 @@ const opening: Obstacle[] = [
   },
   {
     x: 223.2,
+    design: "cable-reels",
     width: 1.6,
     height: 1.15,
     kind: "vault",
@@ -174,6 +194,7 @@ const opening: Obstacle[] = [
   { x: 240, width: 7, kind: "gap" },
   {
     x: 267,
+    design: "antenna-base",
     width: 1.2,
     height: 0.85,
     kind: "vault",
@@ -201,6 +222,7 @@ const opening: Obstacle[] = [
   { x: 290, width: 5, kind: "branch" },
   {
     x: 312,
+    design: "ac-condenser",
     width: 2.8,
     height: 1.1,
     kind: "vault",
@@ -211,6 +233,7 @@ const opening: Obstacle[] = [
   { x: 325, width: 7, kind: "gap", route: "upper" },
   {
     x: 349,
+    design: "utility-cabinet",
     width: 2.6,
     height: 1.2,
     kind: "vault",

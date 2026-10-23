@@ -70,3 +70,7 @@ Bar crossings (v14): jump into hand reach, catch, then release across a real roo
 Bar crossings v15 widen to 12.6 m with a faster 0.55 s swing, a stronger release impulse, and extended landing corridors. Movement-lab shares the updated geometry and physics.
 
 Choose a character in the course or pause menu: Rooftop Courier, Rooftop Climber (default), Hop Bot, or Original Silhouette. The choice is saved on this device and applies to the runner and ghost. Available designs are registered in `src/pages/Skystride/characters.ts`.
+
+Eight equipment designs now appear throughout the course: AC condensers, secured cable reels, utility cabinets, maintenance carts, roof hatches, duct elbows, safety barricades and antenna bases. See the [implemented equipment preview](docs/implemented-obstacles-v2.png) and the original [concept sheet](docs/obstacle-concepts-v2.png). Equipment follows the existing traversal dimensions; reels have a flat service tread, duct risers sit behind the slide lane, and hatch rims leave the jump opening clear.
+
+To regenerate the equipment preview, run `node scripts/obstacle-study.cjs --equipment`, then `node scripts/render-obstacle-study.cjs docs/implemented-obstacles-v2.png` with `sharp` available on the Node module path. The renderer uses depth-tested triangles from the live game meshes.

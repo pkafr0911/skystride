@@ -174,7 +174,7 @@ export default function MovementLab() {
     }
     const cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
     for (const o of previewItems) {
-      if (o.feature) {
+      if (o.feature || o.design) {
         environment.add(
           creativeObstacle(o, {
             box: geometry,
