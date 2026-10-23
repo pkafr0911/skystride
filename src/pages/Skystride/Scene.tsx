@@ -194,10 +194,32 @@ export default function Scene({
     const sun = new THREE.Mesh(sunGeometry, sunMat);
     sun.position.set(16, -30.5, -125);
     scene.add(sun);
-    // A continuous playable terrace can belong to several adjoining buildings.
-    // Keep its roof at the collision height; stagger the wings behind the lane.
+    // Physical roof heights and connecting ramps come from the collision surfaces.
     for (const slab of surfaces) {
       const upper = slab.upper;
+      if (slab.endY !== undefined) {
+        const width = slab.end - slab.start;
+        const x = (slab.start + slab.end) / 2;
+        const y = (slab.y + slab.endY) / 2;
+        const slope = (slab.endY - slab.y) / width;
+        const rampBox = (
+          cy: number,
+          z: number,
+          height: number,
+          depth: number,
+          mat: THREE.Material,
+        ) => {
+          const mesh = box(scene, x, cy, z, width, height, depth, mat);
+          mesh.updateMatrix();
+          mesh.matrix.elements[1] = slope * width;
+          mesh.matrixAutoUpdate = false;
+        };
+        rampBox(y - 7.1, 0, 13.8, 4, side);
+        rampBox(y - 0.1, 0, 0.2, 4.15, metal);
+        rampBox(y + 0.025, 2.06, 0.055, 0.08, edge);
+        rampBox(y + 0.025, -2.06, 0.055, 0.08, edge);
+        continue;
+      }
       let start = slab.start;
       let part = 0;
       while (start < slab.end) {
@@ -312,61 +334,6 @@ export default function Scene({
                 cap,
               );
             }
-          }
-          // These wings stay behind the full running/obstacle corridor. Their
-          // staggered rooflines read as a city block, not one endless extrusion.
-          const rise = [-1.4, 2.8, 5.2, 0.7, 3.8][seed % 5];
-          const wingWidth = Math.max(1, width - 1.2);
-          const top = slab.y + rise;
-          const wingHeight = 14 + rise;
-          const wingZ = -5.5 - (seed % 2) * 0.6;
-          box(
-            group,
-            x,
-            top - wingHeight / 2,
-            wingZ,
-            wingWidth,
-            wingHeight,
-            4.4,
-            face,
-          );
-          box(group, x, top + 0.09, wingZ, wingWidth + 0.15, 0.18, 4.55, cap);
-          box(group, x, top + 0.25, wingZ - 2.15, wingWidth, 0.3, 0.18, metal);
-          if (rise > 1) {
-            for (let column = start + 2; column < end - 2; column += 3) {
-              box(
-                group,
-                column,
-                top - 1.1,
-                wingZ + 2.22,
-                1.2,
-                0.95,
-                0.045,
-                windowGlass,
-              );
-            }
-          }
-          if (width > 12 && seed % 3 === 0) {
-            box(
-              group,
-              x + width * 0.18,
-              top + 0.65,
-              wingZ,
-              2.6,
-              1.1,
-              1.8,
-              metal,
-            );
-            box(
-              group,
-              x + width * 0.18,
-              top + 1.23,
-              wingZ,
-              2.85,
-              0.1,
-              2,
-              alloy,
-            );
           }
         }
         start = end;
@@ -592,7 +559,7 @@ export default function Scene({
           meshes.length,
         );
         meshes.forEach((mesh, i) => {
-          mesh.updateMatrix();
+          if (mesh.matrixAutoUpdate) mesh.updateMatrix();
           instances.setMatrixAt(i, mesh.matrix);
           parent.remove(mesh);
         });

@@ -266,3 +266,10 @@ Course selection now offers Standard (default) and Hardcore independently of tim
 ## Connected building blocks
 
 Long continuous roof surfaces are now rendered as adjoining buildings, usually 16–32 m wide. Facade colors, window proportions, floor bands, depth and party-wall piers vary between buildings. Rear wings have staggered rooflines from 1.4 m below to 5.2 m above the running terrace, with occasional rooftop service housings. Wings remain behind the obstacle corridor. The connected running terraces retain the existing shared collision heights and authored gaps; this is an architectural visual change, not a new course layout. Existing geometry/material reuse, culling and disposal remain in place.
+
+
+## Physical connected rooftops — v28
+
+This replaces the rear-wing-only interpretation above. Eight lower-route stretches now contain actual lower buildings, 0.7–1.4 m below their neighbors, joined by 3 m ramps. Four occur in the repeated districts and four in the long technical district. The shared surface definitions drive rendered rooftop slopes, foot support, landing collision and runner tilt. Obstacles use the new roof elevations; upper routes retain their independent height. Practice spawns use the physical roof height. Extra rear wings from the previous visual pass have been removed; contrasting adjoining facades remain. Replay version advances for the changed physical course.
+
+Full-route checks cover both routes, varied input timing, Standard and Hardcore. Additional checks walk each new building and both ramp seams against the shared height function and verify practice spawning on the roof.

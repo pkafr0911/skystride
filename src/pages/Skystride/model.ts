@@ -11,7 +11,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v27";
+export const VERSION = "sunset-relay-v28";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -419,7 +419,7 @@ const elevationStages = [
   { start: 1960, high: 0.35, low: -0.8 },
   { start: 2440, high: 1.2, low: 0.3 },
 ];
-export function roofHeight(x: number) {
+function districtRoofHeight(x: number) {
   for (const stage of elevationStages) {
     const local = x - stage.start;
     // Tolerate round-off when a gap endpoint is translated into another district.
@@ -428,7 +428,41 @@ export function roofHeight(x: number) {
   }
   return 0;
 }
-export type Surface = { start: number; end: number; y: number; upper: boolean };
+// Physical lower buildings: flat roofs joined by short, obstacle-free ramps.
+// Keep the upper line independent so its existing clearance only increases.
+export const roofBuildings = [
+  ...[0, 1480, 1960, 2440].map((offset) => ({
+    start: 132 + offset,
+    end: 198 + offset,
+    depth: 1.2,
+    ramp: 3,
+  })),
+  { start: 901, end: 1023, depth: 0.9, ramp: 3 },
+  { start: 1029, end: 1151, depth: 1.4, ramp: 3 },
+  { start: 1155, end: 1284, depth: 0.7, ramp: 3 },
+  { start: 1351, end: 1456, depth: 1.1, ramp: 3 },
+];
+export function roofHeight(x: number) {
+  const building = roofBuildings.find((b) => x >= b.start && x < b.end);
+  if (!building) return districtRoofHeight(x);
+  const fraction = Math.min(
+    1,
+    (x - building.start) / building.ramp,
+    (building.end - x) / building.ramp,
+  );
+  return districtRoofHeight(x) - building.depth * fraction;
+}
+export type Surface = {
+  start: number;
+  end: number;
+  y: number;
+  upper: boolean;
+  endY?: number;
+};
+export function surfaceHeight(s: Surface, x: number) {
+  const fraction = Math.max(0, Math.min(1, (x - s.start) / (s.end - s.start)));
+  return s.y + ((s.endY ?? s.y) - s.y) * fraction;
+}
 function cut(start: number, end: number, y: number, upper: boolean): Surface[] {
   const result: Surface[] = [];
   let cursor = start;
@@ -439,19 +473,45 @@ function cut(start: number, end: number, y: number, upper: boolean): Surface[] {
       item.x >= start &&
       item.x < end,
   )) {
-    result.push({ start: cursor, end: o.x, y: y + roofHeight(cursor), upper });
+    result.push({
+      start: cursor,
+      end: o.x,
+      y: y + districtRoofHeight(cursor),
+      upper,
+    });
     cursor = o.x + o.width + (isSwing(o.technique) ? SWING_GAP_EXTRA : 0);
   }
-  result.push({ start: cursor, end, y: y + roofHeight(cursor), upper });
+  result.push({ start: cursor, end, y: y + districtRoofHeight(cursor), upper });
   return result;
 }
 export const surfaces: Surface[] = [
-  ...cut(-30, FINISH + 25, 0, false),
+  ...cut(-30, FINISH + 25, 0, false).flatMap((slab) => {
+    const cuts = [
+      slab.start,
+      slab.end,
+      ...roofBuildings
+        .flatMap((b) => [b.start, b.start + b.ramp, b.end - b.ramp, b.end])
+        .filter((x) => x > slab.start && x < slab.end),
+    ].sort((a, b) => a - b);
+    return cuts.slice(0, -1).map((start, i): Surface => {
+      const end = cuts[i + 1];
+      // Sample just inside each bank: existing roof changes across gaps stay discrete.
+      const y = roofHeight(start + 1e-7),
+        endY = roofHeight(end - 1e-7);
+      return {
+        start,
+        end,
+        y,
+        endY: Math.abs(endY - y) > 0.001 ? endY : undefined,
+        upper: false,
+      };
+    });
+  }),
   ...upperPlatforms.flatMap((p) => cut(p.start, p.end, 3.3, true)),
 ];
 export function ground(x: number, upper: boolean) {
   return upper && upperPlatforms.some((p) => x >= p.start && x <= p.end)
-    ? roofHeight(x) + 3.3
+    ? districtRoofHeight(x) + 3.3
     : roofHeight(x);
 }
 /** Solid obstacle tops are support surfaces even after their scoring event is handled. */
@@ -766,7 +826,7 @@ export class Run {
     this.phase = "running";
     this.startSector = sector;
     this.x = sector * SECTOR;
-    this.y = 0;
+    this.y = ground(this.x, false);
     this.time = 0;
     this.ticks = 0;
     this.speed = 7.5;
@@ -1364,10 +1424,35 @@ export class Run {
       this.vy -= GRAVITY * (this.vy < 0 ? 1.18 : 1) * STEP;
       this.y += this.vy * STEP;
     }
+    const roofRamp = !this.upper
+      ? surfaces.find(
+          (s) =>
+            !s.upper &&
+            s.endY !== undefined &&
+            ((this.x >= s.start && this.x < s.end) ||
+              (oldX >= s.start && oldX < s.end)),
+        )
+      : undefined;
+    let rampSupport = false;
+    if (roofRamp) {
+      const before = surfaceHeight(roofRamp, oldX),
+        after = surfaceHeight(roofRamp, this.x);
+      if (this.grounded && Math.abs(oldY - before) < 0.04) {
+        this.y = after;
+        rampSupport = true;
+      } else if (
+        !this.grounded &&
+        this.vy <= 0 &&
+        oldY >= before &&
+        this.y <= after
+      ) {
+        this.land(after, false);
+        rampSupport = true;
+      }
+    }
     const ramp = ramps.find(
       (o) => this.applicable(o) && this.x >= o.x && this.x < o.x + o.width,
     );
-    let rampSupport = false;
     if (ramp) {
       const before = rampHeight(ramp, oldX),
         after = rampHeight(ramp, this.x);
@@ -1413,7 +1498,9 @@ export class Run {
       rampSupport ||
       supports.find(
         (s) =>
-          this.x >= s.start && this.x < s.end && Math.abs(s.y - this.y) < 0.025,
+          this.x >= s.start &&
+          this.x < s.end &&
+          Math.abs(surfaceHeight(s, this.x) - this.y) < 0.025,
       );
     if (this.grounded && !support) {
       if (this.move === "slide") this.slideExitAt = this.time;
@@ -1473,11 +1560,18 @@ export class Run {
       const landing = supports
         .filter(
           (s) =>
-            this.x >= s.start && this.x < s.end && oldY >= s.y && this.y <= s.y,
+            this.x >= s.start &&
+            this.x < s.end &&
+            oldY >= surfaceHeight(s, oldX) &&
+            this.y <= surfaceHeight(s, this.x),
         )
-        .sort((a, b) => b.y - a.y)[0];
+        .sort(
+          (a, b) =>
+            surfaceHeight(b, this.x) - surfaceHeight(a, this.x) ||
+            Number(a.upper !== this.upper) - Number(b.upper !== this.upper),
+        )[0];
       if (landing) {
-        this.land(landing.y, landing.upper);
+        this.land(surfaceHeight(landing, this.x), landing.upper);
         if ("index" in landing) this.handled.add(Number(landing.index));
       } else if (
         this.time -
@@ -1533,7 +1627,7 @@ export class Run {
       if (deck.kind !== "ledge" || !this.applicable(deck)) continue;
       const bodyHeight =
         this.move === "slide" || this.move === "roll" ? 0.85 : 1.85;
-      const top = (deck.route === "upper" ? 3.3 : 0) + deck.height!;
+      const top = ground(deck.x, deck.route === "upper") + deck.height!;
       if (
         this.x + 0.22 < deck.x ||
         this.x - 0.22 > deck.x + deck.width ||
@@ -2065,6 +2159,17 @@ export class Run {
     };
   }
   private slope() {
+    const roofRamp = !this.upper
+      ? surfaces.find(
+          (s) =>
+            !s.upper &&
+            s.endY !== undefined &&
+            this.x >= s.start &&
+            this.x < s.end,
+        )
+      : undefined;
+    if (roofRamp && Math.abs(this.y - surfaceHeight(roofRamp, this.x)) < 0.04)
+      return (roofRamp.endY! - roofRamp.y) / (roofRamp.end - roofRamp.start);
     const ramp = ramps.find(
       (o) => this.applicable(o) && this.x >= o.x && this.x < o.x + o.width,
     );

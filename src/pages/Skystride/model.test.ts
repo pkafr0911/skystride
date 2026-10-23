@@ -18,6 +18,8 @@ import {
   Swipe,
   obstacles,
   surfaces,
+  roofBuildings,
+  surfaceHeight,
   formatTime,
 } from "./model";
 function advance(g: Run, seconds: number) {
@@ -928,11 +930,11 @@ test("billboard sill vaults fit through the opening while high jumps hit the hea
     const above = new Run();
     above.start();
     above.x = o.x + 0.5;
-    above.y = o.openingTop! + 0.56;
+    above.y = ground(o.x, false) + o.openingTop! + 0.56;
     above.grounded = false;
     above.vy = -3;
     above.step();
-    assert.equal(above.y, o.openingTop! + 0.55);
+    assert.equal(above.y, ground(o.x, false) + o.openingTop! + 0.55);
     assert.ok(above.onObstacle());
     assert.equal(above.upper, false);
   }
@@ -1404,9 +1406,9 @@ test("a raised building face blocks a jump below its roof", () => {
   assert.equal(g.grounded, false);
 });
 
-test("the districts offer nine distinct base rooftop elevations", () => {
+test("the districts and connected buildings offer varied rooftop elevations", () => {
   const heights = new Set(surfaces.filter((s) => !s.upper).map((s) => s.y));
-  assert.equal(heights.size, 9);
+  assert.ok(heights.size >= 13);
   assert.ok(Math.min(...heights) < 0);
   assert.ok(Math.max(...heights) > 1);
 });
@@ -1598,4 +1600,42 @@ test("hardcore clean routes finish and records stay isolated by game mode", () =
     assert.equal(g.practice, true);
   }
   assert.notEqual(recordStorage("standard"), recordStorage("hardcore"));
+});
+
+test("connected building ramps keep feet on the physical roof through both seams", () => {
+  for (const building of roofBuildings) {
+    const g = new Run();
+    g.start();
+    g.x = building.start - 1;
+    g.y = ground(g.x, false);
+    g.speed = 12;
+    obstacles.forEach((_, i) => g.handled.add(i));
+    for (let tick = 0; g.x < building.end + 1 && tick < 2000; tick++) {
+      g.step();
+      assert.equal(g.phase, "running");
+      assert.equal(g.grounded, true, `lost footing at ${g.x}`);
+      assert.ok(
+        Math.abs(g.y - ground(g.x, false)) < 1e-5,
+        `roof mismatch at ${g.x}`,
+      );
+      const roof = surfaces.find(
+        (s) => !s.upper && g.x >= s.start && g.x < s.end,
+      )!;
+      assert.ok(Math.abs(g.y - surfaceHeight(roof, g.x)) < 1e-5);
+    }
+    assert.ok(g.x >= building.end + 1);
+    assert.equal(g.recoveries, 0);
+    assert.ok(
+      ground(building.start + building.ramp + 1, false) <
+        ground(building.start - 1, false),
+    );
+  }
+});
+
+test("sector practice starts on the changed rooftop rather than above it", () => {
+  const g = new Run();
+  g.start(1, true);
+  assert.equal(g.y, ground(1000, false));
+  g.step();
+  assert.equal(g.grounded, true);
 });
