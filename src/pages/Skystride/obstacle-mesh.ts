@@ -301,7 +301,7 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
       box(x, bottom / 2, -1.4, 0.12, bottom, 0.12, kit.trim);
     box(w / 2, bottom - 0.025, 1.34, w, 0.04, 0.06, kit.amber);
   } else if (o.feature === "greenhouse" && o.part === "planter") {
-    box(w / 2, h / 2, 0, w, h, 2.4, kit.face);
+    box(w / 2, (h - 0.08) / 2, 0, w, h - 0.08, 2.4, kit.face);
     box(w / 2, h - 0.04, 0, w + 0.08, 0.08, 2.5, kit.trim);
     box(w / 2, h + 0.02, 1.26, w, 0.04, 0.06, kit.amber);
     for (const x of [0.2, w / 2, w - 0.2]) {
@@ -349,7 +349,8 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
       slash.rotation.z = -0.55;
     }
   } else {
-    box(w / 2, h / 2, 0, w, h, 2.4, kit.face);
+    const bodyHeight = o.feature === "vent-bank" ? h - 0.07 : h;
+    box(w / 2, bodyHeight / 2, 0, w, bodyHeight, 2.4, kit.face);
     box(w / 2, h + 0.02, 1.22, w, 0.04, 0.055, kit.amber);
     box(0.025, h + 0.02, 0, 0.05, 0.04, 2.45, kit.amber);
     for (let y = 0.14; y < h - 0.1; y += 0.17)

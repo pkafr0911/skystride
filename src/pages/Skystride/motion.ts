@@ -821,15 +821,12 @@ function wallClimbPose(f: Frame): Pose {
     ],
     f.progress,
   );
-  // Lift the leading shoe above the lip before carrying it onto the roof.
-  p.feet[0][1] += 0.4 * Math.sin(Math.PI * smooth(0.82, 0.92, f.progress));
   if (f.contact) {
+    const u = f.progress,
+      face = f.contact.x - f.x,
+      lip = f.contact.y - f.y;
     for (let side = 0; side < 2; side++) {
-      const anchor: Point = [
-        f.contact.x - f.x,
-        f.contact.y - f.y + 0.025,
-        side ? 0.23 : -0.23,
-      ];
+      const anchor: Point = [face, lip + 0.025, side ? 0.23 : -0.23];
       const reach = Math.hypot(
         anchor[0] - p.chest[0],
         anchor[1] - p.chest[1] + 0.025,
@@ -837,21 +834,68 @@ function wallClimbPose(f: Frame): Pose {
       p.hands[side] = pointMix(
         p.hands[side],
         anchor,
-        smooth(0.43, 0.52, f.progress) *
-          (1 - smooth(0.92, 1, f.progress)) *
+        smooth(0.43, 0.52, u) *
+          (1 - smooth(0.92, 1, u)) *
           (1 - smooth(0.66, 0.75, reach)),
       );
     }
-    // The toe is pinned to the wall during the propulsive foot plant.
-    const pin =
-      smooth(0.25, 0.35, f.progress) * (1 - smooth(0.38, 0.48, f.progress));
-    p.feet[0] = pointMix(
-      p.feet[0],
-      [f.contact.x - f.x - 0.09, 1.27 - f.y, -0.14],
-      pin,
-    );
+    // Contact-space ankle tracks: plant, replant high, extend, then lift
+    // clear of the lip before moving forward. The other leg follows later.
+    // Holding a world-space target prevents the feet riding up with the root.
+    const tracks = [
+      [
+        [0.35, -0.09, -2.03, Math.PI / 2],
+        [0.39, -0.09, -2.03, Math.PI / 2],
+        [0.52, -0.18, -1.3, 1.2],
+        [0.66, -0.18, -1.3, 1.2],
+        [0.79, -0.28, -0.53, 0.75],
+        [0.85, -0.3, 0.3, 0.15],
+        [0.9, 0.28, 0.3, 0],
+        [0.93, 0.28, 0.09, 0],
+        [1, 0.28, 0.09, 0],
+      ],
+      [
+        [0.35, -0.95, -2.85, -0.4],
+        [0.52, -0.35, -1.9, 0.75],
+        [0.62, -0.24, -1.7, 1.1],
+        [0.75, -0.42, -1.05, 0.65],
+        [0.84, -0.52, -0.45, 0.35],
+        [0.92, -0.36, 0.28, -0.15],
+        [0.97, 0.46, 0.3, 0],
+        [1, 0.75, 0.09, 0],
+      ],
+    ];
+    for (let side = 0; side < 2; side++) {
+      const keys = tracks[side];
+      let target = keys[keys.length - 1];
+      for (let i = 1; i < keys.length; i++) {
+        if (u <= keys[i][0]) {
+          const t = smooth(keys[i - 1][0], keys[i][0], u);
+          target = keys[i].map((v, j) => mix(keys[i - 1][j], v, t));
+          break;
+        }
+      }
+      const weight = smooth(0.2, 0.35, u);
+      p.feet[side] = pointMix(
+        p.feet[side],
+        [face + target[1], lip + target[2], side ? 0.14 : -0.14],
+        weight,
+      );
+      p.footAngles[side] = mix(p.footAngles[side], target[3], weight);
+      // A consistent forward/up pole keeps the knee on the anatomical side
+      // of the hip–ankle axis, including the deeply flexed top-out pose.
+      p.knees[side] = pointMix(
+        p.knees[side],
+        [
+          p.hip[0] - (p.feet[side][1] - p.hip[1] + 0.025),
+          p.hip[1] - 0.025 + (p.feet[side][0] - p.hip[0]),
+          side ? 0.24 : -0.24,
+        ],
+        weight,
+      );
+    }
   }
-  return p;
+  return blend(p, runPose(f.x, f.speed), smooth(0.97, 1, f.progress));
 }
 
 function divePose(f: Frame): Pose {

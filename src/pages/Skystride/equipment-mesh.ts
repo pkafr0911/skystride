@@ -39,8 +39,11 @@ export function equipmentObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
     g.add(mesh);
     return mesh;
   };
+  // Bodies end at the underside of the lid, rather than overlapping its skin.
+  const lidThickness = 0.07;
+  const bodyTop = h - lidThickness;
   const cap = (depth = 2.4) => {
-    box(w / 2, h - 0.034, 0, w, 0.07, depth, kit.trim);
+    box(w / 2, h - lidThickness / 2, 0, w, lidThickness, depth, kit.trim);
     box(w / 2, h - 0.018, depth / 2 + 0.01, w, 0.035, 0.025, kit.amber);
   };
   const fasteners = (front: number, bottom: number, top: number) => {
@@ -49,7 +52,7 @@ export function equipmentObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
   };
 
   if (o.design === "ac-condenser") {
-    box(w / 2, (h + 0.16) / 2, 0, w, h - 0.16, 2.35);
+    box(w / 2, (bodyTop + 0.16) / 2, 0, w, bodyTop - 0.16, 2.35);
     for (const x of [w * 0.18, w * 0.82])
       box(x, 0.08, 0, 0.18, 0.16, 2.2, kit.trim);
     cap();
@@ -73,7 +76,7 @@ export function equipmentObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
         const offset = (i * r) / 3;
         const span = 2 * Math.sqrt(r * r * 0.82 - offset * offset);
         box(x + offset, h * 0.53, 1.27, 0.015, span, 0.015, kit.trim);
-        box(x, h * 0.53 + offset, 1.27, span, 0.015, 0.015, kit.trim);
+        box(x, h * 0.53 + offset, 1.285, span, 0.015, 0.015, kit.trim);
       }
       disc(x, h * 0.53, 1.29, r * 0.14, 0.025);
     }
@@ -90,14 +93,14 @@ export function equipmentObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
       disc(w / 2, radius + 0.035, z, radius * 0.78, 0.04);
     for (const x of [w * 0.2, w * 0.8]) {
       box(x, 0.08, 0, 0.24, 0.16, 2.25, kit.dark);
-      box(x, h / 2, -0.9, 0.06, h, 0.06, kit.trim);
+      box(x, bodyTop / 2, -0.9, 0.06, bodyTop, 0.06, kit.trim);
     }
     cap(2.2);
     for (let x = 0.1; x < w; x += 0.18)
       box(x, h + 0.003, 0, 0.025, 0.01, 2.05, kit.dark);
   } else if (o.design === "utility-cabinet") {
     box(w / 2, 0.08, 0, w, 0.16, 2.4, kit.trim);
-    box(w / 2, h / 2 + 0.04, 0, w - 0.08, h - 0.16, 2.25);
+    box(w / 2, (bodyTop + 0.16) / 2, 0, w - 0.08, bodyTop - 0.16, 2.25);
     cap();
     box(w / 2, h / 2, 1.14, 0.025, h - 0.25, 0.025, kit.dark);
     for (const x of [w * 0.25, w * 0.75]) {
@@ -120,7 +123,7 @@ export function equipmentObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
         box(x, radius * 2, z, 0.08, radius, 0.08, kit.trim);
       }
     const bottom = radius * 2;
-    box(w / 2, (h + bottom) / 2, 0, w, h - bottom, 2.2);
+    box(w / 2, (bodyTop + bottom) / 2, 0, w, bodyTop - bottom, 2.2);
     cap();
     for (let i = 0; i < 3; i++) {
       const y = bottom + ((h - bottom) * (i + 0.5)) / 3;
@@ -148,7 +151,7 @@ export function equipmentObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
       box(w / 2, y, -1.25, 0.7, 0.045, 0.045, kit.trim);
   } else if (o.design === "duct-elbow") {
     const bottom = 1.25;
-    box(w / 2, (h + bottom) / 2, 0, w, h - bottom, 2.4);
+    box(w / 2, (bodyTop + bottom) / 2, 0, w, bodyTop - bottom, 2.4);
     cap();
     // Risers sit behind the running lane, leaving its entire 1.25 m clearance open.
     for (const x of [0.25, w - 0.25]) {
@@ -165,7 +168,15 @@ export function equipmentObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
     const railHeight = h * 0.5;
     box(w / 2, h - railHeight / 2, 0, w, railHeight, 2.4, kit.amber);
     for (const z of [-0.92, 0.92]) {
-      box(w / 2, h / 2, z, w * 0.3, h, 0.12, kit.trim);
+      box(
+        w / 2,
+        (h - railHeight) / 2,
+        z,
+        w * 0.3,
+        h - railHeight,
+        0.12,
+        kit.trim,
+      );
       box(w / 2, 0.05, z, w, 0.1, 0.45, kit.dark);
     }
     for (const face of [-0.015, w + 0.015]) {
@@ -195,7 +206,7 @@ export function equipmentObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
     }
     fasteners(1.24, h * 0.6, h - 0.05);
   } else if (o.design === "antenna-base") {
-    box(w / 2, h / 2, 0, w, h, 2.4, kit.trim);
+    box(w / 2, bodyTop / 2, 0, w, bodyTop, 2.4, kit.trim);
     cap();
     for (let i = 0; i < 3; i++)
       box(

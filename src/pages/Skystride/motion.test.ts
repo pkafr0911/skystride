@@ -813,3 +813,117 @@ test("equipment designs keep solid tops, slide clearance and hatch void aligned 
     material.dispose();
   }
 });
+
+test("equipment top skins do not compete with overlapping body faces", () => {
+  const box = new THREE.BoxGeometry();
+  const cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
+  const material = new THREE.MeshBasicMaterial();
+  const kit = {
+    box,
+    cylinder,
+    face: material,
+    dark: material,
+    trim: material,
+    amber: material,
+    panel: material,
+  };
+  try {
+    for (const o of obstacles.filter(
+      (o) =>
+        o.kind !== "gap" &&
+        (o.design || o.feature === "vent-bank" || o.part === "planter"),
+    )) {
+      const mesh = creativeObstacle(o, kit);
+      mesh.updateMatrixWorld(true);
+      for (const fraction of [0.23, 0.5, 0.77])
+        for (const z of [-0.4, 0, 0.4, 0.92]) {
+          const ray = new THREE.Raycaster(
+            new THREE.Vector3(
+              o.x + o.width * fraction,
+              ground(o.x, o.route === "upper") + 8,
+              z,
+            ),
+            new THREE.Vector3(0, -1, 0),
+          );
+          const hits = ray.intersectObject(mesh, true);
+          if (!hits.length) continue;
+          const front = hits[0];
+          const competing = hits.find(
+            (hit) =>
+              hit.object !== front.object &&
+              Math.abs(hit.distance - front.distance) < 0.005,
+          );
+          assert.ok(
+            !competing,
+            `${o.design ?? o.feature} at ${o.x}: overlapping top faces at x=${fraction}, z=${z}`,
+          );
+        }
+    }
+  } finally {
+    box.dispose();
+    cylinder.dispose();
+    material.dispose();
+  }
+});
+
+test("climb legs keep wall support, bend forward and clear the lip before crossing", () => {
+  for (const speed of [6, 10, 14]) {
+    let support: THREE.Vector3 | undefined;
+    let samples = 0;
+    for (const f of framesFor("wall-climb", speed)) {
+      if (f.move !== "wall-climb" || !f.contact || f.progress < 0.35) continue;
+      const p = poseFor(f);
+      for (const side of [0, 1]) {
+        const hip = new THREE.Vector3(...p.hip).add(
+          new THREE.Vector3(0, -0.025, side ? 0.14 : -0.14),
+        );
+        const foot = new THREE.Vector3(...p.feet[side]);
+        const target = foot.clone();
+        const knee = solveJoint(
+          hip,
+          foot,
+          new THREE.Vector3(...p.knees[side]),
+          LEG_LENGTHS.thigh,
+          LEG_LENGTHS.shin,
+        );
+        assert.ok(
+          foot.distanceTo(target) < 0.015,
+          "IK must preserve the authored contact",
+        );
+        // The 2D cross product distinguishes a forward/up knee from a
+        // backward bend, even when the ankle rises above the pelvis.
+        const ankle = foot.clone().sub(hip),
+          bend = knee.clone().sub(hip);
+        assert.ok(
+          ankle.x * bend.y - ankle.y * bend.x > 0,
+          "knee must not flip behind the hip–ankle axis",
+        );
+        if (
+          f.progress > 0.79 &&
+          f.progress < 0.97 &&
+          foot.x + f.x > f.contact.x - 0.2
+        )
+          assert.ok(
+            foot.y + f.y >= f.contact.y + 0.075,
+            "shoe must clear the roof before crossing the wall face",
+          );
+      }
+      if (f.progress > 0.53 && f.progress < 0.65) {
+        const world = new THREE.Vector3(...p.feet[0]).add(
+          new THREE.Vector3(f.x, f.y, 0),
+        );
+        if (support)
+          assert.ok(
+            world.distanceTo(support) < 1e-8,
+            "support foot must not slide upward",
+          );
+        support = world;
+        samples++;
+      }
+    }
+    assert.ok(
+      samples > 3,
+      "exercise a sustained wall contact at each entry speed",
+    );
+  }
+});
