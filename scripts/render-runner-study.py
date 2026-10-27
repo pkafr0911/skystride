@@ -15,6 +15,8 @@ for index, panel in enumerate(panels):
     ox, oy, scale = col * card_width + 140, row * card_height + 310, 92
     obstacle = panel.get("obstacle") or {}
     floor = obstacle.get("floor", 0)
+    top = max(v[1] - floor for triangle in panel["triangles"] for v in triangle["points"])
+    scale = min(scale, 265 / max(1, top))
     draw.text((col * card_width + 12, row * card_height + 14), panel["title"], fill="#f5b766")
     if obstacle:
         face = ox + obstacle["x"] * scale

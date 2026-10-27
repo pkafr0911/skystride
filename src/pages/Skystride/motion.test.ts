@@ -286,7 +286,7 @@ test("slide passes through a distinct crouch before extending the legs", () => {
   assert.ok(glide.feet[0][0] > duck.feet[0][0]);
 });
 
-test("Kong and low-duct climb put both reachable wrists on the obstacle", () => {
+test("Kong and Kash put both reachable wrists on the obstacle", () => {
   for (const o of [
     obstacles.find((o) => o.vault === "kong")!,
     obstacles.find(canMantle)!,
@@ -315,7 +315,9 @@ test("Kong and low-duct climb put both reachable wrists on the obstacle", () => 
         );
         return (
           Math.abs(hand.y + f.y - f.contact!.y) < 0.08 &&
-          Math.abs(hand.x + f.x - f.contact!.x) < 0.1
+          (f.vault === "kash"
+            ? hand.x + f.x >= o.x && hand.x + f.x <= o.x + o.width
+            : Math.abs(hand.x + f.x - f.contact!.x) < 0.1)
         );
       });
       if (touching) contactFrames++;
@@ -323,7 +325,7 @@ test("Kong and low-duct climb put both reachable wrists on the obstacle", () => 
     }
     assert.ok(
       contactFrames >= 2,
-      `${o.vault ?? "mantle"} needs sustained hand support`,
+      `${o.vault ?? "kash"} needs sustained hand support`,
     );
   }
 });
@@ -929,73 +931,38 @@ test("climb legs keep wall support, bend forward and clear the lip before crossi
   }
 });
 
-test("mantle steps onto a planted lead foot before running across the top", () => {
+test("Kash vault carries speed through a Kong entry and feet-first exit", () => {
   for (const speed of [6, 10, 14]) {
-    let planted: THREE.Vector3 | undefined;
-    let contacts = 0,
-      running = 0;
-    for (const f of framesFor("mantle", speed)) {
-      if (f.move !== "mantle" || !f.contact) continue;
-      const p = poseFor(f);
-      if (f.progress >= 0.23 && f.progress <= 0.56) {
-        for (const side of [0, 1]) {
-          const hip = new THREE.Vector3(...p.hip).add(
-            new THREE.Vector3(0, -0.025, side ? 0.14 : -0.14),
-          );
-          const foot = new THREE.Vector3(...p.feet[side]);
-          const target = foot.clone();
-          const knee = solveJoint(
-            hip,
-            foot,
-            new THREE.Vector3(...p.knees[side]),
-            LEG_LENGTHS.thigh,
-            LEG_LENGTHS.shin,
-          );
-          assert.ok(
-            foot.distanceTo(target) < 0.015,
-            "mantle foot must remain reachable after IK",
-          );
-          const ankle = foot.clone().sub(hip),
-            bend = knee.clone().sub(hip);
-          assert.ok(
-            ankle.x * bend.y - ankle.y * bend.x > 0,
-            "mantle knee must keep its bend direction",
-          );
-          if (f.progress > 0.43 && foot.x + f.x > f.contact.x - 0.18)
-            assert.ok(
-              foot.y + f.y >= f.contact.y + 0.075,
-              "lift the shoe before carrying it across the lip",
-            );
-        }
-      }
-      if (f.progress > 0.5 && f.progress < 0.53) {
-        const foot = new THREE.Vector3(...p.feet[0]).add(
-          new THREE.Vector3(f.x, f.y, 0),
-        );
-        if (planted)
-          assert.ok(
-            foot.distanceTo(planted) < 1e-8,
-            "lead foot must not slide across the top",
-          );
-        assert.ok(Math.abs(foot.y - f.contact.y - 0.09) < 1e-8);
-        planted = foot;
-        contacts++;
-      }
-      if (f.progress > 0.6 && f.progress < 0.69) {
-        assert.deepEqual(
-          p.feet,
-          runPose(f.x, f.speed).feet,
-          "resume alternating steps instead of carrying a frozen crouch across the duct",
-        );
-        running++;
-      }
+    const frames = framesFor("kash", speed);
+    const active = frames.filter(
+      (f) => f.move === "vault" && f.vault === "kash",
+    );
+    assert.ok(active.length > 10);
+    assert.ok(active.at(-1)!.speed >= active[0].speed);
+    for (const f of active.filter(
+      (f) => f.progress >= 0.6 && f.progress <= 0.67,
+    )) {
+      const pose = poseFor(f);
+      assert.ok(
+        Math.hypot(...pose.chest.map((v, i) => v - pose.hip[i])) > 0.48,
+        "supported torso must not collapse into the hips",
+      );
+      assert.ok(
+        pose.feet.every((foot) => foot[0] > pose.hip[0] + 0.5),
+        "both feet clear the torso during the second press",
+      );
     }
-    assert.ok(contacts >= 2 && running > 3);
+    const entry = poseFor(active.find((f) => f.progress > 0.3)!);
+    const exit = poseFor(active.find((f) => f.progress > 0.65)!);
+    assert.ok(exit.feet.every((foot) => foot[0] > exit.hip[0]));
+    assert.ok(entry.chest[0] > entry.hip[0]);
+    assert.ok(frames.some((f) => f.move === "land"));
   }
 });
 
 test("all vaults connect simulation frames, action changes and replay samples", () => {
   const vaults = [
+    "kash",
     "speed",
     "hurdle",
     "one-hand",

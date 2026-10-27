@@ -1,10 +1,18 @@
-import { Frame, obstacles, Run, canMantle, ground } from "./model";
+import {
+  Frame,
+  obstacles,
+  Run,
+  canMantle,
+  ground,
+  lowerRoofDrops,
+} from "./model";
 import { techniques, isSwing, comboNames, Technique } from "./combos";
 
 export const options = [
   "run",
   "jump",
   "long-jump",
+  "front-flip",
   "dash",
   "hurdle",
   "speed",
@@ -13,7 +21,7 @@ export const options = [
   "lazy",
   "kong",
   "slide",
-  "mantle",
+  "kash",
   "wall",
   "wall-climb",
   "wall-run",
@@ -26,14 +34,20 @@ export const options = [
 ] as const;
 export type Preview = (typeof options)[number];
 export function minimumPreviewSpeed(move: Preview) {
-  return move === "dive"
-    ? 10.5
-    : isSwing(move as Technique) || move === "catch"
-      ? 12
-      : 6;
+  return move === "front-flip"
+    ? 8
+    : move === "dive"
+      ? 10.5
+      : isSwing(move as Technique) || move === "catch"
+        ? 12
+        : 6;
 }
 
 export function previewObstacles(move: Preview) {
+  if (move === "front-flip")
+    return obstacles.filter(
+      (o) => o.route === "lower" && o.x === lowerRoofDrops[0].x,
+    );
   if (move.startsWith("combo:"))
     return obstacles.filter(
       (o) => o.combo === move.slice(6) && o.route === "lower",
@@ -45,7 +59,7 @@ export function previewObstacles(move: Preview) {
         ? item.feature === "wall-billboard"
         : move === "dive"
           ? item.feature === "window"
-          : move === "mantle"
+          : move === "kash"
             ? canMantle(item)
             : move === "safety" || move === "hurdle" || move === "one-hand"
               ? item.kind === "vault"
@@ -131,6 +145,11 @@ export function framesFor(
     g.x = 70;
     g.grounded = false;
   }
+  if (move === "front-flip") {
+    g.x = lowerRoofDrops[0].x - 0.45;
+    g.y = ground(g.x, false);
+    g.upper = false;
+  }
   g.previous = g.frame();
   const frames: Frame[] = [g.frame()];
   let signatureSeen = false,
@@ -140,11 +159,17 @@ export function framesFor(
     tick < (move === "run" ? 100 : 600) && g.phase === "running";
     tick++
   ) {
+    if (move === "front-flip" && (tick === 0 || tick === 12)) g.action("up");
+    if (move === "front-flip" && g.vy < 0 && g.y < ground(g.x, false) + 1.8)
+      g.action("down");
     if (tick === 12 && (move === "jump" || move === "long-jump"))
       g.speed = speed;
     if (
       tick === (move === "safety" ? 0 : 12) &&
-      (o || move === "jump" || move === "wall" || move === "wall-climb")
+      ((o && move !== "front-flip") ||
+        move === "jump" ||
+        move === "wall" ||
+        move === "wall-climb")
     )
       g.action(move === "dive" ? "forward" : "up");
     if (tick === 12 && move === "long-jump") g.action("forward");

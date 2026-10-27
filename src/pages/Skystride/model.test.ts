@@ -19,6 +19,7 @@ import {
   obstacles,
   surfaces,
   roofBuildings,
+  lowerRoofDrops,
   surfaceHeight,
   formatTime,
 } from "./model";
@@ -43,6 +44,12 @@ function complete(
       frame.launchY! - ground(g.x, g.upper) > 0.5 &&
       g.vy < -10 &&
       g.y - ground(g.x, g.upper) < 1.1 &&
+      surfaces.some(
+        (s) =>
+          g.x >= s.start &&
+          g.x < s.end &&
+          Math.abs(surfaceHeight(s, g.x) - ground(g.x, g.upper)) < 0.1,
+      ) &&
       !rolled.has(frame.launchX!)
     ) {
       g.action("down");
@@ -72,7 +79,10 @@ function complete(
         }
       } else if (
         (o.kind !== "branch" || upper) &&
-        g.grounded &&
+        (g.grounded ||
+          (o.kind === "signature" &&
+            g.vy < 0 &&
+            g.y - ground(g.x, g.upper) < (o.height ?? 1.1) + 0.6)) &&
         d <=
           (o.kind === "gap" ? 1.1 : early && o.kind === "vault" ? 6 : approach)
       ) {
@@ -151,7 +161,7 @@ test("both routes complete physically with clean contacts and three splits", () 
     assert.ok(g.splits[0] < g.splits[1] && g.splits[1] < g.splits[2]);
     assert.equal(g.recoveries, 0);
     assert.ok(
-      g.inputs.length >= 280,
+      g.inputs.length >= 260,
       `Full course input count: ${g.inputs.length}, route: ${upper}`,
     );
     const intervals = g.inputs
@@ -559,7 +569,7 @@ test("jump crests lose vertical speed then accelerate through descent", () => {
   while (g.vy > -10) g.step();
   assert.ok(Math.hypot(g.speed, g.vy) > crest + 2);
 });
-test("vault slows over support and accelerates into release without changing collision clearance", () => {
+test("successful vault keeps forward speed across support and release", () => {
   const g = new Run();
   g.start();
   g.x = 25.1;
@@ -571,8 +581,7 @@ test("vault slows over support and accelerates into release without changing col
     g.step();
     rates.push((g.x - x) / STEP);
   }
-  assert.ok(rates[Math.floor(rates.length / 2)] < rates[2]);
-  assert.ok(rates[Math.floor(rates.length / 2)] < rates[rates.length - 3]);
+  assert.ok(rates.every((rate) => rate >= 7.5 - 1e-8));
 });
 
 test("slide loses momentum and rebuilding speed requires running", () => {
@@ -595,7 +604,7 @@ test("starting a slide after a stumble never creates momentum", () => {
   g.step();
   assert.ok(g.speed <= 6);
 });
-test("up climbs a low uncovered duct more slowly than sliding under it", () => {
+test("up uses a fast Kash vault over a low uncovered duct", () => {
   const o = obstacles.find(canMantle)!;
   const times: number[] = [];
   for (const action of ["up", "down"] as const) {
@@ -606,12 +615,12 @@ test("up climbs a low uncovered duct more slowly than sliding under it", () => {
     g.upper = o.route === "upper";
     g.action(action);
     g.step();
-    assert.equal(g.move, action === "up" ? "mantle" : "slide");
+    assert.equal(g.move, action === "up" ? "vault" : "slide");
     while (g.x < o.x + o.width + 1.5 && g.time < 3) g.step();
     times.push(g.time);
     assert.equal(g.recoveries, 0);
   }
-  assert.ok(times[0] > times[1] + 0.5);
+  assert.ok(times[0] < times[1] + 0.5);
 });
 test("climb-over alternative is forbidden beneath another roof", () => {
   for (const o of obstacles.filter(
@@ -727,36 +736,26 @@ test("descending onto barriers and ducts gives real support and immediate follow
   }
 });
 
-test("mantle tops allow a supported jump or a feet-first edge exit", () => {
+test("Kash clears a high obstacle without a stationary top-out", () => {
   const o = obstacles.find(canMantle)!;
-  for (const action of ["up", "down"] as const) {
+  for (const speed of [6, 10, 14]) {
     const g = new Run();
     g.start();
     g.x = o.x - 1.7;
-    g.y = ground(g.x, o.route === "upper");
-    g.speed = 8;
+    g.speed = speed;
     g.action("up");
     g.step();
-    for (let i = 0; !g.onObstacle() && g.traversal && i < 300; i++) g.step();
-    assert.ok(g.onObstacle(), "mantle must expose a supported top-out phase");
-    const oldY = g.y;
-    g.action(action);
-    g.step();
-    assert.equal(g.traversal, null);
-    if (action === "up") {
-      assert.equal(g.move, "jump");
-      assert.ok(g.vy > 0 && g.y >= oldY);
-    } else {
-      assert.equal(g.move, "slide");
-      for (let i = 0; g.grounded && i < 100; i++) g.step();
-      assert.equal(g.grounded, false);
+    assert.equal(g.vault, "kash");
+    assert.ok(g.traversal!.duration < 0.8);
+    let x = g.x;
+    while (g.traversal) {
       g.step();
-      assert.ok(g.vy < 0, "edge exits fall under gravity");
-      for (let i = 0; !g.grounded && g.phase === "running" && i < 200; i++)
-        g.step();
-      assert.equal(g.grounded, true);
-      assert.equal(g.y, ground(g.x, false));
+      assert.ok(g.x > x, "keep travelling through both hand supports");
+      x = g.x;
     }
+    assert.ok(g.speed >= speed);
+    assert.equal(g.grounded, true);
+    assert.equal(g.recoveries, 0);
   }
 });
 
@@ -1012,11 +1011,14 @@ test("fast window entry dives and transitions into a roll", () => {
 test("balconies climb in sequence without changing route ownership", () => {
   const g = new Run();
   g.start();
-  g.x = 174.2;
+  const balconies = obstacles
+    .filter((o) => o.feature === "balcony")
+    .slice(0, 3);
+  g.x = balconies[0].x - 1.8;
   g.y = 3.3;
   g.upper = true;
-  for (const x of [176, 179.5, 183]) {
-    if (x > 176) {
+  for (const { x } of balconies) {
+    if (x > balconies[0].x) {
       while (g.x < x - 1.8 && g.phase === "running") g.step();
     }
     g.action("up");
@@ -1778,4 +1780,157 @@ test("missing a building-gap wall run falls instead of walking on an invisible r
   assert.ok(g.y < ground(o.x, false));
   advance(g, 1.5);
   assert.equal(g.phase, "failed");
+});
+
+test("high-drop front flips require a timed roll in both modes", () => {
+  for (const mode of ["standard", "hardcore"] as const) {
+    for (const roll of [false, true]) {
+      const g = new Run();
+      g.start(0, false, mode);
+      g.x = 196;
+      g.y = 9;
+      g.speed = 12;
+      g.grounded = false;
+      g.move = "fall";
+      g.action("up");
+      g.step();
+      assert.equal(g.move, "front-flip");
+      const vy = g.vy;
+      g.action("up");
+      g.step();
+      assert.ok(g.vy < vy, "flip cannot add lift or repeat in flight");
+      for (let i = 0; !g.grounded && i < 200; i++) {
+        if (roll && g.y < 1.8) g.action("down");
+        g.step();
+      }
+      assert.equal(g.move, roll ? "roll" : "heavy-land");
+      assert.equal(g.grounded, true);
+      assert.ok(roll ? g.speed > 10 : g.speed < 5);
+      g.start();
+      assert.equal(g.move, "run");
+    }
+  }
+});
+
+test("ordinary low jumps cannot start a front flip", () => {
+  const g = new Run();
+  g.start();
+  g.x = 200;
+  g.y = 1;
+  g.grounded = false;
+  g.move = "fall";
+  g.action("up");
+  g.step();
+  assert.notEqual(g.move, "front-flip");
+});
+
+test("every successful vault preserves boosted speed through landing", () => {
+  for (const mode of ["standard", "hardcore"] as const) {
+    for (const variant of [
+      "safety",
+      "speed",
+      "hurdle",
+      "one-hand",
+      "lazy",
+      "kong",
+      "dash",
+      "kash",
+    ] as const) {
+      for (const speed of [6, 14, 20]) {
+        const o =
+          variant === "kash"
+            ? obstacles.find(canMantle)!
+            : obstacles.find(
+                (o) =>
+                  !o.feature &&
+                  o.vault ===
+                    (variant === "safety" ||
+                    variant === "hurdle" ||
+                    variant === "one-hand"
+                      ? "speed"
+                      : variant),
+              )!;
+        const g = new Run();
+        g.start(0, false, mode);
+        g.x = o.x - 1.7;
+        g.y = ground(o.x, o.route === "upper");
+        g.upper = o.route === "upper";
+        g.speed = speed;
+        g.action("up");
+        g.step();
+        assert.equal(g.move, "vault");
+        if (
+          variant === "safety" ||
+          variant === "hurdle" ||
+          variant === "one-hand"
+        ) {
+          g.traversal!.vault = variant;
+          g.vault = variant;
+        }
+        for (
+          let i = 0;
+          i < 200 && (g.traversal || g.frame().move === "land");
+          i++
+        ) {
+          const next = g.next();
+          if (!g.traversal && next && next.x - g.x < 0.5) break;
+          assert.ok(g.speed >= speed, `${variant} must preserve ${speed} m/s`);
+          g.step();
+        }
+        assert.equal(g.recoveries, 0);
+      }
+    }
+  }
+});
+
+test("lower-route building drops allow a front flip and roll onto a lower roof", () => {
+  for (const drop of lowerRoofDrops) {
+    assert.equal(ground(drop.x + drop.width + 2, false), -drop.depth);
+    assert.ok(
+      !surfaces.some(
+        (s) => !s.upper && s.start < drop.x + drop.width && s.end > drop.x,
+      ),
+    );
+    for (const speed of [8, 10, 14]) {
+      const g = new Run();
+      g.start();
+      g.x = drop.x - 0.45;
+      g.y = ground(g.x, false);
+      g.speed = speed;
+      g.action("up");
+      g.step();
+      advance(g, 0.09);
+      g.action("up");
+      g.step();
+      assert.equal(g.move, "front-flip");
+      for (let i = 0; !g.grounded && i < 300; i++) {
+        if (g.vy < 0 && g.y < ground(g.x, false) + 1.8) g.action("down");
+        g.step();
+      }
+      assert.equal(g.move, "roll");
+      assert.equal(g.upper, false);
+      assert.equal(g.y, -drop.depth);
+      assert.equal(g.recoveries, 0);
+    }
+  }
+});
+
+test("deep transfers end both building levels before an unobstructed lower rooftop", () => {
+  for (const drop of lowerRoofDrops) {
+    assert.ok(surfaces.some((s) => s.upper && s.end === drop.x));
+    assert.ok(
+      !surfaces.some((s) => s.start < drop.x + drop.width && s.end > drop.x),
+    );
+    assert.ok(
+      !surfaces.some(
+        (s) => s.upper && s.start < drop.landingEnd && s.end > drop.x,
+      ),
+    );
+    const landing = surfaces.find(
+      (s) => !s.upper && s.start === drop.x + drop.width,
+    )!;
+    assert.equal(landing.y, -drop.depth);
+    assert.equal(landing.endY, undefined);
+    assert.ok(landing.end >= drop.landingEnd);
+  }
 });

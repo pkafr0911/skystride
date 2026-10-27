@@ -7,7 +7,7 @@ import {
 } from "./characters";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { Frame, STEP, ground } from "./model";
+import { Frame, STEP, ground, lowerRoofDrops } from "./model";
 import {
   options,
   Preview,
@@ -122,15 +122,17 @@ export default function MovementLab() {
                           ? "special"
                           : move === "wall-run" || move === "dive"
                             ? move
-                            : move === "wall"
-                              ? "wall"
-                              : move === "wall-climb"
-                                ? "wall-climb"
-                                : move === "slide"
-                                  ? "slide"
-                                  : move === "mantle"
-                                    ? "mantle"
-                                    : "vault",
+                            : move === "front-flip"
+                              ? "front-flip"
+                              : move === "wall"
+                                ? "wall"
+                                : move === "wall-climb"
+                                  ? "wall-climb"
+                                  : move === "slide"
+                                    ? "slide"
+                                    : move === "kash"
+                                      ? "vault"
+                                      : "vault",
                         p,
                       ),
                     );
@@ -153,7 +155,12 @@ export default function MovementLab() {
       o = previewItems[0],
       base = o ? ground(o.x, o.route === "upper") : 0;
     const start = samples[0].x;
-    if (move === "catch") {
+    if (move === "front-flip") {
+      const drop = lowerRoofDrops[0];
+      box(drop.x - 10, -2, 20, 4);
+      box(drop.x + drop.width + 18, -drop.depth - 2, 36, 4);
+      box(drop.x + drop.width + 18, -drop.depth, 36, 0.035, amber);
+    } else if (move === "catch") {
       box(82, ground(74, false) - 2, 17.6, 4);
       box(82, ground(74, false), 17.6, 0.035, amber);
     } else if (move === "roll" || move === "landing") {
@@ -200,7 +207,7 @@ export default function MovementLab() {
             panel: roof,
           }),
         );
-      } else if (o) {
+      } else if (o.kind !== "gap") {
         const bottom = o.kind === "slide" ? 1.25 : 0;
         box(
           o.x + o.width / 2,
@@ -299,7 +306,11 @@ export default function MovementLab() {
       });
       camera.position.set(
         showSheet ? 0 : f.x + 0.8,
-        showSheet ? 1.9 : base + 1.9,
+        showSheet
+          ? 1.9
+          : move === "front-flip"
+            ? f.y + 1.2
+            : Math.max(base + 1.9, f.y + 1.2),
         18,
       );
       camera.lookAt(camera.position.x, camera.position.y, 0);

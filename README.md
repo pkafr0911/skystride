@@ -46,7 +46,13 @@ Sunset Relay includes split ventilation banks, low/high pipe crossings, solar la
 
 See the [obstacle geometry preview](docs/creative-obstacles.png) and [movement/course notes](docs/game-design.md). Course v8 keeps earlier personal bests separate.
 
+Successful vaults preserve incoming speed through contact and landing, including boosted speed. Missed timing and collision recoveries still cost momentum.
+
+The lower route now includes deep building transfers at 132 m, 1,612 m, 2,092 m, and 2,572 m: cross a 5 m gap to a rooftop 8 m below, roll through the clear landing area, then climb back along the connecting ramp. Both levels of the first building end at the same edge, leaving open air above the lower landing roof. Amber stripes mark takeoff and landing.
+
 ## Controls
+
+- High rooftop drops: press Up again while airborne to front flip when a lower roof is at least 3 m below and there is enough flight time. Press Down just before touchdown to roll; missing the roll causes a hard landing and substantial speed loss in both modes.
 
 - Up / W / Space: jump from a roof or obstacle top; contextual vault, low-duct climb, wall step or high-wall climb near a suitable obstacle. Climb input remains available up to the visible wall face.
 - Down / S: slide; on an obstacle top, slide off its edge with a prepared landing roll. In the air, press before landing from a drop to roll.

@@ -10,6 +10,7 @@ import {
   ground,
   obstacles,
   surfaces,
+  lowerRoofDrops,
   RecordRun,
   Run,
   STEP,
@@ -234,6 +235,31 @@ export default function Scene({
       [skyStart, skyEnd],
       [craneBank, craneBank + 5],
     ];
+    // Bright takeoff bars and a clear landing strip mark the deep lower-route transfers.
+    for (const drop of lowerRoofDrops) {
+      for (const offset of [0.5, 1.1, 1.7])
+        box(
+          scene,
+          drop.x - offset,
+          ground(drop.x - offset, false) + 0.035,
+          0,
+          0.16,
+          0.06,
+          3.8,
+          edge,
+        );
+      for (let offset = 2; offset <= 14; offset += 3)
+        box(
+          scene,
+          drop.x + drop.width + offset,
+          -drop.depth + 0.035,
+          0,
+          0.3,
+          0.06,
+          3.8,
+          edge,
+        );
+    }
     const renderSurfaces = surfaces.flatMap((slab) => {
       if (!slab.upper) return [slab];
       const boundaries = [
@@ -726,7 +752,7 @@ export default function Scene({
         1,
       );
       const targetHeight = THREE.MathUtils.lerp(
-        3.6 + Math.max(0, visual.y) * 0.32 + anticipate,
+        3.6 + Math.min(0, visual.y) + Math.max(0, visual.y) * 0.32 + anticipate,
         visual.y + 1.1,
         closeFraming,
       );

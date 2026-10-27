@@ -338,6 +338,53 @@ function landingPose(f: Frame): Pose {
   return blend(swapLead(braced, f.lead || 0), p, smooth(0.08, recovery, age));
 }
 function vaultPose(f: Frame, link?: "in" | "out"): Pose {
+  if (f.vault === "kash") {
+    // Kong entry folds the legs beneath the hips, then a dash press sends
+    // both feet forward. Blend the support phases without restarting a pose.
+    const p = f.progress;
+    const kong = vaultPose({
+      ...f,
+      vault: "kong",
+      progress: Math.min(0.62, p * 1.1),
+    });
+    const dash = vaultPose({
+      ...f,
+      vault: "dash",
+      contact: f.contact ? { ...f.contact, x: f.contact.x + 0.45 } : null,
+      progress: Math.max(0, (p - 0.22) / 0.78),
+    });
+    const result = blend(kong, dash, smooth(0.3, 0.62, p));
+    if (f.contact) {
+      const support = smooth(0.48, 0.59, p) * (1 - smooth(0.68, 0.78, p));
+      const x = f.contact.x + 0.45 - f.x;
+      const y = f.contact.y - f.y;
+      result.hip = pointMix(result.hip, [x + 0.3, y + 0.22, 0], support);
+      result.chest = pointMix(result.chest, [x + 0.02, y + 0.65, 0], support);
+      result.head = pointMix(result.head, [x, y + 0.96, 0], support);
+      for (const side of [0, 1]) {
+        // Move the legs with the supported pelvis, keeping the shoes ahead
+        // of the torso instead of folding them into a separately pinned body.
+        const z = side ? 0.18 : -0.18;
+        result.feet[side] = pointMix(
+          result.feet[side],
+          [x + 0.98, y + 0.32, z],
+          support,
+        );
+        result.knees[side] = pointMix(
+          result.knees[side],
+          [x + 0.65, y + 0.65, z],
+          support,
+        );
+        result.hands[side] = pointMix(
+          result.hands[side],
+          [x, y + 0.025, side ? 0.23 : -0.23],
+          support,
+        );
+      }
+    }
+    return result;
+  }
+
   const p = f.progress,
     run = runPose(f.x, f.speed),
     plant = basePose(),
@@ -810,6 +857,38 @@ function mantlePose(f: Frame): Pose {
   }
   return result;
 }
+function frontFlipPose(f: Frame): Pose {
+  const u = f.progress;
+  const tuck = basePose();
+  tuck.hip = [0, 0.85, 0];
+  tuck.chest = [0.24, 1.16, 0];
+  tuck.head = [0.4, 1.35, 0];
+  for (const side of [0, 1]) {
+    const z = side ? 0.18 : -0.18;
+    tuck.feet[side] = [-0.18, 0.57, z];
+    tuck.knees[side] = [0.43, 0.65, z];
+    tuck.hands[side] = [0.43, 0.69, z];
+    tuck.elbows[side] = [0.55, 1, z];
+  }
+  const pose = blend(
+    jumpPose(f),
+    tuck,
+    smooth(0, 0.18, u) * (1 - smooth(0.73, 1, u)),
+  );
+  const angle = -2 * Math.PI * smooth(0, 1, u);
+  const rotate = (v: Point): Point => [
+    v[0] * Math.cos(angle) - (v[1] - 0.85) * Math.sin(angle),
+    0.85 + v[0] * Math.sin(angle) + (v[1] - 0.85) * Math.cos(angle),
+    v[2],
+  ];
+  for (const key of ["hip", "chest", "head"] as const)
+    pose[key] = rotate(pose[key]);
+  for (const key of ["feet", "hands", "knees", "elbows"] as const)
+    pose[key] = pose[key].map(rotate);
+  pose.footAngles = pose.footAngles.map((a) => a + angle);
+  return pose;
+}
+
 function rollPose(f: Frame): Pose {
   const p = basePose(),
     u = f.progress;
@@ -1275,6 +1354,8 @@ function flatPose(f: Frame): Pose {
         : runPose(f.x, f.speed);
     case "land":
       return landingPose(f);
+    case "front-flip":
+      return frontFlipPose(f);
     case "jump":
       return jumpPose(f);
     case "fall":
@@ -1467,7 +1548,9 @@ export function poseFor(f: Frame): Pose {
   // Derive the joint plane after blending, not by interpolating pole hints.
   // A pole crossing its limb axis flips the solved knee/elbow in one frame.
   // Tumbles and grounded recovery poses carry their own rotated joint planes.
-  if (["roll", "crash", "knockback", "heavy-land"].includes(f.move))
+  if (
+    ["front-flip", "roll", "crash", "knockback", "heavy-land"].includes(f.move)
+  )
     return connected;
   const yaw =
     f.move === "special" &&
@@ -1480,6 +1563,12 @@ export function poseFor(f: Frame): Pose {
 }
 
 export function motionPhase(f: Frame): string {
+  if (f.move === "front-flip")
+    return f.progress < 0.2
+      ? "TUCK"
+      : f.progress < 0.73
+        ? "FRONT ROTATION"
+        : "OPEN · DOWN TO ROLL";
   if (f.move === "crash" || f.move === "knockback" || f.move === "heavy-land")
     return f.progress < 0.18
       ? "IMPACT"

@@ -104,21 +104,35 @@ if (process.argv.includes("--wall")) {
     });
   }
 }
-if (process.argv.includes("--mantle")) {
+if (process.argv.includes("--front-flip")) {
+  samples.length = 0;
+  const { framesFor } = require("../src/pages/Skystride/lab-model");
+  const frames = framesFor("front-flip", 12);
+  for (const progress of [0, 0.2, 0.4, 0.6, 0.8, 0.98]) {
+    const frame = frames.find(
+      (f) => f.move === "front-flip" && f.progress >= progress,
+    );
+    samples.push({
+      title: `FRONT FLIP / ${Math.round(progress * 100)}%`,
+      frame: { ...frame, y: 0 },
+    });
+  }
+}
+if (process.argv.includes("--kash")) {
   samples.length = 0;
   const {
     framesFor,
     previewObstacles,
   } = require("../src/pages/Skystride/lab-model");
-  const frames = framesFor("mantle", 12).filter((f) => f.move === "mantle");
-  const obstacle = previewObstacles("mantle")[0];
+  const frames = framesFor("kash", 12).filter((f) => f.move === "vault");
+  const obstacle = previewObstacles("kash")[0];
   for (const [title, progress] of [
-    ["GRIP", 0.23],
+    ["KONG ENTRY", 0.23],
     ["PUSH", 0.34],
     ["LEAD CLEARANCE", 0.45],
-    ["STEP ON", 0.51],
-    ["TRAILING STEP", 0.55],
-    ["RUN ACROSS", 0.64],
+    ["TUCK THROUGH", 0.51],
+    ["DASH PRESS", 0.65],
+    ["EXIT", 0.85],
   ]) {
     const frame = frames.find((f) => f.progress >= progress);
     samples.push({
