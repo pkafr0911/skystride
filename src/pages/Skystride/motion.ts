@@ -1231,7 +1231,7 @@ function specialPose(f: Frame): Pose {
       smooth(0.78, 1, u),
     );
   }
-  if (t === "duck" || t === "canopy") {
+  if (t === "duck") {
     const low = lowPose();
     if (t === "duck") {
       low.feet[0][0] += 0.12 * Math.sin(u * 4 * Math.PI);
@@ -1276,12 +1276,11 @@ function specialPose(f: Frame): Pose {
       u,
     );
   }
-  if (t === "palm-drop" || t === "drop-through") {
+  if (t === "drop-through") {
     p.hands = [
       [contact[0], contact[1], -0.22],
       [contact[0] + 0.15, contact[1], 0.22],
     ];
-    if (t === "palm-drop") p.hands[1] = [-0.4, 1.2, 0.22];
     p.feet = [
       [0.4, 0.12, -0.14],
       [0.45, 0.12, 0.14],

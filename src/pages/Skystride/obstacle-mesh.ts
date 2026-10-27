@@ -116,19 +116,6 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
       if (t === "squeeze")
         for (const z of [-0.5, 0.5])
           box(w / 2, 0.8, z, 0.14, 1.6, 0.1, kit.trim);
-    } else if (t === "canopy") {
-      const slope = box(
-        w / 2,
-        h / 2,
-        0,
-        Math.hypot(w, h),
-        0.14,
-        2.4,
-        kit.panel,
-      );
-      slope.rotation.z = -Math.atan2(h, w);
-      box(0.1, h / 2, -1.1, 0.12, h, 0.12, kit.trim);
-      edge(w - 0.1, 0.08, 0.2);
     } else if (t === "stride") {
       for (let i = 0; i < 3; i++) {
         const y = 0.3 + i * 0.25;
@@ -483,7 +470,6 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
       "rebound",
       "duck",
       "squeeze",
-      "canopy",
       "stride",
       "drop-through",
     ].includes(o.technique ?? "")

@@ -1137,7 +1137,9 @@ test("all 20 authored combos retain distinct contacts on both routes", () => {
     const count =
       key === "upper:High-Line Escape" || key === "upper:Stride Stones"
         ? 4
-        : /:(Wall Traverse|Monkey Relay)$/.test(key)
+        : /:(Wall Traverse|Monkey Relay|Descending Flow|Roof Rollout)$/.test(
+              key,
+            )
           ? 4
           : 5;
     assert.deepEqual(

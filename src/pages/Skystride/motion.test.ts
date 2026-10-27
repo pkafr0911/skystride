@@ -639,7 +639,14 @@ test("movement lab samples every new technique and all 20 full chains", () => {
       props = previewObstacles(move);
     assert.equal(
       props.length,
-      ["Wall Traverse", "Monkey Relay"].includes(name) ? 4 : 5,
+      [
+        "Wall Traverse",
+        "Monkey Relay",
+        "Descending Flow",
+        "Roof Rollout",
+      ].includes(name)
+        ? 4
+        : 5,
     );
     const last = props[props.length - 1];
     assert.ok(

@@ -7,8 +7,6 @@ export const techniques = [
   "lache",
   "rebound",
   "precision",
-  "canopy",
-  "palm-drop",
   "monkey",
   "reverse",
   "squeeze",
@@ -168,9 +166,8 @@ export function comboCourse(): Obstacle[] {
       case 9:
         steps = [
           vault(0),
-          special(8, "palm-drop"),
-          special(18, "canopy"),
-          special(28, "palm-drop"),
+          special(8, "reverse"),
+          special(28, "reverse"),
           vault(36),
         ];
         break;
@@ -208,7 +205,7 @@ export function comboCourse(): Obstacle[] {
         steps = [
           vault(0),
           special(18, "shimmy"),
-          special(28, "palm-drop"),
+          special(28, "reverse"),
           vault(36),
         ];
         break;
@@ -253,7 +250,6 @@ export function comboCourse(): Obstacle[] {
       default:
         steps = [
           vault(0, "kong"),
-          special(8, "canopy"),
           special(18, "precision"),
           vault(28),
           vault(36),

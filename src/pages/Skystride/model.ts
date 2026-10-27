@@ -18,7 +18,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v37";
+export const VERSION = "sunset-relay-v38";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -2237,11 +2237,7 @@ export class Run {
             t.obstacle!.start +
             (t.obstacle!.end - t.obstacle!.start) *
               (0.25 + 0.5 * smooth((p - 0.4) / 0.2));
-        } else if (
-          t.technique === "canopy" ||
-          t.technique === "palm-drop" ||
-          t.technique === "drop-through"
-        ) {
+        } else if (t.technique === "drop-through") {
           this.y =
             t.y0 +
             t.arc * (p < 0.3 ? smooth(p / 0.3) : 1 - smooth((p - 0.3) / 0.7));
