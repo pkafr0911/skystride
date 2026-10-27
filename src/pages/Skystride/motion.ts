@@ -1,4 +1,4 @@
-import { Frame } from "./model";
+import type { Frame } from "./model";
 
 export type Point = [number, number, number];
 export type Pose = {
@@ -11,6 +11,24 @@ export type Pose = {
   elbows: Point[];
   footAngles: number[];
 };
+export const POSE_TRANSITION = 0.08;
+export function validPose(value: unknown): value is Pose {
+  if (!value || typeof value !== "object") return false;
+  const p = value as Pose;
+  const point = (v: unknown) =>
+    Array.isArray(v) &&
+    v.length === 3 &&
+    v.every((n) => typeof n === "number" && Number.isFinite(n));
+  return (
+    [p.hip, p.chest, p.head].every(point) &&
+    [p.feet, p.hands, p.knees, p.elbows].every(
+      (v) => Array.isArray(v) && v.length === 2 && v.every(point),
+    ) &&
+    Array.isArray(p.footAngles) &&
+    p.footAngles.length === 2 &&
+    p.footAngles.every(Number.isFinite)
+  );
+}
 export const STRIDE = 4.4;
 export const STANCE = 0.22;
 export const mix = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -30,7 +48,20 @@ export function blend(a: Pose, b: Pose, t: number): Pose {
     chest: pointMix(a.chest, b.chest, t),
     head: pointMix(a.head, b.head, t),
     feet: a.feet.map((v, i) => pointMix(v, b.feet[i], t)),
-    hands: a.hands.map((v, i) => pointMix(v, b.hands[i], t)),
+    hands: a.hands.map((v, i) => {
+      const hand = pointMix(v, b.hands[i], t);
+      const ax = v[0] - a.chest[0] + 0.015,
+        ay = v[1] - a.chest[1] + 0.025;
+      const bx = b.hands[i][0] - b.chest[0] + 0.015,
+        by = b.hands[i][1] - b.chest[1] + 0.025;
+      const dot =
+        (ax * bx + ay * by) /
+        Math.max(0.001, Math.hypot(ax, ay) * Math.hypot(bx, by));
+      // Opposing arm poses travel below the shoulder instead of cutting
+      // straight through it and flipping the elbow's IK plane.
+      hand[1] -= 0.5 * Math.sin(Math.PI * t) * (1 - smooth(-0.8, 0, dot));
+      return hand;
+    }),
     knees: a.knees.map((v, i) => pointMix(v, b.knees[i], t)),
     elbows: a.elbows.map((v, i) => pointMix(v, b.elbows[i], t)),
     footAngles: a.footAngles.map((v, i) => mix(v, b.footAngles[i], t)),
@@ -132,11 +163,22 @@ export function runPose(x: number, speed = 12): Pose {
     if (u > STANCE) {
       const extension = Math.sin((Math.PI * (u - STANCE)) / (1 - STANCE));
       p.feet[s][0] +=
-        Math.sign(p.feet[s][0]) * extension * mix(-0.09, 0.18, intensity);
+        Math.tanh(p.feet[s][0] * 5) * extension * mix(-0.09, 0.18, intensity);
       p.feet[s][1] += extension * mix(-0.05, 0.08, intensity);
     }
+    // Recover the heel below the pelvis. Passing the ankle through the hip
+    // made the folded leg rotate almost 180 degrees between adjacent frames.
+    p.feet[s][1] = Math.min(
+      p.feet[s][1],
+      p.hip[1] - 0.245,
+      p.hip[1] - 0.345 + 0.8 * Math.abs(p.feet[s][0] - p.hip[0]),
+    );
     p.footAngles[s] = foot.angle;
-    p.knees[s] = [0.85, 0.7, side * 0.14];
+    p.knees[s] = [
+      p.hip[0] - (p.feet[s][1] - p.hip[1] + 0.025),
+      p.hip[1] - 0.025 + p.feet[s][0] - p.hip[0],
+      side * 0.14,
+    ];
     // Swing from the shoulder with an actual upper-arm/forearm arc. Interpolating
     // arbitrary wrist positions folded both elbows into the ribs at mid-stride.
     const swing = Math.cos(u * Math.PI * 2 - 0.3);
@@ -295,7 +337,7 @@ function landingPose(f: Frame): Pose {
   ];
   return blend(swapLead(braced, f.lead || 0), p, smooth(0.08, recovery, age));
 }
-function vaultPose(f: Frame): Pose {
+function vaultPose(f: Frame, link?: "in" | "out"): Pose {
   const p = f.progress,
     run = runPose(f.x, f.speed),
     plant = basePose(),
@@ -437,10 +479,10 @@ function vaultPose(f: Frame): Pose {
       break;
     case "safety":
       carry.hip = [-0.14, 0.52, 0];
-      carry.chest = [0.18, 0.95, 0];
-      carry.head = [0.33, 1.24, 0];
+      carry.chest = [0.23, 0.62, 0];
+      carry.head = [0.38, 0.91, 0];
       carry.feet = [
-        [0.34, 0.08, -0.16],
+        [0.45, 0.35, -0.16],
         [-0.45, 0.46, 0.18],
       ];
       carry.knees = [
@@ -454,13 +496,17 @@ function vaultPose(f: Frame): Pose {
       plant.hip = [-0.15, 0.64, 0];
       plant.chest = [-0.25, 1.08, 0];
       plant.head = [-0.2, 1.39, 0];
+      plant.hands = [
+        [-0.4, 0.5, -0.24],
+        [-0.4, 0.5, 0.24],
+      ];
       plant.feet = [
         [0.62, 0.48, -0.16],
         [0.45, 0.42, 0.16],
       ];
       carry.hip = [0.07, 0.34, 0];
-      carry.chest = [-0.28, 0.58, 0];
-      carry.head = [-0.29, 0.89, 0];
+      carry.chest = [-0.28, 0.5, 0];
+      carry.head = [-0.29, 0.81, 0];
       carry.feet = [
         [0.92, 0.48, -0.16],
         [0.86, 0.45, 0.16],
@@ -508,24 +554,46 @@ function vaultPose(f: Frame): Pose {
     [0.03, 0.02, -0.25],
     [0.03, 0.02, 0.25],
   ];
+  // Carry keeps travelling into clearance; never freeze a pose over the bar.
+  const clear = blend(carry, exit, f.vault === "dash" ? 0.08 : 0.3);
+  clear.hip[1] += 0.06;
+  if (f.vault === "hurdle" || f.vault === "one-hand") {
+    clear.feet = [
+      [0.55, 0.25, -0.17],
+      [-0.25, 0.64, 0.22],
+    ];
+  } else if (f.vault === "speed") {
+    clear.feet = [
+      [-0.45, 0.43, -0.17],
+      [0.3, 0.56, 0.23],
+    ];
+  } else if (f.vault === "lazy") {
+    clear.feet = [
+      [0.68, 0.24, -0.17],
+      [0.18, 0.55, 0.26],
+    ];
+  }
+  const touchdown = landingPose({ ...f, landingAge: 0, landX: f.x, impact: 7 });
+  const start = link === "in" ? coil : run;
+  const finish = link === "out" ? coil : touchdown;
   const result = sequence(
     f.vault === "kong"
       ? [
-          { at: 0, pose: run },
+          { at: 0, pose: start },
           { at: 0.1, pose: coil },
           { at: 0.25, pose: dive },
           { at: 0.43, pose: carry },
           { at: 0.62, pose: push },
           { at: 0.86, pose: exit },
-          { at: 1, pose: run },
+          { at: 1, pose: finish },
         ]
       : [
-          { at: 0, pose: run },
+          { at: 0, pose: start },
           { at: 0.18, pose: plant },
           { at: 0.36, pose: carry },
-          { at: f.vault === "dash" ? 0.64 : 0.59, pose: carry },
+          { at: f.vault === "dash" ? 0.64 : 0.59, pose: clear },
           { at: 0.86, pose: exit },
-          { at: 1, pose: run },
+          { at: 1, pose: finish },
         ],
     p,
   );
@@ -546,6 +614,33 @@ function vaultPose(f: Frame): Pose {
         [hand[0], hand[1], 0.23],
         pin,
       );
+  }
+  if (f.vault === "safety" && f.contact) {
+    // Keep the body over the opposite hand/foot supports while the free leg
+    // passes. Root-relative poses slid away from both contacts on late entry.
+    const support = smooth(0.12, 0.25, p) * (1 - smooth(0.45, 0.62, p));
+    const x = f.contact.x - f.x,
+      y = f.contact.y - f.y;
+    result.hip = pointMix(result.hip, [x - 0.25, y + 0.48, 0], support);
+    result.chest = pointMix(result.chest, [x + 0.15, y + 0.6, 0], support);
+    result.head = pointMix(result.head, [x + 0.3, y + 0.9, 0], support);
+    result.hands[0] = pointMix(result.hands[0], [x, y + 0.025, -0.23], support);
+    result.hands[1] = pointMix(
+      result.hands[1],
+      [x + 0.45, y + 0.65, 0.25],
+      support,
+    );
+    result.feet[1] = pointMix(
+      result.feet[1],
+      [x + 0.28, y + 0.09, 0.18],
+      support,
+    );
+    result.feet[0] = pointMix(
+      result.feet[0],
+      [x + 0.45 + 0.2 * smooth(0.25, 0.6, p), y + 0.3, -0.16],
+      support,
+    );
+    result.footAngles[1] = mix(result.footAngles[1], 0, support);
   }
   return result;
 }
@@ -636,12 +731,12 @@ function mantlePose(f: Frame): Pose {
       { at: 0, pose: runPose(f.x, f.speed) },
       { at: 0.23, pose: grip },
       { at: 0.48, pose: supported },
-      { at: 0.65, pose: supported },
-      { at: 1, pose: runPose(f.x, f.speed) },
+      { at: 0.5, pose: supported },
+      { at: 0.6, pose: runPose(f.x, f.speed) },
     ],
     f.progress,
   );
-  if (f.contact)
+  if (f.contact) {
     for (let side = 0; side < 2; side++) {
       const contact: Point = [
         f.contact.x - f.x,
@@ -655,9 +750,64 @@ function mantlePose(f: Frame): Pose {
       result.hands[side] = pointMix(
         result.hands[side],
         contact,
-        smooth(0, 0.2, f.progress) * (1 - smooth(0.65, 0.72, reach)),
+        smooth(0, 0.2, f.progress) *
+          (1 - smooth(0.49, 0.56, f.progress)) *
+          (1 - smooth(0.65, 0.72, reach)),
       );
     }
+    // Push from the face, lift each shoe clear, then step onto the top.
+    // The old held crouch carried both feet sideways across the whole duct.
+    const tracks = [
+      [
+        [0.23, -0.3, -1.05, 1.1],
+        [0.34, -0.28, -0.58, 0.8],
+        [0.44, -0.3, 0.22, 0.1],
+        [0.49, 0.1, 0.22, 0],
+        [0.5, 0.1, 0.09, 0],
+        [0.56, 0.1, 0.09, 0],
+      ],
+      [
+        [0.23, -0.95, -1.56, -0.3],
+        [0.34, -0.7, -0.8, 0.2],
+        [0.43, -0.55, -0.48, 0.3],
+        [0.49, -0.35, 0.22, 0],
+        [0.53, 0.15, 0.22, 0],
+        [0.56, 0.5, 0.09, 0],
+      ],
+    ];
+    const weight =
+      smooth(0.08, 0.23, f.progress) * (1 - smooth(0.53, 0.58, f.progress));
+    for (let side = 0; side < 2; side++) {
+      const keys = tracks[side];
+      let target = keys[keys.length - 1];
+      for (let i = 1; i < keys.length; i++) {
+        if (f.progress <= keys[i][0]) {
+          const t = smooth(keys[i - 1][0], keys[i][0], f.progress);
+          target = keys[i].map((v, j) => mix(keys[i - 1][j], v, t));
+          break;
+        }
+      }
+      result.feet[side] = pointMix(
+        result.feet[side],
+        [
+          f.contact.x - f.x + target[1],
+          f.contact.y - f.y + target[2],
+          side ? 0.14 : -0.14,
+        ],
+        weight,
+      );
+      result.footAngles[side] = mix(result.footAngles[side], target[3], weight);
+      result.knees[side] = pointMix(
+        result.knees[side],
+        [
+          result.hip[0] - (result.feet[side][1] - result.hip[1] + 0.025),
+          result.hip[1] - 0.025 + result.feet[side][0] - result.hip[0],
+          side ? 0.24 : -0.24,
+        ],
+        weight,
+      );
+    }
+  }
   return result;
 }
 function rollPose(f: Frame): Pose {
@@ -960,12 +1110,15 @@ function specialPose(f: Frame): Pose {
     ? ([f.contact.x - f.x, f.contact.y - f.y, 0] as Point)
     : ([0, 1.1, 0] as Point);
   if (t === "double-kong") {
-    return vaultPose({
-      ...f,
-      move: "vault",
-      vault: "kong",
-      progress: u < 0.5 ? u * 2 : (u - 0.5) * 2,
-    });
+    return vaultPose(
+      {
+        ...f,
+        move: "vault",
+        vault: "kong",
+        progress: u < 0.5 ? u * 2 : (u - 0.5) * 2,
+      },
+      u < 0.5 ? "out" : "in",
+    );
   }
   if (t === "underbar" || t === "lache" || t === "monkey" || t === "shimmy") {
     const swing = Math.sin((u - 0.2) * Math.PI * 2);
@@ -1027,9 +1180,11 @@ function specialPose(f: Frame): Pose {
       [0.55, 1.15, 0.3],
     ];
     if (t === "stride") {
-      const side = Math.floor(u * 4) % 2;
-      land.feet[side][0] -= 0.5;
-      land.feet[side][1] += 0.35;
+      for (let side = 0; side < 2; side++) {
+        const lift = (1 + Math.cos(u * 4 * Math.PI + side * Math.PI)) / 2;
+        land.feet[side][0] -= 0.5 * lift;
+        land.feet[side][1] += 0.35 * lift;
+      }
       land.hip[1] += 0.15;
     }
     return sequence(
@@ -1207,7 +1362,55 @@ function flatPose(f: Frame): Pose {
   }
 }
 
+function continuousJoints(p: Pose, yaw = 0): Pose {
+  if (yaw) {
+    const rotate = (angle: number) => {
+      for (const v of [
+        p.hip,
+        p.chest,
+        p.head,
+        ...p.feet,
+        ...p.hands,
+        ...p.knees,
+        ...p.elbows,
+      ]) {
+        const x = v[0],
+          z = v[2];
+        v[0] = x * Math.cos(angle) - z * Math.sin(angle);
+        v[2] = x * Math.sin(angle) + z * Math.cos(angle);
+      }
+    };
+    rotate(-yaw);
+    continuousJoints(p);
+    rotate(yaw);
+    return p;
+  }
+  for (let side = 0; side < 2; side++) {
+    const sign = side ? 1 : -1;
+    // Keep a folded ankle away from the hip singularity during crossfades.
+    p.feet[side][1] = Math.min(
+      p.feet[side][1],
+      p.hip[1] - 0.345 + 0.8 * Math.abs(p.feet[side][0] - p.hip[0]),
+    );
+    p.knees[side] = [
+      p.hip[0] - (p.feet[side][1] - p.hip[1] + 0.025),
+      p.hip[1] - 0.025 + p.feet[side][0] - p.hip[0],
+      sign * 0.24,
+    ];
+    const wristX = p.hands[side][0] - p.chest[0] + 0.015;
+    const wristY = p.hands[side][1] - p.chest[1] + 0.025;
+    const reach = Math.max(0.001, Math.hypot(wristX, wristY));
+    p.elbows[side] = [
+      p.chest[0] - 0.015 + wristY / reach,
+      p.chest[1] - 0.025 - wristX / reach,
+      sign * 0.48,
+    ];
+  }
+  return p;
+}
+
 export function poseFor(f: Frame): Pose {
+  if (f.renderPose) return f.renderPose;
   const p = flatPose(f);
   if (f.move === "run" && (f.anticipation ?? 0) > 0) {
     const prepare = f.anticipation!;
@@ -1254,7 +1457,26 @@ export function poseFor(f: Frame): Pose {
       p.footAngles[side] += Math.atan(slope);
     }
   }
-  return p;
+  const connected = f.transitionPose
+    ? blend(
+        f.transitionPose,
+        p,
+        smooth(0, f.transitionDuration ?? POSE_TRANSITION, f.moveTime),
+      )
+    : p;
+  // Derive the joint plane after blending, not by interpolating pole hints.
+  // A pole crossing its limb axis flips the solved knee/elbow in one frame.
+  // Tumbles and grounded recovery poses carry their own rotated joint planes.
+  if (["roll", "crash", "knockback", "heavy-land"].includes(f.move))
+    return connected;
+  const yaw =
+    f.move === "special" &&
+    ["reverse", "squeeze", "transfer"].includes(f.technique ?? "")
+      ? (f.technique === "reverse"
+          ? Math.PI * 2 * f.progress
+          : (Math.sin(Math.PI * f.progress) * Math.PI) / 2) * (f.side ?? 1)
+      : 0;
+  return continuousJoints(connected, yaw);
 }
 
 export function motionPhase(f: Frame): string {
@@ -1334,16 +1556,37 @@ export function motionPhase(f: Frame): string {
 
 /** Interpolate animation clocks with position; keep discrete contacts on their own side of a transition. */
 export function interpolateFrame(a: Frame, b: Frame, t: number): Frame {
+  if (t <= 0) return a;
   if (t >= 1) return b;
   const sameMove =
-    a.move === b.move ||
-    (["jump", "fall"].includes(a.move) && ["jump", "fall"].includes(b.move));
+    (a.move === b.move ||
+      (["jump", "fall"].includes(a.move) &&
+        ["jump", "fall"].includes(b.move))) &&
+    a.vault === b.vault &&
+    a.technique === b.technique &&
+    a.side === b.side &&
+    b.moveTime >= a.moveTime &&
+    a.grounded === b.grounded &&
+    a.landX === b.landX;
   return {
     ...a,
+    // Discrete gameplay state remains on its own side of the boundary, while
+    // the rendered pose reaches the incoming frame continuously.
+    ...(!sameMove || a.move !== b.move
+      ? { renderPose: blend(poseFor(a), poseFor(b), t) }
+      : {}),
+    contact:
+      sameMove && a.contact && b.contact
+        ? {
+            x: mix(a.contact.x, b.contact.x, t),
+            y: mix(a.contact.y, b.contact.y, t),
+          }
+        : a.contact,
     x: mix(a.x, b.x, t),
     y: mix(a.y, b.y, t),
     speed: mix(a.speed, b.speed, t),
     vy: mix(a.vy, b.vy, t),
+    anticipation: mix(a.anticipation ?? 0, b.anticipation ?? 0, t),
     slope: mix(a.slope ?? 0, b.slope ?? 0, t),
     lane: mix(a.lane ?? 0.55, b.lane ?? 0.55, t),
     moveTime: sameMove ? mix(a.moveTime, b.moveTime, t) : a.moveTime,

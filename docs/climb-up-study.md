@@ -14,3 +14,11 @@ The old knee hints pointed backward during the hang and changed direction during
 The comparison uses the existing `node scripts/runner-study.cjs --wall` six-phase triangle export, sampled before and after the change. It is an offline side-view inspection, not browser or device playback. Gameplay traversal timing and root motion are unchanged.
 
 Validation: model tests, motion tests, and TypeScript checking. Additional motion coverage samples 6, 10 and 14 m/s entry speeds and checks stationary wall support, reachable ankle targets after IK, consistent knee bend, and roof clearance before either foot crosses the face. Existing two-hand lip support and initial wall-plant checks remain in place.
+
+## Low-duct mantle
+
+The mantle now follows the same contact principles with its own shorter sequence: press upward, clear the leading shoe, plant it on the top, bring the trailing foot through, then resume running across the duct. Previously the supported crouch stayed nearly frozen through the horizontal traversal, carrying both feet across the surface. Hands now release during the step rather than following the old grip as the runner travels away. Knee hints keep a consistent bend direction during the lift.
+
+![Mantle before and after](mantle-comparison.png)
+
+Reproduce the six mesh samples with `node scripts/runner-study.cjs --mantle`. Regression coverage checks reachable solved ankles, knee bend direction, shoe clearance, a stationary leading-foot contact and the return to alternating strides at 6, 10 and 14 m/s. Root motion, traversal duration and obstacle-top interruption behavior are unchanged. Visual verification remains an offline mesh comparison rather than browser playback.

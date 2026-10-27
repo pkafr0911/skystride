@@ -60,7 +60,7 @@ See [game notes](docs/game-design.md) for mechanics, performance decisions, and 
 
 Character asset: `public/models/skystride-runner.glb`. Regenerate from the live geometry with `node scripts/export-runner.cjs`.
 
-The default runner is Rooftop Climber, with a mustard hooded top, olive cargo shorts, wrist wraps, and burgundy shoes, using continuous limb surfaces and procedural contact animation. The movement lab includes an entry-speed slider, long-jump preview, and high-wall climb study. `node scripts/runner-study.cjs --wall` exports mesh triangles for offline inspection of the wall-climb poses.
+The default runner is Rooftop Climber, with a mustard hooded top, olive cargo shorts, wrist wraps, and burgundy shoes, using continuous limb surfaces and procedural contact animation. The movement lab includes an entry-speed slider, long-jump preview, and high-wall climb study. `node scripts/runner-study.cjs --wall` exports mesh triangles for offline inspection of the wall-climb poses. Vault contact poses and connected transitions are documented in the [vault motion study](docs/vault-motion-study.md); `node scripts/runner-study.cjs --vaults` exports all seven vaults.
 
 Creative course encounters include ventilation chains, solar launch ramps, tank cradles, wall-run billboards, pipe crossings, broken bridges, construction windows, greenhouses, suspended scaffolds and staggered balconies. Swipe Up for contextual contacts/climbs; swipe Right near a window for a fast dive or near a tank for its service platform. New wall-run and dive previews are in the movement lab. See the v9 section of the game notes for animation phases and route choices.
 

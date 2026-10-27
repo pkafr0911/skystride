@@ -1,4 +1,11 @@
 import {
+  blend,
+  poseFor,
+  POSE_TRANSITION,
+  validPose,
+  type Pose,
+} from "./motion";
+import {
   swingGripOffset,
   SWING_GAP_EXTRA,
   SWING_DURATION,
@@ -11,7 +18,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v30";
+export const VERSION = "sunset-relay-v31";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -625,6 +632,11 @@ const supportSurfaces = {
 };
 export type Contact = { x: number; y: number };
 export type Frame = {
+  /** Bounded pose snapshot for deterministic action-to-action blending. */
+  transitionPose?: Pose;
+  transitionDuration?: number;
+  /** Interpolation-only pose; never produced by the simulation. */
+  renderPose?: Pose;
   chain?: number;
   anticipation?: number;
   x: number;
@@ -772,6 +784,12 @@ export function readRecord(
           ].every((value) => value === undefined || Number.isFinite(value)) &&
           (f.technique === undefined || techniques.includes(f.technique)) &&
           (f.side === undefined || f.side === 1 || f.side === -1) &&
+          (f.transitionPose === undefined || validPose(f.transitionPose)) &&
+          (f.transitionDuration === undefined ||
+            (Number.isFinite(f.transitionDuration) &&
+              f.transitionDuration > 0 &&
+              f.transitionDuration <= POSE_TRANSITION)) &&
+          f.renderPose === undefined &&
           moves.includes(f.move) &&
           vaults.includes(f.vault) &&
           (f.contact === null ||
@@ -831,6 +849,8 @@ export class Run {
   grounded = true;
   move: Move = "run";
   moveTime = 0;
+  private transitionPose?: Pose;
+  private transitionDuration = POSE_TRANSITION;
   vault: Vault = "speed";
   paused = false;
   eligible = true;
@@ -884,6 +904,7 @@ export class Run {
     this.grounded = true;
     this.move = "run";
     this.moveTime = 0;
+    this.transitionPose = undefined;
     this.paused = false;
     this.eligible = !practice;
     this.practice = practice;
@@ -956,6 +977,17 @@ export class Run {
     this.onChange();
   }
   private setMove(move: Move, duration = 0) {
+    // Capture the visible outgoing pose, including an unfinished transition.
+    // A pose snapshot stays bounded even when inputs chain several actions.
+    const outgoing = poseFor(this.previous);
+    // Clone and normalize signed zero so replay JSON round-trips exactly.
+    this.transitionPose = blend(outgoing, outgoing, 0);
+    this.transitionDuration =
+      this.traversal?.move === move
+        ? Math.min(POSE_TRANSITION, this.traversal.duration * 0.16)
+        : move === "jump"
+          ? 0.035
+          : POSE_TRANSITION;
     this.move = move;
     this.moveTime = 0;
     this.actionDuration = duration;
@@ -1078,6 +1110,17 @@ export class Run {
       obstacle: { start: o.x, end: o.x + o.width },
       side: o.side ?? 1,
     };
+    if (move === "vault")
+      this.traversal.duration = Math.max(
+        this.traversal.duration,
+        !clean
+          ? 0.85
+          : vault === "kong"
+            ? 0.52
+            : vault === "dash" || vault === "lazy" || vault === "safety"
+              ? 0.44
+              : 0.36,
+      );
     if (move === "mantle") this.traversal.duration += 0.75;
     if (move === "wall-climb")
       this.traversal.duration += 0.62 + Math.max(0, 11.5 - this.speed) * 0.09;
@@ -1818,7 +1861,7 @@ export class Run {
           end: o.x + o.width + 0.7,
           y0: this.y,
           y1: base,
-          duration: (o.width + 1.2) / 5.5,
+          duration: Math.max(0.85, (o.width + 1.2) / 5.5),
           elapsed: 0,
           arc: (o.height || 1) + 0.25,
           move: "vault",
@@ -2189,6 +2232,12 @@ export class Run {
         ? clamp(1 - (next.x - this.x) / 7, 0, 1)
         : 0;
     return {
+      ...(this.transitionPose && this.moveTime < this.transitionDuration
+        ? {
+            transitionPose: this.transitionPose,
+            transitionDuration: this.transitionDuration,
+          }
+        : {}),
       anticipation: anticipate,
       x: this.x,
       y: this.y,

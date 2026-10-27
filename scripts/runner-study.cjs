@@ -3,7 +3,7 @@ require("ts-node/register");
 const fs = require("node:fs");
 const THREE = require("three");
 const { makeRunner } = require("../src/pages/Skystride/runner");
-const { Run, obstacles } = require("../src/pages/Skystride/model");
+const { Run, obstacles, ground } = require("../src/pages/Skystride/model");
 const scene = new THREE.Scene(),
   runner = makeRunner(
     scene,
@@ -102,6 +102,81 @@ if (process.argv.includes("--wall")) {
       frame: game.frame(),
       obstacle: { x: wall.x + wall.width - game.x, height: wall.height },
     });
+  }
+}
+if (process.argv.includes("--mantle")) {
+  samples.length = 0;
+  const {
+    framesFor,
+    previewObstacles,
+  } = require("../src/pages/Skystride/lab-model");
+  const frames = framesFor("mantle", 12).filter((f) => f.move === "mantle");
+  const obstacle = previewObstacles("mantle")[0];
+  for (const [title, progress] of [
+    ["GRIP", 0.23],
+    ["PUSH", 0.34],
+    ["LEAD CLEARANCE", 0.45],
+    ["STEP ON", 0.51],
+    ["TRAILING STEP", 0.55],
+    ["RUN ACROSS", 0.64],
+  ]) {
+    const frame = frames.find((f) => f.progress >= progress);
+    samples.push({
+      title,
+      frame,
+      obstacle: {
+        x: obstacle.x - frame.x,
+        height: frame.contact.y,
+        width: obstacle.width,
+      },
+    });
+  }
+}
+if (process.argv.includes("--vaults")) {
+  samples.length = 0;
+  const {
+    framesFor,
+    previewObstacles,
+  } = require("../src/pages/Skystride/lab-model");
+  for (const move of [
+    "speed",
+    "hurdle",
+    "one-hand",
+    "safety",
+    "lazy",
+    "kong",
+    "dash",
+  ]) {
+    const frames = framesFor(move, 12);
+    const obstacle = previewObstacles(move)[0];
+    const vault = frames.filter((f) => f.move === "vault");
+    for (const [title, progress] of [
+      ["ENTRY", 0.18],
+      ["CONTACT", 0.4],
+      ["CLEAR", 0.6],
+      ["RELEASE", 0.8],
+      ["TOUCHDOWN", 0.98],
+      ["LAND", 1],
+    ]) {
+      const frame =
+        progress === 1
+          ? frames.find((f) => f.move === "land")
+          : vault.find((f) => f.progress >= progress) ||
+            vault[vault.length - 1];
+      if (!frame) continue;
+      samples.push({
+        title: `${move.toUpperCase()} / ${title}`,
+        frame,
+        obstacle: {
+          x: obstacle.x - frame.x,
+          floor: ground(obstacle.x, obstacle.route === "upper"),
+          height:
+            ground(obstacle.x, obstacle.route === "upper") +
+            (obstacle.height || 1.1),
+          width: obstacle.width,
+        },
+      });
+    }
   }
 }
 for (const { title, frame: f, obstacle } of samples) {

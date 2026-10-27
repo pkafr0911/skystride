@@ -8,7 +8,13 @@ import {
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Frame, STEP, ground } from "./model";
-import { options, Preview, framesFor, previewObstacles } from "./lab-model";
+import {
+  options,
+  Preview,
+  framesFor,
+  minimumPreviewSpeed,
+  previewObstacles,
+} from "./lab-model";
 import { SWING_GAP_EXTRA, techniques, isSwing, Technique } from "./combos";
 import { creativeObstacle } from "./obstacle-mesh";
 import { makeRunner } from "./runner";
@@ -59,7 +65,10 @@ export default function MovementLab() {
     );
     const environment = new THREE.Group();
     scene.add(environment);
-    const first = (predicate: (f: Frame) => boolean, fallback: number) => {
+    const first = (
+      predicate: (f: Frame, index: number) => boolean,
+      fallback: number,
+    ) => {
       const index = samples.findIndex(predicate);
       return index < 0 ? fallback : index;
     };
@@ -76,11 +85,16 @@ export default function MovementLab() {
           atProgress("special", 0),
           atProgress("special", 0.2),
           atProgress("special", 0.4),
-          first((f) => f.move === "jump", samples.length - 1),
+          first(
+            (f, index) => f.move === "jump" && index > atProgress("special", 0),
+            samples.length - 1,
+          ),
           landing,
         ]
       : move.startsWith("combo:")
-        ? previewObstacles(move).map((o) => first((f) => f.x >= o.x, 0))
+        ? Array.from({ length: 5 }, (_, i) =>
+            Math.round(((samples.length - 1) * i) / 4),
+          )
         : move === "run"
           ? [0, 9, 17, 26, 36]
           : move === "jump" || move === "long-jump"
@@ -214,6 +228,7 @@ export default function MovementLab() {
       t = 0,
       previous = performance.now(),
       uiTime = 0;
+    let lastScrub = controls.current.scrub;
     let layoutSheet = controls.current.sheet;
     const resize = () => {
       const { width, height } = host.current!.getBoundingClientRect();
@@ -234,11 +249,18 @@ export default function MovementLab() {
     const draw = (now: number) => {
       const dt = Math.max(0, Math.min(0.05, (now - previous) / 1000));
       previous = now;
-      if (controls.current.playing)
-        t =
-          (t + dt * (controls.current.slow ? 0.35 : 1)) %
-          (samples.length * STEP);
-      else t = (controls.current.scrub / 100) * (samples.length - 1) * STEP;
+      if (controls.current.scrub === 0 && lastScrub !== 0) t = 0;
+      lastScrub = controls.current.scrub;
+      if (controls.current.playing) {
+        t = Math.min(
+          t + dt * (controls.current.slow ? 0.35 : 1),
+          (samples.length - 1) * STEP,
+        );
+        if (t >= (samples.length - 1) * STEP) {
+          setScrub(100);
+          setPlaying(false);
+        }
+      } else t = (controls.current.scrub / 100) * (samples.length - 1) * STEP;
       const index = Math.min(samples.length - 1, Math.floor(t / STEP));
       const f = interpolateFrame(
         samples[index],
@@ -249,7 +271,8 @@ export default function MovementLab() {
       if (now - uiTime > 100) {
         uiTime = now;
         setPhase(motionPhase(f));
-        if (controls.current.playing) setScrub(progress.current);
+        if (controls.current.playing)
+          setScrub(progress.current >= 100 ? 0 : progress.current);
       }
       if (layoutSheet !== controls.current.sheet) resize();
       const showSheet = controls.current.sheet;
@@ -330,6 +353,13 @@ export default function MovementLab() {
             value={move}
             onChange={(e) => {
               setMove(e.target.value as Preview);
+              setEntrySpeed(
+                Math.max(
+                  entrySpeed,
+                  minimumPreviewSpeed(e.target.value as Preview),
+                ),
+              );
+              setPlaying(true);
               setScrub(0);
             }}
           >
@@ -343,11 +373,11 @@ export default function MovementLab() {
         <button
           type="button"
           onClick={() => {
-            setScrub(progress.current);
+            setScrub(progress.current >= 100 ? 0 : progress.current);
             setPlaying(!playing);
           }}
         >
-          {playing ? "Freeze" : "Play"}
+          {playing ? "Freeze" : scrub >= 100 ? "Replay" : "Play"}
         </button>
         <label>
           Bar release{" "}
@@ -370,7 +400,7 @@ export default function MovementLab() {
           <input
             aria-label="Entry speed"
             type="range"
-            min="6"
+            min={minimumPreviewSpeed(move)}
             max="14"
             step="0.5"
             value={entrySpeed}

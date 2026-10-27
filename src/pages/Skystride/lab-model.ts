@@ -1,5 +1,5 @@
 import { Frame, obstacles, Run, canMantle, ground } from "./model";
-import { techniques, isSwing, comboNames } from "./combos";
+import { techniques, isSwing, comboNames, Technique } from "./combos";
 
 export const options = [
   "run",
@@ -25,6 +25,14 @@ export const options = [
   ...comboNames.map((name) => `combo:${name}` as const),
 ] as const;
 export type Preview = (typeof options)[number];
+export function minimumPreviewSpeed(move: Preview) {
+  return move === "dive"
+    ? 10.5
+    : isSwing(move as Technique) || move === "catch"
+      ? 12
+      : 6;
+}
+
 export function previewObstacles(move: Preview) {
   if (move.startsWith("combo:"))
     return obstacles.filter(
@@ -51,13 +59,14 @@ export function framesFor(
   entrySpeed: number,
   releaseAt = 0.55,
 ): Frame[] {
+  const speed = Math.max(minimumPreviewSpeed(move), entrySpeed);
   if (move.startsWith("combo:")) {
     const group = previewObstacles(move);
     const g = new Run();
     g.start();
     g.x = group[0].x - 3;
     g.y = ground(g.x, false);
-    g.speed = entrySpeed;
+    g.speed = speed;
     const frames: Frame[] = [],
       pressed = new Set<number>();
     for (
@@ -98,24 +107,10 @@ export function framesFor(
   }
   const g = new Run();
   g.start();
-  g.speed = entrySpeed;
-  const o = obstacles.find((item) =>
-    item.technique === move
-      ? true
-      : move === "wall-run"
-        ? item.feature === "wall-billboard"
-        : move === "dive"
-          ? item.feature === "window"
-          : move === "mantle"
-            ? canMantle(item)
-            : move === "safety"
-              ? item.kind === "vault"
-              : move === "hurdle" || move === "one-hand"
-                ? item.kind === "vault"
-                : item.vault === move,
-  );
+  g.speed = speed;
+  const o = previewObstacles(move)[0];
   if (o) {
-    g.x = o.x - (isSwing(o.technique) ? 3.1 : 2);
+    g.x = o.x - (move === "safety" ? 0.2 : isSwing(o.technique) ? 3.1 : 2);
     g.y = ground(o.x, o.route === "upper");
     g.upper = o.route === "upper";
   }
@@ -136,15 +131,19 @@ export function framesFor(
     g.x = 70;
     g.grounded = false;
   }
-  const frames: Frame[] = [];
+  g.previous = g.frame();
+  const frames: Frame[] = [g.frame()];
   let signatureSeen = false,
     settle = 0;
-  for (let tick = 0; tick < (move === "wall-climb" ? 330 : 210); tick++) {
+  for (
+    let tick = 0;
+    tick < (move === "run" ? 100 : 600) && g.phase === "running";
+    tick++
+  ) {
     if (tick === 12 && (move === "jump" || move === "long-jump"))
-      g.speed = entrySpeed;
-    if (tick === 12 && move === "safety" && o) g.x = o.x - 0.2;
+      g.speed = speed;
     if (
-      tick === 12 &&
+      tick === (move === "safety" ? 0 : 12) &&
       (o || move === "jump" || move === "wall" || move === "wall-climb")
     )
       g.action(move === "dive" ? "forward" : "up");
@@ -169,8 +168,19 @@ export function framesFor(
       g.vault = move;
     }
     frames.push(g.frame());
-    if (g.frame().technique === move) signatureSeen = true;
-    if (signatureSeen && !g.traversal && g.grounded && ++settle > 24) break;
+    const f = g.frame();
+    if (f.move !== "run" && f.move !== "fall") signatureSeen = true;
+    if (
+      signatureSeen &&
+      !g.traversal &&
+      g.grounded &&
+      (f.move === "run" || f.move === "land" || f.move === "heavy-land")
+    ) {
+      settle++;
+      // Stop before the course introduces another obstacle into this isolated study.
+      const next = g.next();
+      if (settle > 24 || (next && next.x - g.x < 0.7)) break;
+    } else settle = 0;
   }
   return frames;
 }

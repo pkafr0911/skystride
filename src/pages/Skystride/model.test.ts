@@ -172,7 +172,10 @@ test("clean routes retain flow while mistimed chains lose speed or miss gaps", (
     assert.equal(clean.phase, "finished");
     assert.equal(clean.recoveries, 0);
     assert.ok(early.recoveries > 0);
-    assert.ok(early.phase === "failed" || early.time > clean.time);
+    assert.ok(
+      early.phase === "failed" || early.time > clean.time,
+      `Route ${upper}: clean ${clean.time}s, early ${early.time}s with ${early.recoveries} recoveries`,
+    );
   }
 });
 test("every authored vault type has its own traversal and obstacle contact anchor", () => {

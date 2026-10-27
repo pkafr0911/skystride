@@ -84,7 +84,8 @@ test("jump visibly extends from push-off, drives a knee, then reaches down befor
   const load = poseFor(g.frame());
   for (let i = 0; i < 8; i++) g.step();
   const drive = poseFor(g.frame());
-  assert.ok(drive.hip[1] > load.hip[1] + 0.15);
+  // Entry now preserves the running pose instead of snapping to a deep crouch.
+  assert.ok(drive.hip[1] > load.hip[1] + 0.08);
   assert.ok(Math.max(...drive.feet.map((f) => f[1])) > 0.65);
   while (g.vy > -10) g.step();
   const reach = poseFor(g.frame());
@@ -925,5 +926,239 @@ test("climb legs keep wall support, bend forward and clear the lip before crossi
       samples > 3,
       "exercise a sustained wall contact at each entry speed",
     );
+  }
+});
+
+test("mantle steps onto a planted lead foot before running across the top", () => {
+  for (const speed of [6, 10, 14]) {
+    let planted: THREE.Vector3 | undefined;
+    let contacts = 0,
+      running = 0;
+    for (const f of framesFor("mantle", speed)) {
+      if (f.move !== "mantle" || !f.contact) continue;
+      const p = poseFor(f);
+      if (f.progress >= 0.23 && f.progress <= 0.56) {
+        for (const side of [0, 1]) {
+          const hip = new THREE.Vector3(...p.hip).add(
+            new THREE.Vector3(0, -0.025, side ? 0.14 : -0.14),
+          );
+          const foot = new THREE.Vector3(...p.feet[side]);
+          const target = foot.clone();
+          const knee = solveJoint(
+            hip,
+            foot,
+            new THREE.Vector3(...p.knees[side]),
+            LEG_LENGTHS.thigh,
+            LEG_LENGTHS.shin,
+          );
+          assert.ok(
+            foot.distanceTo(target) < 0.015,
+            "mantle foot must remain reachable after IK",
+          );
+          const ankle = foot.clone().sub(hip),
+            bend = knee.clone().sub(hip);
+          assert.ok(
+            ankle.x * bend.y - ankle.y * bend.x > 0,
+            "mantle knee must keep its bend direction",
+          );
+          if (f.progress > 0.43 && foot.x + f.x > f.contact.x - 0.18)
+            assert.ok(
+              foot.y + f.y >= f.contact.y + 0.075,
+              "lift the shoe before carrying it across the lip",
+            );
+        }
+      }
+      if (f.progress > 0.5 && f.progress < 0.53) {
+        const foot = new THREE.Vector3(...p.feet[0]).add(
+          new THREE.Vector3(f.x, f.y, 0),
+        );
+        if (planted)
+          assert.ok(
+            foot.distanceTo(planted) < 1e-8,
+            "lead foot must not slide across the top",
+          );
+        assert.ok(Math.abs(foot.y - f.contact.y - 0.09) < 1e-8);
+        planted = foot;
+        contacts++;
+      }
+      if (f.progress > 0.6 && f.progress < 0.69) {
+        assert.deepEqual(
+          p.feet,
+          runPose(f.x, f.speed).feet,
+          "resume alternating steps instead of carrying a frozen crouch across the duct",
+        );
+        running++;
+      }
+    }
+    assert.ok(contacts >= 2 && running > 3);
+  }
+});
+
+test("all vaults connect simulation frames, action changes and replay samples", () => {
+  const vaults = [
+    "speed",
+    "hurdle",
+    "one-hand",
+    "safety",
+    "lazy",
+    "kong",
+    "dash",
+    ...techniques,
+  ] as const;
+  const coordinates = (f: Frame) => {
+    const p = poseFor(f);
+    return [
+      p.hip,
+      p.chest,
+      p.head,
+      ...p.feet,
+      ...p.hands,
+      ...p.knees,
+      ...p.elbows,
+    ]
+      .flatMap((v) => [v[0] + f.x, v[1] + f.y, v[2]])
+      .concat(p.footAngles);
+  };
+  for (const vault of vaults)
+    for (const speed of [6, 10, 14]) {
+      const frames = framesFor(vault, speed);
+      for (const spacing of [1, 6]) {
+        for (let i = spacing; i < frames.length; i += spacing) {
+          const a = frames[i - spacing],
+            b = frames[i];
+          const near = coordinates(interpolateFrame(a, b, 1 - 1e-7));
+          const end = coordinates(b);
+          assert.ok(
+            near.every(
+              (v, j) => Number.isFinite(v) && Math.abs(v - end[j]) < 0.001,
+            ),
+            `${vault} at ${speed}: pose must reach the next frame without a boundary snap (${a.move} → ${b.move})`,
+          );
+        }
+      }
+      // Check the authored curves between ticks, including the double-Kong seam.
+      // A slow approach may miss a bar grab. Check that recovery above, then
+      // sample the authored special pose directly rather than skipping it.
+      const active: Frame = frames.find(
+        (f) => f.move === "vault" || f.move === "special",
+      ) ?? {
+        ...frames[0],
+        move: "special",
+        technique: techniques.find((t) => t === vault),
+      };
+      assert.ok(active.move === "vault" || active.technique);
+      for (let i = 1; i < 1000; i++) {
+        const f = { ...active, transitionPose: undefined, progress: i / 1000 };
+        const before = coordinates({ ...f, progress: f.progress - 1e-7 });
+        const after = coordinates({ ...f, progress: f.progress + 1e-7 });
+        assert.ok(
+          before.every((v, j) => Math.abs(v - after[j]) < 0.001),
+          `${vault}: continuous authored pose at ${f.progress}`,
+        );
+      }
+    }
+});
+
+test("running recovery has no sign-change jump as either foot passes the hip", () => {
+  for (const speed of [6, 10, 14]) {
+    let previous = runPose(0, speed);
+    for (let i = 1; i <= 4400; i++) {
+      const p = runPose(i / 1000, speed);
+      for (const side of [0, 1]) {
+        assert.ok(
+          new THREE.Vector3(...p.feet[side]).distanceTo(
+            new THREE.Vector3(...previous.feet[side]),
+          ) < 0.01,
+        );
+      }
+      previous = p;
+    }
+  }
+});
+
+test("action handoffs preserve the outgoing pose and survive serialized replay", () => {
+  const g = new Run();
+  g.start();
+  g.action("up");
+  g.step();
+  const f = g.frame();
+  assert.ok(f.transitionPose && f.transitionDuration! > 0);
+  assert.deepEqual(poseFor(f), poseFor(JSON.parse(JSON.stringify(f))));
+  const outgoing = poseFor(g.previous);
+  const incoming = poseFor({ ...f, moveTime: 0 });
+  assert.deepEqual(incoming.feet, outgoing.feet);
+  assert.deepEqual(incoming.hands, outgoing.hands);
+  const scene = new THREE.Scene(),
+    runner = makeRunner(scene);
+  const matrices = (frame: Frame) => {
+    runner.pose(frame, 0, 1 / 60);
+    runner.group.updateMatrixWorld(true);
+    return runner.group.children.map((m) => m.matrixWorld.toArray());
+  };
+  const expected = matrices(f);
+  runner.pose({ ...f, move: "roll", progress: 0.5 }, 0, 1 / 30);
+  assert.deepEqual(
+    matrices(f),
+    expected,
+    "scrubbing must not depend on renderer history",
+  );
+  runner.dispose();
+});
+
+test("safety vault holds opposite hand and foot contacts while the free leg passes", () => {
+  for (const speed of [6, 10, 14]) {
+    let supported = 0;
+    for (const f of framesFor("safety", speed)) {
+      if (f.move !== "vault" || f.progress < 0.26 || f.progress > 0.44)
+        continue;
+      const p = poseFor(f),
+        hand = new THREE.Vector3(...p.hands[0]),
+        foot = new THREE.Vector3(...p.feet[1]);
+      solveJoint(
+        new THREE.Vector3(...p.chest).add(
+          new THREE.Vector3(-0.015, -0.025, -0.185),
+        ),
+        hand,
+        new THREE.Vector3(...p.elbows[0]),
+        0.34,
+        0.34,
+      );
+      solveJoint(
+        new THREE.Vector3(...p.hip).add(new THREE.Vector3(0, -0.025, 0.14)),
+        foot,
+        new THREE.Vector3(...p.knees[1]),
+        LEG_LENGTHS.thigh,
+        LEG_LENGTHS.shin,
+      );
+      assert.ok(Math.abs(hand.x + f.x - f.contact!.x) < 0.01);
+      assert.ok(Math.abs(hand.y + f.y - f.contact!.y - 0.025) < 0.01);
+      assert.ok(Math.abs(foot.x + f.x - f.contact!.x - 0.28) < 0.01);
+      assert.ok(Math.abs(foot.y + f.y - f.contact!.y - 0.09) < 0.01);
+      supported++;
+    }
+    assert.ok(supported >= 3);
+  }
+});
+
+test("movement lab reaches each selected movement across its speed controls", () => {
+  for (const move of options.filter((name) => !name.startsWith("combo:"))) {
+    for (const speed of [6, 10, 14]) {
+      const frames = framesFor(move, speed);
+      const expected =
+        move === "landing" ? "land" : move === "long-jump" ? "jump" : move;
+      assert.ok(
+        frames.some(
+          (f) =>
+            f.move === expected ||
+            (f.move === "vault" && f.vault === move) ||
+            (f.move === "special" && f.technique === move),
+        ),
+        `${move} at ${speed} must show the selected movement`,
+      );
+      assert.ok(
+        frames.every((f) => f.move !== "stumble" && f.move !== "crash"),
+        `${move} must not continue into another obstacle`,
+      );
+    }
   }
 });
