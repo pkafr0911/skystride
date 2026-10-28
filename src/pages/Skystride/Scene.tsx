@@ -14,6 +14,7 @@ import {
   RecordRun,
   Run,
   STEP,
+  skybridges,
 } from "./model";
 import { creativeObstacle } from "./obstacle-mesh";
 import { makeRunner } from "./runner";
@@ -233,8 +234,28 @@ export default function Scene({
       : Infinity;
     const narrowRanges = [
       [skyStart, skyEnd],
+      ...skybridges.map((bridge) => [bridge.crest, bridge.descent]),
       [craneBank, craneBank + 5],
     ];
+    // Bank-mounted towers make the elevated shortcut visible from the approach.
+    for (const bridge of skybridges) {
+      for (const offset of [15, 27, 39, 63]) {
+        const x = bridge.start + offset;
+        box(scene, x, 3.2, -1.1, 0.28, 6.4, 0.28, alloy);
+        box(scene, x, 6.5, -0.3, 0.35, 0.35, 2.1, metal);
+      }
+      for (const offset of [28.5, 29.3, 38, 39])
+        box(
+          scene,
+          bridge.start + offset,
+          bridge.height + 0.025,
+          0,
+          0.18,
+          0.05,
+          0.85,
+          edge,
+        );
+    }
     // Bright takeoff bars and a clear landing strip mark the deep lower-route transfers.
     for (const drop of lowerRoofDrops) {
       for (const offset of [0.5, 1.1, 1.7])
@@ -307,10 +328,16 @@ export default function Scene({
           mesh.matrix.elements[1] = slope * width;
           mesh.matrixAutoUpdate = false;
         };
-        rampBox(y - 7.1, 0, 13.8, 4, side);
-        rampBox(y - 0.1, 0, 0.2, 4.15, metal);
-        rampBox(y + 0.025, 2.06, 0.055, 0.08, edge);
-        rampBox(y + 0.025, -2.06, 0.055, 0.08, edge);
+        rampBox(
+          y - (upper ? 0.25 : 7.1),
+          0,
+          upper ? 0.5 : 13.8,
+          upper ? 1.4 : 4,
+          upper ? metal : side,
+        );
+        rampBox(y - 0.1, 0, 0.2, upper ? 1.4 : 4.15, metal);
+        rampBox(y + 0.025, upper ? 0.68 : 2.06, 0.055, 0.08, edge);
+        rampBox(y + 0.025, upper ? -0.68 : -2.06, 0.055, 0.08, edge);
         continue;
       }
       let start = slab.start;

@@ -18,6 +18,8 @@ import React, {
 } from "react";
 import {
   FINISH,
+  skybridges,
+  skybridgeAt,
   canMantle,
   timingRange,
   timingWindow,
@@ -225,9 +227,13 @@ export default function Skystride() {
                           : next?.feature === "window"
                             ? "↑ SILL VAULT / → FAST DIVE"
                             : next?.kind === "branch"
-                              ? next.height
-                                ? "↑ WALL CLIMB / RUN FOR NORMAL"
-                                : "↑ HARD LINE / RUN FOR NORMAL"
+                              ? skybridges.some(
+                                  (bridge) => next.x === bridge.start - 5,
+                                )
+                                ? "↑ SKYBRIDGE SHORTCUT · GAP + VAULT / RUN BELOW"
+                                : next.height
+                                  ? "↑ WALL CLIMB / RUN FOR NORMAL"
+                                  : "↑ HARD LINE / RUN FOR NORMAL"
                               : next?.kind === "drop"
                                 ? "↓ LANDING ROLL"
                                 : next?.kind === "slide"
@@ -388,7 +394,11 @@ export default function Skystride() {
           {game.phase === "running" && !game.paused && (
             <>
               <div className={styles.route}>
-                {game.upper ? "↗ HARD LINE" : "→ NORMAL LINE"}
+                {game.upper && skybridgeAt(game.x)
+                  ? "↗ SKYBRIDGE · FAST LINE"
+                  : game.upper
+                    ? "↗ HARD LINE"
+                    : "→ NORMAL LINE"}
                 <span>
                   SECTOR {Math.min(3, Math.floor(game.x / SECTOR) + 1)} / 03
                 </span>

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   FINISH,
+  skybridges,
   GameMode,
   recordStorage,
   canMantle,
@@ -31,12 +32,20 @@ function complete(
   early = false,
   approach = 1.9,
   mode: GameMode = "standard",
+  branchStart?: number,
 ) {
   const g = new Run();
   g.start(0, false, mode);
+  if (branchStart !== undefined) {
+    g.x = branchStart - 8;
+    g.y = ground(g.x, false);
+    g.speed = 12;
+  }
   const pressed = new Set<number>();
   const rolled = new Set<number>();
   for (let tick = 0; tick < 60000 && g.phase === "running"; tick++) {
+    if (branchStart !== undefined && g.x >= branchStart + 92 && g.grounded)
+      break;
     const frame = g.frame();
     if (
       !g.grounded &&
@@ -161,7 +170,8 @@ test("both routes complete physically with clean contacts and three splits", () 
     assert.ok(g.splits[0] < g.splits[1] && g.splits[1] < g.splits[2]);
     assert.equal(g.recoveries, 0);
     assert.ok(
-      g.inputs.length >= 260,
+      // Open skybridge stretches deliberately replace dense upper filler.
+      g.inputs.length >= (upper ? 250 : 260),
       `Full course input count: ${g.inputs.length}, route: ${upper}`,
     );
     const intervals = g.inputs
@@ -1934,5 +1944,54 @@ test("deep transfers end both building levels before an unobstructed lower rooft
     assert.equal(landing.y, -drop.depth);
     assert.equal(landing.endY, undefined);
     assert.ok(landing.end >= drop.landingEnd);
+  }
+});
+
+test("all sectors have skybridges with continuous physical heights and real gaps", () => {
+  assert.deepEqual(
+    [...new Set(skybridges.map((b) => Math.floor(b.start / SECTOR)))],
+    [0, 1, 2],
+  );
+  for (const bridge of skybridges) {
+    for (const offset of [0, 3, 13, 14, 25, 45, 66, 72, 79]) {
+      const x = bridge.start + offset;
+      const slab = surfaces.find((s) => s.upper && x >= s.start && x < s.end)!;
+      assert.ok(slab);
+      assert.ok(Math.abs(surfaceHeight(slab, x) - ground(x, true)) < 0.001);
+    }
+    assert.equal(ground(bridge.start + 25, true), bridge.height);
+    assert.deepEqual(
+      obstacles
+        .filter(
+          (o) =>
+            o.route === "upper" &&
+            o.kind !== "ledge" &&
+            o.x >= bridge.start &&
+            o.x < bridge.end,
+        )
+        .map((o) => o.kind),
+      ["gap", "vault"],
+    );
+    const gapX = bridge.start + 33;
+    assert.ok(
+      !surfaces.some((s) => s.upper && s.start <= gapX && s.end > gapX),
+    );
+  }
+});
+test("every skybridge saves time including entry and landing in both modes", () => {
+  for (const bridge of skybridges) {
+    for (const mode of ["standard", "hardcore"] as const) {
+      const lower = complete(false, false, 1.9, mode, bridge.start);
+      const upper = complete(true, false, 1.9, mode, bridge.start);
+      for (const run of [lower, upper]) {
+        assert.equal(run.phase, "running", `x=${run.x}, y=${run.y}`);
+        assert.equal(run.recoveries, 0);
+        assert.ok(run.x >= bridge.start + 92);
+      }
+      console.log(
+        `Skybridge ${bridge.start} ${mode}: lower=${lower.time.toFixed(3)}s upper=${upper.time.toFixed(3)}s`,
+      );
+      assert.ok(upper.time < lower.time - 0.4);
+    }
   }
 });

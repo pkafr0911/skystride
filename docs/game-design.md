@@ -289,3 +289,17 @@ The record version advances for these encounter and reward changes. Full-route s
 ## Building-to-building wall runs — v30
 
 The four district billboard wall runs and the upper billboard shortcut now cross real five-metre building gaps. Up on approach starts the takeoff/contact/crossing sequence and transfers the runner to the existing elevated far-bank deck; another Up can launch from that deck. Shared surface cuts remove the roof and facade beneath the crossing. Bank-mounted supports and amber takeoff/landing marks identify the wall connection. Missing the wall run leaves the runner falling into the gap, with lower-route recovery possible where a real lower surface exists. These crossings also trigger the pre-jump camera pullback. Replay version advances for the new physical voids.
+
+## Skybridge shortcut prototype — v39
+
+The first 295–375 m branch now climbs from its existing wall-step landing to a 7 m-high service skybridge. A short flat landing precedes the ascent; a narrow deck crosses the existing 7 m gap and retains one dash vault. Generated upper filler contacts are removed within this branch. Bank-mounted towers, amber gap marks and a specific HUD entrance cue identify the shortcut. The other branches retain their previous layouts.
+
+The lower line has a longer service passage at 335–358 m. The upper descent at 361–375 m converts height into running momentum (capped at 18 m/s), followed by the existing roll landing. This provides a speed reward from the terrain without changing global running speed. Upper slopes share height sampling with support, animation tilt and underside collision.
+
+A deterministic comparison from 287 m through a grounded rejoin at 387 m, entering at 12 m/s with zero flow, measures approximately 8.43 s below and 7.88 s above, including entry and landing. This short branch saves roughly 0.56 s; the proposed 2–4 s target for longer 20–30 s branches does not apply to this eight-second prototype. Regression checks cover shared heights, the physical gap, clean branch timing in both modes, and complete-course traversal. Browser/mobile feel still needs hands-on playtesting. The v39 record namespace separates previous course times.
+
+## Skybridge routes across all sectors — v40
+
+The proven short-route pattern now applies to all four district branches: 295–375 m, 1,775–1,855 m, 2,255–2,335 m and 2,735–2,815 m. Shared route definitions drive 7 m elevations, entry/exit ramps, open upper approaches, slower lower service passages, support towers, gap markings and HUD cues. Every sector now contains at least one such choice. Optional balcony/scaffold ledges remain available; clean shortcut runs bypass them without extra inputs. The long technical district and brief entrance decks retain their distinct encounter layouts.
+
+Each branch is tested independently from eight metres before its platform to twelve metres beyond its end, including a grounded landing, in Standard and Hardcore. Regression tests require zero recoveries and at least 0.4 seconds saved over the lower line, as well as continuous slope heights, real gaps, all-sector coverage and complete-course traversal. The v40 record namespace keeps old course times separate. Browser/mobile feel remains to be playtested.

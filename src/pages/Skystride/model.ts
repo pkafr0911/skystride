@@ -18,7 +18,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v38";
+export const VERSION = "sunset-relay-v40";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -297,6 +297,34 @@ const sideRamps: Obstacle[] = [0, ...districts].map((offset) => ({
   kind: "ramp",
   feature: "side-ramp",
 }));
+// Shared short-route rules across all three sectors.
+export const skybridges = [0, ...districts].map((offset) => ({
+  start: 295 + offset,
+  rampStart: 297 + offset,
+  crest: 309 + offset,
+  descent: 361 + offset,
+  end: 375 + offset,
+  height: 7,
+}));
+export function skybridgeAt(x: number) {
+  return skybridges.find((bridge) => x >= bridge.start && x <= bridge.end);
+}
+function skybridgeHeight(x: number) {
+  const bridge = skybridgeAt(x);
+  if (!bridge) return 3.3;
+  return (
+    3.3 +
+    (bridge.height - 3.3) *
+      Math.max(
+        0,
+        Math.min(
+          1,
+          (x - bridge.rampStart) / (bridge.crest - bridge.rampStart),
+          (bridge.end - x) / (bridge.end - bridge.descent),
+        ),
+      )
+  );
+}
 const courseAnchors: Obstacle[] = [
   ...sideRamps,
   ...sideRamps.map(
@@ -311,6 +339,11 @@ const courseAnchors: Obstacle[] = [
   { x: 2960, width: 4.2, kind: "slide" },
   { x: 2980, width: 6, kind: "gap" },
 ].sort((a, b) => a.x - b.x) as Obstacle[];
+// Each high shortcut bypasses a slower, forgiving service passage.
+for (const bridge of skybridges)
+  courseAnchors.find(
+    (o) => o.x === bridge.start + 40 && o.route === "lower",
+  )!.width = 23;
 /** Separate lower-route buildings: a street gap, a roof eight metres below,
  * a clear roll-out, then a gradual connection back into the district. */
 export const lowerRoofDrops = [132, 1612, 2092, 2572].map((x) => ({
@@ -379,6 +412,8 @@ function denseLane(start: number, end: number, route: "upper" | "lower") {
     }
   }
   return additions.filter((o) => {
+    // The skybridge is a short, open momentum line with authored contacts only.
+    if (route === "upper" && skybridgeAt(o.x)) return false;
     if (
       sideRamps.some((r) => o.x + o.width > r.x - 2 && o.x < r.x + r.width + 12)
     )
@@ -594,7 +629,29 @@ export const surfaces: Surface[] = [
       };
     });
   }),
-  ...upperPlatforms.flatMap((p) => cut(p.start, p.end, 3.3, true)),
+  ...upperPlatforms.flatMap((p) => {
+    const bridge = skybridgeAt(p.start);
+    return bridge
+      ? [
+          { start: p.start, end: bridge.rampStart, y: 3.3, upper: true },
+          {
+            start: bridge.rampStart,
+            end: bridge.crest,
+            y: 3.3,
+            endY: bridge.height,
+            upper: true,
+          },
+          ...cut(bridge.crest, bridge.descent, bridge.height, true),
+          {
+            start: bridge.descent,
+            end: p.end,
+            y: bridge.height,
+            endY: 3.3,
+            upper: true,
+          },
+        ]
+      : cut(p.start, p.end, 3.3, true);
+  }),
 ];
 export const craneRecovery = obstacles
   .filter((o) => o.landmark === "crane" && isSwing(o.technique))
@@ -609,7 +666,7 @@ export const craneRecovery = obstacles
 surfaces.push(...craneRecovery);
 export function ground(x: number, upper: boolean) {
   return upper && upperPlatforms.some((p) => x >= p.start && x <= p.end)
-    ? districtRoofHeight(x) + 3.3
+    ? districtRoofHeight(x) + skybridgeHeight(x)
     : roofHeight(x);
 }
 /** Solid obstacle tops are support surfaces even after their scoring event is handled. */
@@ -1668,21 +1725,28 @@ export class Run {
       this.vy -= GRAVITY * (this.vy < 0 ? 1.18 : 1) * STEP;
       this.y += this.vy * STEP;
     }
-    const roofRamp = !this.upper
-      ? surfaces.find(
-          (s) =>
-            !s.upper &&
-            s.endY !== undefined &&
-            ((this.x >= s.start && this.x < s.end) ||
-              (oldX >= s.start && oldX < s.end)),
-        )
-      : undefined;
+    const roofRamp = surfaces.find(
+      (s) =>
+        s.upper === this.upper &&
+        s.endY !== undefined &&
+        ((this.x >= s.start && this.x < s.end) ||
+          (oldX >= s.start && oldX < s.end)),
+    );
     let rampSupport = false;
     if (roofRamp) {
       const before = surfaceHeight(roofRamp, oldX),
         after = surfaceHeight(roofRamp, this.x);
       if (this.grounded && Math.abs(oldY - before) < 0.04) {
         this.y = after;
+        // The skybridge's downhill exit converts height into usable momentum.
+        if (roofRamp.upper && roofRamp.endY! < roofRamp.y)
+          this.speed = Math.min(
+            18,
+            this.speed +
+              ((GRAVITY * (roofRamp.y - roofRamp.endY!)) /
+                (roofRamp.end - roofRamp.start)) *
+                STEP,
+          );
         rampSupport = true;
       } else if (
         !this.grounded &&
@@ -1690,7 +1754,7 @@ export class Run {
         oldY >= before &&
         this.y <= after
       ) {
-        this.land(after, false);
+        this.land(after, roofRamp.upper);
         rampSupport = true;
       }
     }
@@ -1791,11 +1855,11 @@ export class Run {
           s.upper &&
           this.x >= s.start &&
           this.x <= s.end &&
-          oldY + 1.85 <= s.y - 0.9 &&
-          this.y + 1.85 >= s.y - 0.9,
+          oldY + 1.85 <= surfaceHeight(s, oldX) - 0.9 &&
+          this.y + 1.85 >= surfaceHeight(s, this.x) - 0.9,
       );
       if (ceiling) {
-        this.y = ceiling.y - 0.9 - 1.85;
+        this.y = surfaceHeight(ceiling, this.x) - 0.9 - 1.85;
         this.vy = 0;
         this.setMove("fall");
       }
@@ -2423,15 +2487,13 @@ export class Run {
     };
   }
   private slope() {
-    const roofRamp = !this.upper
-      ? surfaces.find(
-          (s) =>
-            !s.upper &&
-            s.endY !== undefined &&
-            this.x >= s.start &&
-            this.x < s.end,
-        )
-      : undefined;
+    const roofRamp = surfaces.find(
+      (s) =>
+        s.upper === this.upper &&
+        s.endY !== undefined &&
+        this.x >= s.start &&
+        this.x < s.end,
+    );
     if (roofRamp && Math.abs(this.y - surfaceHeight(roofRamp, this.x)) < 0.04)
       return (roofRamp.endY! - roofRamp.y) / (roofRamp.end - roofRamp.start);
     const ramp = ramps.find(
