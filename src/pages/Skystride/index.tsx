@@ -230,7 +230,7 @@ export default function Skystride() {
                               ? skybridges.some(
                                   (bridge) => next.x === bridge.start - 5,
                                 )
-                                ? "↑ SKYBRIDGE SHORTCUT · GAP + VAULT / RUN BELOW"
+                                ? "↑ ROOFTOP SHORTCUT · GAP + VAULT / RUN BELOW"
                                 : next.height
                                   ? "↑ WALL CLIMB / RUN FOR NORMAL"
                                   : "↑ HARD LINE / RUN FOR NORMAL"
@@ -395,7 +395,7 @@ export default function Skystride() {
             <>
               <div className={styles.route}>
                 {game.upper && skybridgeAt(game.x)
-                  ? "↗ SKYBRIDGE · FAST LINE"
+                  ? "↗ HIGH ROOFS · FAST LINE"
                   : game.upper
                     ? "↗ HARD LINE"
                     : "→ NORMAL LINE"}

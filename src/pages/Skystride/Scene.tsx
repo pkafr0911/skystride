@@ -107,7 +107,7 @@ export default function Scene({
       near: 0.5,
       far: 100,
     });
-    sunlight.shadow.normalBias = 0.035;
+    sunlight.shadow.normalBias = 0.06;
     sunlight.shadow.bias = -0.0002;
     scene.add(sunlight.target);
     scene.add(sunlight);
@@ -131,6 +131,23 @@ export default function Scene({
     const roof = material(0x35465a),
       side = material(0x182a43),
       edge = material(0xf3ae65);
+    // Mid-tone matte steel preserves panel detail under the warm sunlight.
+    const vaultFace = material(0x5e7084),
+      slideFace = material(0x586f83),
+      rampFace = material(0x687b8b),
+      obstacleTrim = material(0x89939c),
+      obstacleAccent = material(0xbd8c56),
+      obstacleDark = material(0x152634);
+    for (const finish of [
+      vaultFace,
+      slideFace,
+      rampFace,
+      obstacleTrim,
+      obstacleAccent,
+    ]) {
+      finish.roughness = 1;
+      finish.metalness = 0;
+    }
     const metal = material(0x40506a),
       black = material(0x101c2c);
     // Atmospheric props have a deliberately lighter, quieter value range.
@@ -148,7 +165,20 @@ export default function Scene({
       material(0x303c50),
       material(0x1c3040),
     ];
-    const buildingCaps = [roof, material(0x455063), material(0x394c59), metal];
+    // Roof skins receive shadows; their solid building bodies cast them.
+    // Dedicated materials keep the instanced batches separate from obstacles.
+    const buildingCaps = [
+      material(0x35465a),
+      material(0x455063),
+      material(0x394c59),
+      material(0x40506a),
+    ];
+    const receiveOnlyMaterials = new Set<THREE.Material>([
+      ...buildingCaps,
+      seam,
+      windowGlass,
+      warmWindow,
+    ]);
     const chunks = new Map<number, THREE.Group>();
     const chunkFor = (x: number) => {
       const key = Math.floor(x / 80);
@@ -174,6 +204,19 @@ export default function Scene({
       mesh.scale.set(w, h, d);
       (parent === scene ? chunkFor(x) : parent).add(mesh);
       return mesh;
+    };
+    // Closed service hatches are low architectural details, with no action-colored trim.
+    const serviceHatch = (
+      parent: THREE.Object3D,
+      x: number,
+      y: number,
+      z: number,
+    ) => {
+      box(parent, x, y + 0.04, z, 1.7, 0.08, 1.05, seam);
+      box(parent, x, y + 0.105, z, 1.55, 0.05, 0.9, roof);
+      for (const offset of [-0.5, 0.5])
+        box(parent, x + offset, y + 0.145, z - 0.35, 0.15, 0.03, 0.12, metal);
+      box(parent, x, y + 0.15, z + 0.28, 0.25, 0.04, 0.08, seam);
     };
     const skyline = new THREE.Group();
     scene.add(skyline);
@@ -234,25 +277,19 @@ export default function Scene({
       : Infinity;
     const narrowRanges = [
       [skyStart, skyEnd],
-      ...skybridges.map((bridge) => [bridge.crest, bridge.descent]),
       [craneBank, craneBank + 5],
     ];
-    // Bank-mounted towers make the elevated shortcut visible from the approach.
+    // Full-width rooftop edge markings identify the real building-to-building gaps.
     for (const bridge of skybridges) {
-      for (const offset of [15, 27, 39, 63]) {
-        const x = bridge.start + offset;
-        box(scene, x, 3.2, -1.1, 0.28, 6.4, 0.28, alloy);
-        box(scene, x, 6.5, -0.3, 0.35, 0.35, 2.1, metal);
-      }
       for (const offset of [28.5, 29.3, 38, 39])
         box(
           scene,
           bridge.start + offset,
           bridge.height + 0.025,
-          0,
+          -1.6,
           0.18,
           0.05,
-          0.85,
+          6.6,
           edge,
         );
     }
@@ -311,6 +348,53 @@ export default function Scene({
         }
         continue;
       }
+      if (upper) {
+        // The lower route runs along the front terrace of a taller rear building.
+        // Keep its running plane clear: the occupied floors are set behind it.
+        const width = slab.end - slab.start;
+        const x = (slab.start + slab.end) / 2;
+        const endY = slab.endY ?? slab.y;
+        const top = Math.min(slab.y, endY) - 0.9;
+        const bottom = -14;
+        const face =
+          buildingFaces[
+            Math.abs(Math.floor(slab.start / 80)) % buildingFaces.length
+          ];
+        const group = chunkFor(x);
+        box(group, x, (top + bottom) / 2, -3.4, width, top - bottom, 4, face);
+        // Stepped roof infill belongs to the rear facade, never the lower lane.
+        if (slab.endY !== undefined) {
+          const fill = box(
+            group,
+            x,
+            (slab.y + endY) / 2 - 1.8,
+            -3.4,
+            width,
+            1.8,
+            4,
+            face,
+          );
+          fill.updateMatrix();
+          fill.matrix.elements[1] = endY - slab.y;
+          fill.matrixAutoUpdate = false;
+        }
+        for (
+          let column = slab.start + 1.5;
+          column < slab.end - 1;
+          column += 3.2
+        ) {
+          for (let y = -10; y < top - 1; y += 2.5) {
+            box(group, column, y, -1.37, 1.25, 1.35, 0.06, windowGlass);
+            box(group, column, y - 0.74, -1.3, 1.45, 0.12, 0.18, alloy);
+          }
+        }
+        // Architectural silhouettes stay distinct from interactive equipment.
+        // All decorative raised geometry sits behind the playable lane.
+        if (slab.endY === undefined) {
+          box(group, x, slab.y + 0.35, -5.3, width, 0.7, 0.2, face);
+          if (width > 12) serviceHatch(group, slab.start + 5, slab.y, -3.7);
+        }
+      }
       if (slab.endY !== undefined) {
         const width = slab.end - slab.start;
         const x = (slab.start + slab.end) / 2;
@@ -329,15 +413,25 @@ export default function Scene({
           mesh.matrixAutoUpdate = false;
         };
         rampBox(
-          y - (upper ? 0.25 : 7.1),
-          0,
-          upper ? 0.5 : 13.8,
-          upper ? 1.4 : 4,
+          y - (upper ? 0.55 : 7.1),
+          upper ? -1.6 : -1,
+          upper ? 0.7 : 13.8,
+          upper ? 7.6 : 6,
           upper ? metal : side,
         );
-        rampBox(y - 0.1, 0, 0.2, upper ? 1.4 : 4.15, metal);
-        rampBox(y + 0.025, upper ? 0.68 : 2.06, 0.055, 0.08, edge);
-        rampBox(y + 0.025, upper ? -0.68 : -2.06, 0.055, 0.08, edge);
+        rampBox(
+          y - 0.1,
+          upper ? -1.6 : -1,
+          0.2,
+          upper ? 7.6 : 6.15,
+          buildingCaps[0],
+        );
+        rampBox(y + 0.025, upper ? 2.16 : 2.06, 0.055, 0.08, edge);
+        rampBox(y + 0.025, upper ? -5.36 : -4.06, 0.055, 0.08, edge);
+        if (!upper) {
+          // One roof skin only: overlapping coping tops cause depth flicker.
+          rampBox(y + 0.012, 1.65, 0.024, 0.16, black);
+        }
         continue;
       }
       let start = slab.start;
@@ -352,7 +446,8 @@ export default function Scene({
         const variant = seed % buildingFaces.length;
         const face = buildingFaces[variant];
         const cap = buildingCaps[variant];
-        const depth = 4 + (seed % 3) * 0.22;
+        const depth = upper ? 7.6 : 6;
+        const centerZ = upper ? -1.6 : -1;
         const thickness = 0.2;
         const wallHeight = upper ? 0.7 : 13.8 + (seed % 4);
         const group = chunkFor(x);
@@ -360,7 +455,7 @@ export default function Scene({
           group,
           x,
           slab.y - thickness - wallHeight / 2,
-          0,
+          centerZ,
           width,
           wallHeight,
           depth,
@@ -371,7 +466,7 @@ export default function Scene({
           group,
           x,
           slab.y - thickness / 2,
-          0,
+          centerZ,
           width,
           thickness,
           depth + 0.15,
@@ -381,7 +476,7 @@ export default function Scene({
           group,
           x,
           slab.y + 0.025,
-          depth / 2 + 0.06,
+          centerZ + depth / 2 + 0.06,
           width,
           0.055,
           0.08,
@@ -391,23 +486,85 @@ export default function Scene({
           group,
           x,
           slab.y - 0.23,
-          depth / 2 + 0.09,
+          centerZ + depth / 2 + 0.09,
           width,
           0.16,
           0.12,
           alloy,
         );
         for (let joint = start + 3; joint < end; joint += 4) {
-          box(group, joint, slab.y + 0.006, 0, 0.025, 0.012, depth - 0.1, seam);
+          box(
+            group,
+            joint,
+            slab.y + 0.006,
+            centerZ,
+            0.025,
+            0.012,
+            depth - 0.1,
+            seam,
+          );
         }
         if (!upper) {
+          const front = centerZ + depth / 2;
+          const back = centerZ - depth / 2;
+          // The existing front fascia supplies the cutaway edge. Do not layer
+          // coplanar coping over the roof skin: it flickers as the camera moves.
+          box(
+            group,
+            x,
+            slab.y + 0.012,
+            front - 0.35,
+            width,
+            0.024,
+            0.16,
+            black,
+          );
+          // Roof membranes, drain grates and downpipes anchor the surface to its facade.
+          for (let drain = start + 1; drain < end - 0.5; drain += 10) {
+            box(
+              group,
+              drain,
+              slab.y + 0.025,
+              front - 0.42,
+              0.55,
+              0.04,
+              0.4,
+              metal,
+            );
+            for (let slot = -0.18; slot <= 0.18; slot += 0.12)
+              box(
+                group,
+                drain + slot,
+                slab.y + 0.048,
+                front - 0.42,
+                0.035,
+                0.01,
+                0.3,
+                black,
+              );
+            box(group, drain, slab.y - 4, front + 0.12, 0.13, 8, 0.16, alloy);
+          }
+          const roofStart = start;
+          const underBuilding = surfaces.some(
+            (roofSlab) =>
+              roofSlab.upper &&
+              roofSlab.start < end &&
+              roofSlab.end > roofStart,
+          );
+          if (!underBuilding) {
+            box(group, x, slab.y + 0.3, back + 0.08, width, 0.6, 0.22, face);
+            box(group, x, slab.y + 0.62, back + 0.08, width, 0.06, 0.32, alloy);
+            if (width > 10 && seed % 3 === 1)
+              serviceHatch(group, start + 5, slab.y, back + 1.25);
+          }
+
           // Recessed party-wall joints and contrasting end piers identify each property.
           for (const boundary of [start + 0.12, end - 0.12]) {
             box(
               group,
               boundary,
               slab.y - 6.5,
-              depth / 2 + 0.055,
+              centerZ + depth / 2 + 0.055,
               0.18,
               12.5,
               0.15,
@@ -423,7 +580,7 @@ export default function Scene({
                 group,
                 column,
                 y,
-                depth / 2 + 0.025,
+                centerZ + depth / 2 + 0.025,
                 windowWidth,
                 variant === 2 ? 1.6 : 1.2,
                 0.045,
@@ -433,7 +590,7 @@ export default function Scene({
                 group,
                 column,
                 y - 0.7,
-                depth / 2 + 0.07,
+                centerZ + depth / 2 + 0.07,
                 windowWidth + 0.15,
                 0.09,
                 0.14,
@@ -447,7 +604,7 @@ export default function Scene({
                 group,
                 x,
                 slab.y - 3.1 - row * 2.5,
-                depth / 2 + 0.06,
+                centerZ + depth / 2 + 0.06,
                 width - 0.35,
                 0.12,
                 0.12,
@@ -466,16 +623,22 @@ export default function Scene({
           ? 3.3
           : 0
         : ground(o.x, o.route === "upper");
+      const obstacleFace =
+        o.kind === "slide"
+          ? slideFace
+          : o.kind === "ramp"
+            ? rampFace
+            : vaultFace;
       if (o.feature || o.design) {
         chunkFor(o.x).add(
           creativeObstacle(o, {
             box: boxGeometry,
             cylinder: cylinderGeometry,
-            face: metal,
-            dark: black,
-            trim: alloy,
-            amber: edge,
-            panel: solar,
+            face: obstacleFace,
+            dark: obstacleDark,
+            trim: obstacleTrim,
+            amber: obstacleAccent,
+            panel: o.kind === "ramp" ? rampFace : solar,
           }),
         );
       } else if (o.kind === "vault") {
@@ -487,7 +650,7 @@ export default function Scene({
           o.width,
           o.height || 1,
           2.4,
-          metal,
+          vaultFace,
         );
         box(
           scene,
@@ -497,7 +660,7 @@ export default function Scene({
           o.width + 0.08,
           0.05,
           2.4,
-          edge,
+          obstacleAccent,
         );
         for (let j = 0; j < 4; j++)
           box(
@@ -519,7 +682,7 @@ export default function Scene({
           o.width,
           (o.height ?? 2.35) - 1.25,
           3.3,
-          roof,
+          slideFace,
         );
         box(
           scene,
@@ -529,7 +692,7 @@ export default function Scene({
           o.width,
           0.05,
           3.3,
-          edge,
+          obstacleAccent,
         );
         box(
           scene,
@@ -539,7 +702,7 @@ export default function Scene({
           o.width,
           0.055,
           0.055,
-          edge,
+          obstacleAccent,
         );
         for (const x of [o.x, o.x + o.width])
           box(scene, x, y + 0.7, -1.5, 0.2, 1.4, 0.2, metal);
@@ -611,48 +774,16 @@ export default function Scene({
       if (o.kind === "branch")
         box(scene, o.x + o.width, 3.32, -0.8, 0.24, 0.06, 2.6, edge);
     });
-    // Rooftop service details, kept behind the playable silhouette.
+    // Background buildings use quiet architectural masses, never obstacle-like props.
     for (let i = 0; i < Math.ceil(FINISH / 22); i++) {
       const x = i * 22 - 10;
       box(scene, x + 2, -7, -11, 17, 14, 6, decorDark);
-      box(scene, x, 1.1, -9, 0.12, 2.2, 0.12, decor);
-      box(scene, x + 3, 1.1, -9, 0.12, 2.2, 0.12, decor);
-      box(scene, x + 1.5, 2.1, -9, 3, 0.1, 0.1, decor);
-      if (i % 3 === 0) {
-        box(scene, x + 6, 2.4, -12, 3, 2.7, 3, decor);
-        for (const offset of [-1, 1])
-          box(scene, x + 6 + offset, 0.7, -12, 0.15, 1.4, 2, decorDark);
-        box(scene, x + 6, 3.8, -12, 3.1, 0.1, 3.1, decor);
-      }
     }
     for (const x of [SECTOR, SECTOR * 2, FINISH]) {
       box(scene, x, 2.5, -2, 0.12, 5, 0.12, metal);
       box(scene, x + 1, 4.5, -2, 2, 0.65, 0.08, x === FINISH ? metal : roof);
     }
-    // Water towers, pipework and a distant bridge echo the supplied silhouette concept.
-    for (const x of [-10, 104, 280, 391]) {
-      for (const offset of [-1.5, 1.5]) {
-        box(scene, x + offset, 3, -12, 0.2, 6, 0.2, decorDark);
-        const brace = box(
-          scene,
-          x,
-          2.7 + offset * 0.5,
-          -12,
-          3.7,
-          0.12,
-          0.12,
-          decorDark,
-        );
-        brace.rotation.z = offset > 0 ? 0.65 : -0.65;
-      }
-      const tank = new THREE.Mesh(cylinderGeometry, decorDark);
-      tank.scale.set(2, 3.4, 2);
-      tank.position.set(x, 7, -12);
-      scene.add(tank);
-      box(scene, x, 5.2, -12, 4.15, 0.16, 4.15, decorDark);
-      box(scene, x + 2.4, 3.5, -12, 0.2, 7, 0.2, decor);
-      box(scene, x + 1.8, 6.9, -12, 1.4, 0.2, 0.2, decor);
-    }
+    // The distant skyline bridge stays separate from the playable roofs.
     const bridge = new THREE.Group();
     skyline.add(bridge);
     box(bridge, 140, 1, -47, 150, 0.35, 1, decor);
@@ -697,7 +828,7 @@ export default function Scene({
           object.material instanceof THREE.MeshStandardMaterial &&
           !object.material.transparent
         ) {
-          object.castShadow = true;
+          object.castShadow = !receiveOnlyMaterials.has(object.material);
           object.receiveShadow = true;
         }
       });

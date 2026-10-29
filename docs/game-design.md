@@ -303,3 +303,31 @@ A deterministic comparison from 287 m through a grounded rejoin at 387 m, enteri
 The proven short-route pattern now applies to all four district branches: 295–375 m, 1,775–1,855 m, 2,255–2,335 m and 2,735–2,815 m. Shared route definitions drive 7 m elevations, entry/exit ramps, open upper approaches, slower lower service passages, support towers, gap markings and HUD cues. Every sector now contains at least one such choice. Optional balcony/scaffold ledges remain available; clean shortcut runs bypass them without extra inputs. The long technical district and brief entrance decks retain their distinct encounter layouts.
 
 Each branch is tested independently from eight metres before its platform to twelve metres beyond its end, including a grounded landing, in Standard and Hardcore. Regression tests require zero recoveries and at least 0.4 seconds saved over the lower line, as well as continuous slope heights, real gaps, all-sector coverage and complete-course traversal. The v40 record namespace keeps old course times separate. Browser/mobile feel remains to be playtested.
+
+## Upper-route building architecture
+
+Upper shortcut roofs now use broad 7.6 m roof masses attached to full-height rear building volumes, rather than narrow supported walkways. Window rows, rear parapets, rooftop equipment and roof seams identify occupied buildings. The lower route is a front terrace beneath the projecting upper roof, with the rear facade outside the movement plane. Ascents and descents are broad sloping roof sections with facade infill; physical gap intervals remain open through both their roof and rear building mass. Crane and glass-gallery beams retain their specialized narrow geometry. HUD cues now call these rooftop shortcuts. Collision surfaces, timing and downhill momentum are unchanged; this visual pass needs browser/mobile inspection.
+
+## Lower-route rooftop architecture
+
+Lower roofs now have six-metre-wide surfaces and matching building facades, low front parapets with metal coping, perimeter drainage channels, drain grates and downpipes. Exposed roofs add rear parapets and alternating ventilation units or service hatches behind the running lane; roofs beneath upper buildings omit these rear fixtures. Sloping connections share the wider footprint and front coping. Existing seams, windows and facade divisions retain individual building identity. Parapets run along the depth edges, never across takeoff or landing edges. These are visual details outside the movement plane; physics, gap widths and route times are unchanged. Browser/mobile visual inspection remains pending.
+
+## Obstacle contrast and side-ramp visibility
+
+Gameplay obstacles now use orange vault bodies, teal slide bodies and green ramp surfaces with pale trim, separated from the muted blue-grey building palette. The six-metre lower roof footprint is shifted rearward: its front face returns to z=2, clear of the facade slide chute centred at z=2.9. Front coping sits below foot level rather than forming an opaque parapet above the sliding runner. Sloping roof sections use the same setback and cutaway edge. This corrects the previous widened building's overlap with the chute while retaining the architectural detail at the rear. No movement or collision rules change. TypeScript, lint and production build checks pass; camera-angle visibility still needs browser playtesting.
+
+## Theme-preserving obstacle contrast and roof depth cleanup
+
+The saturated orange/teal/green obstacle bodies are replaced with lighter desaturated blue-grey steel and warm pale trim, retaining the existing amber action markers. Upper sloped roof bodies now end at the underside of the roof cap rather than sharing its top plane. Duplicate lower front coping boxes are removed because their top faces coincided with the roof skin. The existing fascia still provides the cutaway edge and the rearward roof footprint still clears the side chute. These changes remove identified sources of depth fighting; the reported flicker still needs browser reproduction to confirm whether any other cause remains.
+
+## Roof self-shadowing cleanup
+
+Dedicated roof-cap materials now receive shadows without casting a duplicate shadow over the solid building body. Roof seams and window overlays also receive only; structural building masses, obstacles and the runner continue to cast shadows. A small increase to directional-light normal bias reduces self-shadowing on roof surfaces. Separate materials preserve these roles through instancing. This addresses a potential source of the dark roof patches shown in the user screenshot; exact location and moving-camera reproduction are still needed to verify that reported artifact.
+
+Obstacle finishes now use mid-tone blue-grey bodies, subdued steel trim and muted amber details with fully rough, non-metallic materials. Dark vents and recesses retain their contrast; course edge markers keep their existing brightness. This reduces bright detail washout without changing scene exposure or building materials.
+
+## Decorative equipment removed for gameplay clarity
+
+Non-interactive rooftop ventilation units, hatch props, repeated service frames, background tanks and pipework are removed. Background identity comes from building masses, windows, parapets, facade divisions and the distant skyline bridge. Authored interactive equipment remains unchanged, so obstacle-like rooftop props now belong to gameplay rather than decorative clutter.
+
+Closed decorative service hatches are restored on selected exposed lower roofs and broad upper roofs. Their low lids, dark frames and subdued hinges sit behind the running lane, away from jump edges, with no amber interaction accents. Rear parapets remain; other decorative equipment stays removed.
