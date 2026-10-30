@@ -1,3 +1,5 @@
+import CourseMenu from "./CourseMenu";
+import { levels, LEVEL_STORAGE, readLevel, LevelDefinition } from "./levels";
 import { CameraView } from "./camera";
 import CharacterPicker from "./CharacterPicker";
 import {
@@ -7,7 +9,7 @@ import {
   readCharacter,
 } from "./characters";
 import { isSwing } from "./combos";
-import { Button, ConfigProvider, Select, theme } from "antd";
+import { Button, ConfigProvider, theme } from "antd";
 import React, {
   lazy,
   Suspense,
@@ -17,14 +19,9 @@ import React, {
   useState,
 } from "react";
 import {
-  FINISH,
-  skybridges,
-  skybridgeAt,
-  canMantle,
   timingRange,
   timingWindow,
   TECHNICAL,
-  SECTOR,
   formatTime,
   readRecord,
   RecordRun,
@@ -37,19 +34,22 @@ import {
 import styles from "./styles.less";
 const Scene = lazy(() => import("./Scene"));
 export default function Skystride() {
-  const [game] = useState(() => new Run());
+  const [game, setGame] = useState(() => new Run());
+  const level = game.level;
+  const { finish: FINISH, skybridges, skybridgeAt, canMantle } = level;
   const [sound, setSound] = useState(true);
   const [gesture] = useState(() => new Swipe());
   const [, redraw] = useReducer((n) => n + 1, 0);
   const [mode, setMode] = useState<GameMode>("standard");
-  const [bests, setBests] = useState<Partial<Record<GameMode, RecordRun>>>({});
-  const best = bests[mode] ?? null;
+  const [bests, setBests] = useState<Record<string, RecordRun>>({});
+  const best = bests[recordStorage(mode, level)] ?? null;
   const [ghost, setGhost] = useState<RecordRun | null>(null);
   const [storageNotice, setStorageNotice] = useState("");
   const [character, setCharacter] = useState<CharacterId>(DEFAULT_CHARACTER);
   useEffect(() => {
     try {
       setCharacter(readCharacter(localStorage.getItem(CHARACTER_STORAGE)));
+      setGame(new Run(readLevel(localStorage.getItem(LEVEL_STORAGE))));
     } catch {
       /* Use default when storage is unavailable. */
     }
@@ -71,18 +71,23 @@ export default function Skystride() {
   const saved = useRef(false);
   useEffect(() => {
     try {
-      const loaded: Partial<Record<GameMode, RecordRun>> = {};
-      for (const key of ["standard", "hardcore"] as const) {
-        const record = readRecord(
-          localStorage.getItem(recordStorage(key)),
-          key,
-        );
-        if (record) loaded[key] = record;
+      const loaded: Record<string, RecordRun> = {};
+      for (const course of levels) {
+        for (const key of ["standard", "hardcore"] as const) {
+          const record = readRecord(
+            localStorage.getItem(recordStorage(key, course)),
+            key,
+            course,
+          );
+          if (record) loaded[recordStorage(key, course)] = record;
+        }
       }
       setBests(loaded);
     } catch {
       setStorageNotice("Storage unavailable · best times last for this visit.");
     }
+  }, []);
+  useEffect(() => {
     game.onChange = redraw;
     const hide = () => {
       if (document.hidden && !game.paused) game.pause();
@@ -114,10 +119,13 @@ export default function Skystride() {
     saved.current = true;
     if (game.eligible && (!best || game.time < best.time)) {
       const record = game.record();
-      setBests((previous) => ({ ...previous, [record.mode]: record }));
+      setBests((previous) => ({
+        ...previous,
+        [recordStorage(record.mode, level)]: record,
+      }));
       try {
         localStorage.setItem(
-          recordStorage(record.mode),
+          recordStorage(record.mode, level),
           JSON.stringify(record),
         );
       } catch {
@@ -141,6 +149,20 @@ export default function Skystride() {
     setGhost(best);
     game.start(Math.max(0, practice), practice >= 0, mode);
     focus();
+  };
+  const chooseLevel = (nextLevel: LevelDefinition) => {
+    if (nextLevel.id === level.id) return;
+    setGame(new Run(nextLevel));
+    setGhost(null);
+    setPractice(-1);
+    saved.current = false;
+    gesture.active = false;
+    pointer.current = null;
+    try {
+      localStorage.setItem(LEVEL_STORAGE, nextLevel.id);
+    } catch {
+      setStorageNotice("Level choice will last for this visit only.");
+    }
   };
   const fullscreen = async () => {
     if (expanded) {
@@ -228,7 +250,10 @@ export default function Skystride() {
                             ? "↑ SILL VAULT / → FAST DIVE"
                             : next?.kind === "branch"
                               ? skybridges.some(
-                                  (bridge) => next.x === bridge.start - 5,
+                                  (bridge) =>
+                                    Math.abs(
+                                      next.x + next.width - bridge.start,
+                                    ) < 1,
                                 )
                                 ? "↑ ROOFTOP SHORTCUT · GAP + VAULT / RUN BELOW"
                                 : next.height
@@ -271,14 +296,14 @@ export default function Skystride() {
       <main className={styles.page}>
         <div
           ref={stage}
-          className={`${styles.stage} ${styles.expanded}`}
+          className={`${styles.stage} ${styles.expanded} ${level.atmosphere === "harbor" ? styles.harborStage : ""}`}
           tabIndex={0}
           role="region"
           aria-label="Skystride parkour course. Up or Space to jump, Down to slide, R to restart, Escape to pause. On touch, swipe up or down."
           onKeyDown={(e) => {
             if (
               (e.target as HTMLElement).closest(
-                'button, input, [role="combobox"]',
+                'button, input, select, summary, [role="combobox"]',
               )
             )
               return;
@@ -362,35 +387,43 @@ export default function Skystride() {
                 PERFECT CHAIN ×{game.flow}
               </div>
             )}
-          <div className={styles.hud} data-ui>
-            <div>
-              <small>{game.practice ? "PRACTICE" : "RUN TIME"}</small>
-              <strong>{formatTime(game.time)}</strong>
-            </div>
-            <div className={styles.best}>
-              <small>PERSONAL BEST</small>
-              <strong>{best ? formatTime(best.time) : "— — : — —"}</strong>
-            </div>
-            <div className={styles.hudActions}>
-              <Button
-                onClick={() => {
-                  game.pause();
-                  focus();
-                }}
-                disabled={game.phase !== "running"}
-              >
-                {game.paused ? "Resume" : "Pause"}
-              </Button>
-              <Button onClick={fullscreen}>
-                {expanded ? "Exit full" : "Fullscreen"}
-              </Button>
-            </div>
-          </div>
-          <div className={styles.progress}>
-            <i style={{ width: `${(game.x / FINISH) * 100}%` }} />
-            <b style={{ left: "33.33%" }} />
-            <b style={{ left: "66.66%" }} />
-          </div>
+          {game.phase !== "ready" && (
+            <>
+              <div className={styles.hud} data-ui>
+                <div>
+                  <small>{game.practice ? "PRACTICE" : "RUN TIME"}</small>
+                  <strong>{formatTime(game.time)}</strong>
+                </div>
+                <div className={styles.best}>
+                  <small>PERSONAL BEST</small>
+                  <strong>{best ? formatTime(best.time) : "— — : — —"}</strong>
+                </div>
+                <div className={styles.hudActions}>
+                  <Button
+                    onClick={() => {
+                      game.pause();
+                      focus();
+                    }}
+                    disabled={game.phase !== "running"}
+                  >
+                    {game.paused ? "Resume" : "Pause"}
+                  </Button>
+                  <Button onClick={fullscreen}>
+                    {expanded ? "Exit full" : "Fullscreen"}
+                  </Button>
+                </div>
+              </div>
+              <div className={styles.progress}>
+                <i style={{ width: `${(game.x / FINISH) * 100}%` }} />
+                {level.sectors.slice(0, -1).map((sector) => (
+                  <b
+                    key={sector.end}
+                    style={{ left: `${(sector.end / FINISH) * 100}%` }}
+                  />
+                ))}
+              </div>
+            </>
+          )}
           {game.phase === "running" && !game.paused && (
             <>
               <div className={styles.route}>
@@ -400,7 +433,13 @@ export default function Skystride() {
                     ? "↗ HARD LINE"
                     : "→ NORMAL LINE"}
                 <span>
-                  SECTOR {Math.min(3, Math.floor(game.x / SECTOR) + 1)} / 03
+                  {level.name.toUpperCase()} · SECTOR{" "}
+                  {Math.min(
+                    level.sectors.length,
+                    level.sectors.findIndex((s) => game.x < s.end) + 1 ||
+                      level.sectors.length,
+                  )}{" "}
+                  / 0{level.sectors.length}
                 </span>
                 {next?.combo && !landmarkCue && (
                   <span className={styles.flow}>
@@ -417,7 +456,9 @@ export default function Skystride() {
                   {game.speed >= LONG_JUMP_SPEED
                     ? " · LONG JUMP READY"
                     : " · BUILD SPEED"}
-                  {game.x >= TECHNICAL.start && game.x <= TECHNICAL.end
+                  {level.id === "sunset-relay" &&
+                  game.x >= TECHNICAL.start &&
+                  game.x <= TECHNICAL.end
                     ? " · TECHNICAL DISTRICT"
                     : ""}
                 </span>
@@ -467,203 +508,219 @@ export default function Skystride() {
             </>
           )}
           {(game.phase !== "running" || game.paused) && (
-            <div className={styles.overlay} data-ui>
-              <div className={styles.panel}>
-                <div className={styles.wordmark}>SKYSTRIDE ↗</div>
-                <span className={styles.eyebrow}>
-                  {finished
-                    ? "SUNSET RELAY / FINISH"
-                    : game.phase === "failed"
-                      ? "ONE MORE ATTEMPT"
-                      : game.paused
-                        ? "TAKE A BREATH"
-                        : "YOUR NEXT PERSONAL BEST STARTS HERE"}
-                </span>
-                <h2>
-                  {finished ? (
-                    formatTime(game.time)
-                  ) : game.phase === "failed" ? (
-                    "Find your footing."
-                  ) : game.paused ? (
-                    "Run paused."
-                  ) : (
-                    <>
-                      3 KM OF ROOFTOPS.
-                      <br />
-                      Against the clock.
-                    </>
-                  )}
-                </h2>
-                <label style={{ display: "block", marginBottom: 12 }}>
-                  <input
-                    type="checkbox"
-                    checked={sound}
-                    onChange={(event) => setSound(event.target.checked)}
-                  />{" "}
-                  Sound effects
-                </label>
-                <p>
-                  {finished
-                    ? `${game.clean} clean moves · ${game.bestFlow} best flow · ${game.recoveries} recoveries${!game.eligible ? " · Practice / paused run — not saved" : " · Local time trial"}`
-                    : game.phase === "failed"
-                      ? "Jump near the edge to carry across. Press R or tap below to go again."
-                      : game.paused
-                        ? "Paused runs remain playable, but cannot set a personal best."
-                        : "Swipe up to jump, vault, or climb a marked wall. Down to slide; down before a drop landing to roll. On obstacle tops, swipe up to jump again or down to slide off. Build speed, then swipe right for a long jump. Keep your momentum. Find your line."}
-                </p>
-                {finished && (
-                  <div className={styles.splits}>
-                    {[0, 1, 2].map((i) => (
-                      <div key={i}>
-                        <small>SECTOR 0{i + 1}</small>
-                        <b>
-                          {game.splits[i]
-                            ? formatTime(
-                                game.splits[i] - (game.splits[i - 1] || 0),
-                              )
-                            : "—"}
-                        </b>
-                      </div>
-                    ))}
+            <div
+              className={`${styles.overlay} ${game.phase === "ready" ? styles.menuOverlay : ""}`}
+              data-ui
+            >
+              {game.phase === "ready" ? (
+                <CourseMenu
+                  level={level}
+                  onLevel={chooseLevel}
+                  mode={mode}
+                  onMode={(value) => {
+                    setMode(value);
+                    setGhost(null);
+                  }}
+                  practice={practice}
+                  onPractice={setPractice}
+                  bests={bests}
+                  onStart={start}
+                  notice={storageNotice}
+                >
+                  <div className={styles.settingsRow}>
+                    <Button onClick={fullscreen}>
+                      {expanded ? "Exit fullscreen" : "Fullscreen"}
+                    </Button>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={sound}
+                        onChange={(e) => setSound(e.target.checked)}
+                      />{" "}
+                      Sound effects
+                    </label>
+                    <label>
+                      Camera{" "}
+                      <select
+                        aria-label="Camera view"
+                        value={view}
+                        onChange={(e) => {
+                          setView(e.target.value as CameraView);
+                          setAutoView(false);
+                        }}
+                      >
+                        <option value="2d">2D</option>
+                        <option value="left">2.5D · Left</option>
+                        <option value="right">2.5D · Right</option>
+                      </select>
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={autoView}
+                        onChange={(e) => setAutoView(e.target.checked)}
+                      />{" "}
+                      Auto camera
+                    </label>
+                    <label>
+                      Swipe sensitivity{" "}
+                      <input
+                        aria-label="Swipe sensitivity"
+                        type="range"
+                        min="10"
+                        max="32"
+                        defaultValue={gesture.threshold}
+                        onChange={(e) => {
+                          gesture.threshold = Number(e.target.value);
+                        }}
+                      />
+                    </label>
                   </div>
-                )}
-                {game.phase === "ready" && (
-                  <>
-                    <label htmlFor="game-mode">Game mode</label>
-                    <Select
-                      id="game-mode"
-                      aria-label="Game mode"
-                      value={mode}
-                      onChange={(value: GameMode) => {
-                        setMode(value);
-                        setGhost(null);
-                      }}
-                      options={[
-                        {
-                          value: "standard",
-                          label: "Standard · forgiving recovery",
-                        },
-                        {
-                          value: "hardcore",
-                          label: "Hardcore · crash penalties",
-                        },
-                      ]}
-                      style={{ width: "100%", marginBottom: 8 }}
-                    />
-                    <p>
-                      {mode === "hardcore"
-                        ? "Missed vaults and slides knock you down. Missed rolls cost momentum. Ledge saves need a quick Up press."
-                        : "Keep moving with assisted vault recovery and lighter landing penalties."}
-                    </p>
-                  </>
-                )}
-                {game.phase !== "ready" && (
-                  <span className={styles.eyebrow}>
-                    {game.mode === "hardcore" ? "HARDCORE" : "STANDARD"}
-                  </span>
-                )}
-                {game.phase === "ready" && (
-                  <Select
-                    aria-label="Run mode"
-                    value={practice}
-                    onChange={setPractice}
-                    options={[
-                      { value: -1, label: "Time trial · full course" },
-                      { value: 0, label: "Practice · from sector 1" },
-                      { value: 1, label: "Practice · from sector 2" },
-                      { value: 2, label: "Practice · from sector 3" },
-                    ]}
-                    style={{ width: "100%", marginBottom: 16 }}
+                  <CharacterPicker
+                    value={character}
+                    onChange={chooseCharacter}
                   />
-                )}
-                {game.phase === "ready" && (
-                  <label className={styles.sensitivity}>
-                    Swipe sensitivity
-                    <input
-                      aria-label="Swipe sensitivity"
-                      type="range"
-                      min="10"
-                      max="32"
-                      defaultValue={gesture.threshold}
-                      onChange={(e) => {
-                        gesture.threshold = Number(e.target.value);
-                      }}
-                    />
-                    <small>Short ← → Deliberate</small>
-                  </label>
-                )}
-                <div className={styles.viewControls} data-ui>
-                  <label>
-                    View{" "}
-                    <select
-                      aria-label="Camera view"
-                      value={view}
-                      onChange={(event) => {
-                        setView(event.target.value as CameraView);
-                        setAutoView(false);
-                      }}
-                    >
-                      <option value="2d">2D</option>
-                      <option value="left">2.5D · Left</option>
-                      <option value="right">2.5D · Right</option>
-                    </select>
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={autoView}
-                      onChange={(event) => setAutoView(event.target.checked)}
-                    />{" "}
-                    Auto cycle
-                  </label>
-                </div>
-                <div className={styles.buttons}>
-                  {game.paused && (
-                    <Button
-                      type="primary"
-                      size="large"
-                      onClick={() => {
-                        game.pause();
-                        focus();
-                      }}
-                    >
-                      Resume run
-                    </Button>
-                  )}
-                  <Button
-                    type={game.paused ? "default" : "primary"}
-                    size="large"
-                    onClick={start}
-                  >
-                    {game.phase === "ready"
-                      ? "Run the rooftops ↗"
-                      : "Run again ↗"}
-                  </Button>
-                  {game.phase !== "ready" && (
-                    <Button
-                      size="large"
-                      onClick={() => {
-                        game.phase = "ready";
-                        game.paused = false;
-                        redraw();
-                      }}
-                    >
-                      Course menu
-                    </Button>
-                  )}
-                </div>
-                {storageNotice && <p role="status">{storageNotice}</p>}
-                <small className={styles.panelNote}>
-                  UP / SPACE · JUMP & VAULT &nbsp; DOWN · SLIDE & ROLL &nbsp; →
-                  · LONG JUMP AT 11.5 M/S &nbsp; R · RETRY
-                </small>
-              </div>
-              <CharacterPicker value={character} onChange={chooseCharacter} />
+                </CourseMenu>
+              ) : (
+                <>
+                  <div className={styles.panel}>
+                    <div className={styles.wordmark}>SKYSTRIDE ↗</div>
+                    <span className={styles.eyebrow}>
+                      {finished
+                        ? `${level.name.toUpperCase()} / FINISH`
+                        : game.phase === "failed"
+                          ? "ONE MORE ATTEMPT"
+                          : game.paused
+                            ? "TAKE A BREATH"
+                            : "YOUR NEXT PERSONAL BEST STARTS HERE"}
+                    </span>
+                    <h2>
+                      {finished ? (
+                        formatTime(game.time)
+                      ) : game.phase === "failed" ? (
+                        "Find your footing."
+                      ) : game.paused ? (
+                        "Run paused."
+                      ) : (
+                        <>
+                          3 KM OF ROOFTOPS.
+                          <br />
+                          Against the clock.
+                        </>
+                      )}
+                    </h2>
+                    <label style={{ display: "block", marginBottom: 12 }}>
+                      <input
+                        type="checkbox"
+                        checked={sound}
+                        onChange={(event) => setSound(event.target.checked)}
+                      />{" "}
+                      Sound effects
+                    </label>
+                    <p>
+                      {finished
+                        ? `${game.clean} clean moves · ${game.bestFlow} best flow · ${game.recoveries} recoveries${!game.eligible ? " · Practice / paused run — not saved" : " · Local time trial"}`
+                        : game.phase === "failed"
+                          ? "Jump near the edge to carry across. Press R or tap below to go again."
+                          : game.paused
+                            ? "Paused runs remain playable, but cannot set a personal best."
+                            : "Swipe up to jump, vault, or climb a marked wall. Down to slide; down before a drop landing to roll. On obstacle tops, swipe up to jump again or down to slide off. Build speed, then swipe right for a long jump. Keep your momentum. Find your line."}
+                    </p>
+                    {finished && (
+                      <div className={styles.splits}>
+                        {level.sectors.map((sector, i) => (
+                          <div key={i}>
+                            <small>{sector.name}</small>
+                            <b>
+                              {game.splits[i]
+                                ? formatTime(
+                                    game.splits[i] - (game.splits[i - 1] || 0),
+                                  )
+                                : "—"}
+                            </b>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className={styles.viewControls} data-ui>
+                      <label>
+                        View{" "}
+                        <select
+                          aria-label="Camera view"
+                          value={view}
+                          onChange={(event) => {
+                            setView(event.target.value as CameraView);
+                            setAutoView(false);
+                          }}
+                        >
+                          <option value="2d">2D</option>
+                          <option value="left">2.5D · Left</option>
+                          <option value="right">2.5D · Right</option>
+                        </select>
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={autoView}
+                          onChange={(event) =>
+                            setAutoView(event.target.checked)
+                          }
+                        />{" "}
+                        Auto cycle
+                      </label>
+                    </div>
+                    <div className={styles.buttons}>
+                      {game.paused && (
+                        <Button
+                          type="primary"
+                          size="large"
+                          onClick={() => {
+                            game.pause();
+                            focus();
+                          }}
+                        >
+                          Resume run
+                        </Button>
+                      )}
+                      <Button
+                        type={game.paused ? "default" : "primary"}
+                        size="large"
+                        onClick={start}
+                      >
+                        Run again ↗
+                      </Button>
+                      {
+                        <Button
+                          size="large"
+                          onClick={() => {
+                            game.phase = "ready";
+                            game.paused = false;
+                            redraw();
+                          }}
+                        >
+                          Course menu
+                        </Button>
+                      }
+                    </div>
+                    {storageNotice && <p role="status">{storageNotice}</p>}
+                    <small className={styles.panelNote}>
+                      UP / SPACE · JUMP & VAULT &nbsp; DOWN · SLIDE & ROLL
+                      &nbsp; → · LONG JUMP AT 11.5 M/S &nbsp; R · RETRY
+                    </small>
+                  </div>
+                  <CharacterPicker
+                    value={character}
+                    onChange={chooseCharacter}
+                  />
+                </>
+              )}
             </div>
           )}
-          <div className={styles.rotate}>
-            ↻ Landscape recommended · fullscreen gives you more room
-          </div>
+          {game.phase !== "ready" && (
+            <div className={styles.rotate}>
+              ↻ Landscape recommended · fullscreen gives you more room
+            </div>
+          )}
         </div>
       </main>
     </ConfigProvider>

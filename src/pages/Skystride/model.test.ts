@@ -1,3 +1,10 @@
+import {
+  harborRun,
+  sunsetRelay,
+  levels,
+  readLevel,
+  type LevelDefinition,
+} from "./levels";
 import { ground } from "./model";
 import { simulateChain } from "./lab-model";
 import {
@@ -42,8 +49,10 @@ function complete(
   approach = 1.9,
   mode: GameMode = "standard",
   branchStart?: number,
+  level: LevelDefinition = sunsetRelay,
 ) {
-  const g = new Run();
+  const g = new Run(level);
+  const { ground, surfaces } = level;
   g.start(0, false, mode);
   if (branchStart !== undefined) {
     g.x = branchStart - 8;
@@ -2185,5 +2194,90 @@ test("new chains have distinct spacing and preserve interval ownership", () => {
       false,
       "touching boundaries do not overlap",
     );
+  }
+});
+
+for (const mode of ["standard", "hardcore"] as const) {
+  for (const upper of [false, true]) {
+    test(`Harbor Run completes ${upper ? "elevated" : "service"} route in ${mode}`, () => {
+      const run = complete(upper, false, 1.9, mode, undefined, harborRun);
+      assert.equal(
+        run.phase,
+        "finished",
+        `Stopped at ${run.x.toFixed(2)}m, y=${run.y.toFixed(2)}, next=${JSON.stringify(run.next())}`,
+      );
+      if (upper) {
+        for (const bridge of harborRun.skybridges)
+          assert.ok(
+            run.samples.some(
+              ({ frame }) =>
+                frame.x >= bridge.crest &&
+                frame.x < bridge.descent &&
+                frame.y >= 6.9,
+            ),
+            `Missing elevated route at ${bridge.start}`,
+          );
+        assert.ok(
+          run.samples.some(
+            ({ frame }) =>
+              frame.technique === "lache" && frame.move === "special",
+          ),
+          "Crane bars must actually be caught",
+        );
+      }
+      assert.ok(
+        run.samples.some(({ frame }) => frame.move === "roll" && frame.y < -4),
+        "Port drops have a playable roll landing",
+      );
+      assert.equal(run.x, harborRun.finish);
+      assert.equal(run.splits.length, 3);
+      assert.ok(run.eligible);
+      const raw = JSON.stringify(run.record());
+      assert.ok(readRecord(raw, mode, harborRun));
+      assert.equal(readRecord(raw, mode, sunsetRelay), null);
+    });
+  }
+}
+test("level geometry and records remain isolated across simultaneous runs", () => {
+  const sunset = new Run();
+  const harbor = new Run(harborRun);
+  sunset.start();
+  harbor.start();
+  assert.equal(sunset.next(), sunsetRelay.obstacles[0]);
+  assert.equal(harbor.next(), harborRun.obstacles[0]);
+  assert.notEqual(sunset.next()?.x, harbor.next()?.x);
+  assert.equal(
+    recordStorage("standard"),
+    "skystride.sunset-relay-v41.standard.best",
+  );
+  assert.notEqual(
+    recordStorage("standard", sunsetRelay),
+    recordStorage("standard", harborRun),
+  );
+  assert.notEqual(
+    recordStorage("standard", harborRun),
+    recordStorage("hardcore", harborRun),
+  );
+  assert.equal(readLevel("bad-value"), sunsetRelay);
+  assert.equal(readLevel("harbor-run"), harborRun);
+});
+test("every level has safe sector practice starts and bounded surfaces", () => {
+  for (const level of levels) {
+    for (let sector = 0; sector < level.sectors.length; sector++) {
+      const run = new Run(level);
+      run.start(sector, true);
+      assert.equal(run.x, level.sectors[sector].start);
+      assert.equal(run.y, level.ground(run.x, false));
+      assert.ok(
+        level.surfaces.some(
+          (s) => !s.upper && s.start <= run.x && s.end >= run.x + 0.25,
+        ),
+      );
+      assert.equal(run.grounded, true);
+      advance(run, 0.5);
+      assert.equal(run.phase, "running");
+      assert.equal(run.eligible, false);
+    }
+    assert.ok(level.surfaces.every((s) => s.end > s.start));
   }
 });

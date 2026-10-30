@@ -7,7 +7,7 @@ import type { ObstacleKit } from "./obstacle-mesh";
 export function movementObstacle(o: Obstacle, kit: ObstacleKit) {
   const group = new THREE.Group();
   group.name = o.appearance!;
-  group.position.set(o.x, ground(o.x, o.route === "upper"), 0);
+  group.position.set(o.x, (kit.ground ?? ground)(o.x, o.route === "upper"), 0);
   const w = o.width,
     h = o.height ?? 1.1;
   const box = (
@@ -119,9 +119,9 @@ export function movementObstacle(o: Obstacle, kit: ObstacleKit) {
           x,
           (h * x) / w / 2 - 0.1,
           z,
-            0.09,
-            Math.max(0.05, (h * x) / w - 0.2),
-            0.09,
+          0.09,
+          Math.max(0.05, (h * x) / w - 0.2),
+          0.09,
           kit.trim,
         );
     }

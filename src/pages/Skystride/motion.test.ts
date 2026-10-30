@@ -1,3 +1,4 @@
+import { harborRun } from "./levels";
 import { ground, movementPropFor } from "./model";
 import {
   speedZoom,
@@ -1313,5 +1314,36 @@ test("movement lab reaches each selected movement across its speed controls", ()
         `${move} must not continue into another obstacle`,
       );
     }
+  }
+});
+
+test("obstacle meshes use the selected map elevation, including delegated prop designs", () => {
+  const box = new THREE.BoxGeometry();
+  const cylinder = new THREE.CylinderGeometry();
+  const material = new THREE.MeshBasicMaterial();
+  const kit = {
+    box,
+    cylinder,
+    face: material,
+    dark: material,
+    trim: material,
+    amber: material,
+    panel: material,
+    ground: harborRun.ground,
+  };
+  try {
+    for (const o of harborRun.obstacles.filter(
+      (o) => o.design || o.feature || o.technique,
+    )) {
+      const mesh = creativeObstacle(o, kit);
+      assert.equal(mesh.position.y, harborRun.ground(o.x, o.route === "upper"));
+    }
+    const prop = obstacles.find((o) => o.appearance)!;
+    const mesh = creativeObstacle(prop, { ...kit, ground: () => -5 });
+    assert.equal(mesh.position.y, -5);
+  } finally {
+    box.dispose();
+    cylinder.dispose();
+    material.dispose();
   }
 });

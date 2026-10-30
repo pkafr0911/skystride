@@ -5,6 +5,8 @@ import { movementObstacle } from "./movement-obstacle-mesh";
 import { ground, Obstacle } from "./model";
 
 export type ObstacleKit = {
+  /** Active map elevation; offline studies default to Sunset Relay. */
+  ground?: typeof ground;
   box: THREE.BufferGeometry;
   cylinder: THREE.BufferGeometry;
   face: THREE.Material;
@@ -20,7 +22,7 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
   if (o.design) return equipmentObstacle(o, kit);
   const group = new THREE.Group();
   group.name = o.feature ?? "obstacle";
-  group.position.set(o.x, ground(o.x, o.route === "upper"), 0);
+  group.position.set(o.x, (kit.ground ?? ground)(o.x, o.route === "upper"), 0);
   const box = (
     x: number,
     y: number,

@@ -1,6 +1,6 @@
 # Skystride
 
-A standalone, fullscreen rooftop parkour time-trial game. Sunset Relay is a 3 km course with three sectors, elevated route choices, contextual traversal, swipe controls, and a local personal-best ghost.
+A standalone, fullscreen rooftop parkour time-trial game. Choose between two 3 km levels, each with three sectors, elevated route choices, contextual traversal, swipe controls, and its own local personal-best ghost.
 
 ## Development
 
@@ -88,3 +88,15 @@ Chain expansion (v41): eight new route-specific chains bring the total to 28 acr
 Obstacle variety: strapped freight crates and hose-reel stations use existing vaults; overhead cable trays use existing slides. Three of every ten eligible vault/slide props are replaced independently per sector and lane (55 replacements total). All eight original equipment designs remain. Positions, collision dimensions, movements and chain ordering stay unchanged. See the [new obstacle preview](docs/new-rooftop-obstacles.png).
 
 Other movement props: roof expansion joints (jumps), loading shutters (dives), acoustic screens (wall runs), maintenance gantries (bar moves), capped chimney plinths (precision), fire-escape platforms (ledge landings), loading ramps and service bulkheads (wall redirects). Each family replaces a rounded 30% of eligible instances, retaining originals and protected landmarks: 19 additional replacements across all three sectors. Existing contact heights, openings, grips and movements are preserved. See the [movement obstacle preview](docs/new-movement-obstacles.png).
+
+
+## Levels and course selection
+
+The course menu now presents two selectable maps with sector previews, Standard/Hardcore difficulty, full-course time trials, and practice from any sector. Runner, camera, sound, swipe sensitivity, and fullscreen controls are grouped under **Runner & settings**. The selected level is remembered on this device.
+
+- **Level 1 — Sunset Relay:** the original three-sector course, with its existing layout and v41 records preserved.
+- **Level 2 — Harbor Run:** Warehouse Row, Crane District, and Port Skyline. Features freight equipment, six optional elevated routes, two crane-bar crossings, and two five-metre rooftop drops with roll-out corridors. Cool morning light, water, freight stacks, and harbor cranes distinguish the setting.
+
+Each `Run` owns a `LevelDefinition` from `src/pages/Skystride/levels.ts`; simulation, obstacle meshes, scene geometry, practice starts, split markers, and finish detection read that same definition. Sunset geometry is authored in `sunset-course.ts`, Harbor geometry in `harbor-course.ts`. Movement Lab and existing offline studies continue to default to Sunset Relay.
+
+Records are isolated by course version and difficulty. Sunset keeps `skystride.sunset-relay-v41.<mode>.best`; Harbor uses `skystride.harbor-run-v1.<mode>.best`. Practice and paused runs remain ineligible. Ghost validation rejects another map's course version.

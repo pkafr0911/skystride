@@ -6,7 +6,7 @@ import type { ObstacleKit } from "./obstacle-mesh";
 export function equipmentObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
   const g = new THREE.Group();
   g.name = o.design!;
-  g.position.set(o.x, ground(o.x, o.route === "upper"), 0);
+  g.position.set(o.x, (kit.ground ?? ground)(o.x, o.route === "upper"), 0);
   const w = o.width,
     h = o.height ?? (o.kind === "slide" ? 2.35 : 1);
   const box = (

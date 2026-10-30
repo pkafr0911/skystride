@@ -3,19 +3,7 @@ import { CharacterId } from "./characters";
 import { SWING_GAP_EXTRA, isSwing } from "./combos";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import {
-  FINISH,
-  SECTOR,
-  Frame,
-  ground,
-  obstacles,
-  surfaces,
-  lowerRoofDrops,
-  RecordRun,
-  Run,
-  STEP,
-  skybridges,
-} from "./model";
+import { Frame, RecordRun, Run, STEP } from "./model";
 import { creativeObstacle } from "./obstacle-mesh";
 import { makeRunner } from "./runner";
 import {
@@ -53,6 +41,15 @@ export default function Scene({
   const ghostRef = useRef(ghost);
   ghostRef.current = ghost;
   useEffect(() => {
+    const {
+      finish: FINISH,
+      ground,
+      obstacles,
+      surfaces,
+      lowerRoofDrops,
+      skybridges,
+    } = game.level;
+    const harbor = game.level.atmosphere === "harbor";
     const container = host.current!;
     const audio = new TraversalAudio();
     audio.setEnabled(soundRef.current);
@@ -88,14 +85,19 @@ export default function Scene({
     renderer.toneMappingExposure = 1.25;
     container.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0xa59abb, 60, 170);
+    scene.fog = new THREE.Fog(harbor ? 0x9fc8cf : 0xa59abb, 60, 170);
     const camera = new THREE.OrthographicCamera(-16, 16, 9, -9, 0.1, 240);
     const motionPreference = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     );
     camera.zoom = speedZoom(game.speed, motionPreference.matches);
-    scene.add(new THREE.HemisphereLight(0xffd3b2, 0x25354e, 1.25));
-    const sunlight = new THREE.DirectionalLight(0xffae6b, 1.6);
+    scene.add(
+      new THREE.HemisphereLight(harbor ? 0xd9f7f5 : 0xffd3b2, 0x25354e, 1.25),
+    );
+    const sunlight = new THREE.DirectionalLight(
+      harbor ? 0xe4f6ed : 0xffae6b,
+      1.6,
+    );
     sunlight.position.set(-12, 18, -9);
     sunlight.castShadow = true;
     sunlight.shadow.mapSize.set(2048, 2048);
@@ -130,7 +132,7 @@ export default function Scene({
     };
     const roof = material(0x35465a),
       side = material(0x182a43),
-      edge = material(0xf3ae65);
+      edge = material(harbor ? 0x9fe5d5 : 0xf3ae65);
     // Mid-tone matte steel preserves panel detail under the warm sunlight.
     const vaultFace = material(0x5e7084),
       slideFace = material(0x586f83),
@@ -628,6 +630,7 @@ export default function Scene({
       if (o.feature || o.design || o.appearance) {
         chunkFor(o.x).add(
           creativeObstacle(o, {
+            ground,
             box: boxGeometry,
             cylinder: cylinderGeometry,
             face: obstacleFace,
@@ -775,9 +778,30 @@ export default function Scene({
       const x = i * 22 - 10;
       box(scene, x + 2, -7, -11, 17, 14, 6, decorDark);
     }
-    for (const x of [SECTOR, SECTOR * 2, FINISH]) {
+    for (const x of game.level.sectors.map((s) => s.end)) {
       box(scene, x, 2.5, -2, 0.12, 5, 0.12, metal);
       box(scene, x + 1, 4.5, -2, 2, 0.65, 0.08, x === FINISH ? metal : roof);
+    }
+    if (harbor) {
+      const water = material(0x528d9e);
+      box(skyline, 150, -11, -36, 600, 0.2, 48, water);
+      for (let x = 0; x < FINISH; x += 160) {
+        // Port cranes and stacked freight sit behind the playable rooftops.
+        box(scene, x + 40, 0, -20, 1, 22, 1, decorDark);
+        box(scene, x + 52, 10, -20, 38, 0.8, 1.2, decorDark);
+        box(scene, x + 67, 5, -20, 0.12, 9, 0.12, metal);
+        for (let row = 0; row < 3; row++)
+          box(
+            scene,
+            x + row * 16,
+            -7 + row * 1.4,
+            -14,
+            13,
+            3,
+            4,
+            row % 2 ? alloy : roof,
+          );
+      }
     }
     // The distant skyline bridge stays separate from the playable roofs.
     const bridge = new THREE.Group();
