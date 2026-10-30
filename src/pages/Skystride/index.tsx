@@ -177,7 +177,7 @@ export default function Skystride() {
   const landmark = game.upper ? next?.landmark : undefined;
   const landmarkCue =
     landmark === "crane"
-      ? "CRANE REACH · JUMP → GRAB → RELEASE AT MID-SWING"
+      ? `${next?.combo?.toUpperCase() ?? "CRANE REACH"} · JUMP → GRAB → RELEASE AT MID-SWING`
       : landmark === "billboard"
         ? "SKYLINE BILLBOARD · WALL RUN → FRAME → ROOF"
         : landmark === "skylights"
@@ -402,6 +402,12 @@ export default function Skystride() {
                 <span>
                   SECTOR {Math.min(3, Math.floor(game.x / SECTOR) + 1)} / 03
                 </span>
+                {next?.combo && !landmarkCue && (
+                  <span className={styles.flow}>
+                    {next.combo.toUpperCase()} · CONTACT {next.contact}/
+                    {next.contactTotal}
+                  </span>
+                )}
                 {landmarkCue && (
                   <span className={styles.flow}>{landmarkCue}</span>
                 )}
@@ -424,7 +430,7 @@ export default function Skystride() {
                 >
                   {next?.combo && (
                     <small>
-                      {next.combo} · {next.contact}/5
+                      {next.combo} · {next.contact}/{next.contactTotal}
                       <br />
                     </small>
                   )}

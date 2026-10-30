@@ -51,7 +51,63 @@ export function equipmentObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
       for (const y of [bottom, top]) disc(x, y, front, 0.025, 0.025);
   };
 
-  if (o.design === "ac-condenser") {
+  if (o.design === "freight-crate") {
+    // A strapped delivery crate: flat lid supports every existing vault contact.
+    box(w / 2, bodyTop / 2, 0, w, bodyTop, 2.3);
+    cap();
+    for (const x of [w * 0.22, w * 0.78]) {
+      box(x, bodyTop / 2, 1.17, 0.07, bodyTop, 0.04, kit.dark);
+      box(x, h + 0.009, 0, 0.07, 0.012, 2.32, kit.dark);
+      box(x, h * 0.45, 1.205, 0.13, 0.12, 0.025, kit.trim);
+    }
+    for (const y of [h * 0.25, h * 0.6])
+      box(w / 2, y, 1.16, w, 0.025, 0.02, kit.trim);
+    box(w / 2, h * 0.55, 1.19, w * 0.22, h * 0.24, 0.025, kit.panel);
+  } else if (o.design === "hose-station") {
+    // Open steel stand and coiled hose give a distinct silhouette below its tread.
+    for (const x of [w * 0.12, w * 0.88])
+      for (const z of [-0.95, 0.95])
+        box(x, bodyTop / 2, z, Math.min(0.1, w * 0.12), bodyTop, 0.1, kit.trim);
+    box(w / 2, 0.06, 0, w, 0.12, 2.3, kit.dark);
+    cap();
+    const radius = Math.min(w * 0.36, h * 0.34);
+    disc(w / 2, h * 0.48, 0, radius, 1.8, kit.dark);
+    for (const z of [-0.94, 0.94]) {
+      disc(w / 2, h * 0.48, z, radius, 0.06, kit.trim);
+      disc(w / 2, h * 0.48, z + 0.04, radius * 0.75, 0.03, kit.dark);
+      disc(w / 2, h * 0.48, z + 0.065, radius * 0.22, 0.025, kit.trim);
+    }
+    box(w * 0.83, h * 0.3, 1.08, 0.07, h * 0.4, 0.07, kit.dark);
+  } else if (o.design === "cable-gantry") {
+    // Elevated cable tray: all legs remain behind the slide lane.
+    const bottom = 1.25;
+    box(w / 2, bottom + 0.04, 0, w, 0.08, 2.4, kit.trim);
+    cap();
+    for (const x of [0.12, w - 0.12]) {
+      box(
+        x,
+        (bottom + bodyTop) / 2,
+        1.12,
+        0.12,
+        bodyTop - bottom,
+        0.12,
+        kit.face,
+      );
+      box(x, bodyTop / 2, -1.4, 0.12, bodyTop, 0.12, kit.trim);
+      box(x, 0.06, -1.4, 0.35, 0.12, 0.4, kit.dark);
+    }
+    for (const z of [-0.65, 0, 0.65])
+      box(
+        w / 2,
+        (bottom + bodyTop) / 2,
+        z,
+        w,
+        Math.min(0.12, bodyTop - bottom),
+        0.15,
+        kit.dark,
+      );
+    box(w / 2, bottom + 0.025, 1.22, w, 0.04, 0.025, kit.amber);
+  } else if (o.design === "ac-condenser") {
     box(w / 2, (bodyTop + 0.16) / 2, 0, w, bodyTop - 0.16, 2.35);
     for (const x of [w * 0.18, w * 0.82])
       box(x, 0.08, 0, 0.18, 0.16, 2.2, kit.trim);

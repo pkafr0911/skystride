@@ -331,3 +331,24 @@ Obstacle finishes now use mid-tone blue-grey bodies, subdued steel trim and mute
 Non-interactive rooftop ventilation units, hatch props, repeated service frames, background tanks and pipework are removed. Background identity comes from building masses, windows, parapets, facade divisions and the distant skyline bridge. Authored interactive equipment remains unchanged, so obstacle-like rooftop props now belong to gameplay rather than decorative clutter.
 
 Closed decorative service hatches are restored on selected exposed lower roofs and broad upper roofs. Their low lids, dark frames and subdued hinges sit behind the running lane, away from jump edges, with no amber interaction accents. Rear parapets remain; other decorative equipment stays removed.
+
+## Eight distinct route chains — v41
+
+Eight additional named chains replace selected repeated district encounters while preserving the original twenty technical-district combos and the 3 km finish. New chain sections reserve explicit start/end bounds and suppress procedural filler inside their route. Existing technical sections advance by their reserved section length, including extra swing landing space.
+
+| Chain | Route / first contact | Authored contacts |
+| --- | --- | --- |
+| Service Run | Lower / 302 m | Speed vault, slide, dash vault |
+| Vent Climb | Upper / 315 m | Kong vault, roof gap, precision contact, roll drop |
+| Window Rush | Lower / 1,708 m | Lazy vault, window dive with roll, speed vault |
+| Roofline Sprint | Upper / 1,795 m | Dash vault, roof gap, precision contact, roll drop |
+| Underpass Escape | Lower / 1,880 m | Slide, speed vault, underbar jump/catch/release |
+| Billboard Transfer | Upper / 2,273 m | Gap wall run, roof jump, precision contact, roll drop |
+| Crane Descent | Upper / 2,770 m | Kong vault, lache catch/timed release, roll drop |
+| Final Relay | Lower / 2,940 m | Speed vault, slide, Kong vault, long jump and landing roll |
+
+Move ordering is intentionally varied from the initial proposal to fit the existing roofs and maintain reachable transitions. Fingerprint regression checks compare each new chain's ordered traversal types against every other chain and both legacy route variants, ignoring position, color and name. No new chain may duplicate another sequence. Every legacy name and both of its route variants remain present. Optional ledges conflicting with Billboard Transfer and Crane Descent are removed; the other optional ledge encounters remain.
+
+The HUD displays chain names and actual contact totals. Movement Lab includes all 28 names and selects the actual upper route for upper-only chains, using physical roof slopes and gaps for new chain previews. Its camera follows the runner through downhill exits. Swing catch heights now use the authored roof elevation, supporting the seven-metre crane approach. Saved runs use v41 because the course layout changes.
+
+Verification: 98 gameplay tests and 41 motion tests pass, including all eight additions at 8, 12 and 16 m/s in both modes, full-course completion, deterministic replay, section-boundary overlap checks and semantic/spatial uniqueness. The four upper shortcuts save 0.77, 0.58, 0.58 and 1.36 seconds respectively in both modes. Type checking, lint and production build pass. A desktop browser spot check confirmed Crane Descent's crossing and visible landing roll; mobile controls and full human playthrough timing remain unverified.

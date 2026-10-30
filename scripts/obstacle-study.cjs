@@ -23,42 +23,52 @@ const kit = {
 const panels = [];
 const signatureStudy = process.argv.includes("--signatures");
 const equipmentStudy = process.argv.includes("--equipment");
-const entries = equipmentStudy
-  ? [
-      ["ac-condenser", "AC CONDENSER"],
-      ["cable-reels", "CABLE REELS"],
-      ["utility-cabinet", "UTILITY CABINET"],
-      ["maintenance-cart", "MAINTENANCE CART"],
-      ["roof-hatch", "ROOF ACCESS HATCH"],
-      ["duct-elbow", "DUCT ELBOW"],
-      ["safety-barricade", "SAFETY BARRICADE"],
-      ["antenna-base", "ANTENNA BASE"],
-    ]
-  : signatureStudy
-    ? require("../src/pages/Skystride/combos").techniques.map((t) => [
-        t,
-        t.replaceAll("-", " ").toUpperCase(),
-      ])
-    : [
-        ["vent-bank", "SPLIT VENTILATION BANK"],
-        ["pipe", "PIPE CROSSING"],
-        ["solar", "SOLAR LAUNCH RAMP"],
-        ["window", "CONSTRUCTION WINDOW"],
-        ["tank", "WATER-TANK CRADLE"],
-        ["wall-billboard", "WALL-RUN BILLBOARD"],
-        ["bridge", "BROKEN MAINTENANCE BRIDGE"],
-        ["greenhouse", "GREENHOUSE SERVICE LINE"],
-        ["scaffold", "HANGING SCAFFOLD"],
-        ["balcony", "STAGGERED BALCONIES"],
-      ];
-for (const [feature, title] of entries) {
-  const pieces = equipmentStudy
-    ? obstacles.filter((o) => o.design === feature).slice(0, 1)
+const movementStudy = process.argv.includes("--movement-props");
+const entries = movementStudy
+  ? [...new Set(obstacles.map((o) => o.appearance).filter(Boolean))].map(
+      (name) => [name, name.replaceAll("-", " ").toUpperCase()],
+    )
+  : equipmentStudy
+    ? [
+        ["ac-condenser", "AC CONDENSER"],
+        ["cable-reels", "CABLE REELS"],
+        ["utility-cabinet", "UTILITY CABINET"],
+        ["maintenance-cart", "MAINTENANCE CART"],
+        ["roof-hatch", "ROOF ACCESS HATCH"],
+        ["duct-elbow", "DUCT ELBOW"],
+        ["safety-barricade", "SAFETY BARRICADE"],
+        ["antenna-base", "ANTENNA BASE"],
+        ["freight-crate", "STRAPPED FREIGHT CRATE"],
+        ["hose-station", "HOSE-REEL STATION"],
+        ["cable-gantry", "OVERHEAD CABLE TRAY"],
+      ]
     : signatureStudy
-      ? obstacles
-          .filter((o) => o.technique === feature && o.route === "lower")
-          .slice(0, 1)
-      : obstacles.filter((o) => o.feature === feature && o.x < 480);
+      ? require("../src/pages/Skystride/combos").techniques.map((t) => [
+          t,
+          t.replaceAll("-", " ").toUpperCase(),
+        ])
+      : [
+          ["vent-bank", "SPLIT VENTILATION BANK"],
+          ["pipe", "PIPE CROSSING"],
+          ["solar", "SOLAR LAUNCH RAMP"],
+          ["window", "CONSTRUCTION WINDOW"],
+          ["tank", "WATER-TANK CRADLE"],
+          ["wall-billboard", "WALL-RUN BILLBOARD"],
+          ["bridge", "BROKEN MAINTENANCE BRIDGE"],
+          ["greenhouse", "GREENHOUSE SERVICE LINE"],
+          ["scaffold", "HANGING SCAFFOLD"],
+          ["balcony", "STAGGERED BALCONIES"],
+        ];
+for (const [feature, title] of entries) {
+  const pieces = movementStudy
+    ? obstacles.filter((o) => o.appearance === feature).slice(0, 1)
+    : equipmentStudy
+      ? obstacles.filter((o) => o.design === feature).slice(0, 1)
+      : signatureStudy
+        ? obstacles
+            .filter((o) => o.technique === feature && o.route === "lower")
+            .slice(0, 1)
+        : obstacles.filter((o) => o.feature === feature && o.x < 480);
   const start = pieces[0].x,
     end =
       pieces.at(-1).x +
@@ -75,7 +85,7 @@ for (const [feature, title] of entries) {
   const roof = new THREE.Mesh(box, materials[1]);
   roof.position.set(0, -0.15, 0);
   roof.scale.set(end - start + 2, 0.3, 4);
-  if (["underbar", "lache", "monkey"].includes(feature)) {
+  if (["underbar", "lache", "monkey", "maintenance-gantry"].includes(feature)) {
     for (const [a, b] of [
       [start - 3, start],
       [end + SWING_GAP_EXTRA, end + SWING_GAP_EXTRA + 3],
@@ -88,7 +98,8 @@ for (const [feature, title] of entries) {
   } else if (
     feature !== "bridge" &&
     feature !== "scaffold" &&
-    feature !== "roof-hatch"
+    feature !== "roof-hatch" &&
+    feature !== "expansion-joint"
   )
     scene.add(roof);
   const width = Math.max(11, end - start + SWING_GAP_EXTRA + 6);

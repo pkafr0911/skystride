@@ -5,8 +5,16 @@ import {
   canMantle,
   ground,
   lowerRoofDrops,
+  GameMode,
 } from "./model";
-import { techniques, isSwing, comboNames, Technique } from "./combos";
+import {
+  techniques,
+  isSwing,
+  comboNames,
+  Technique,
+  chainSections,
+  obstacleEnd,
+} from "./combos";
 
 export const options = [
   "run",
@@ -50,7 +58,12 @@ export function previewObstacles(move: Preview) {
     );
   if (move.startsWith("combo:"))
     return obstacles.filter(
-      (o) => o.combo === move.slice(6) && o.route === "lower",
+      (o) =>
+        o.combo === move.slice(6) &&
+        (o.route === "lower" ||
+          !obstacles.some(
+            (item) => item.combo === move.slice(6) && item.route === "lower",
+          )),
     );
   const o = obstacles.find((item) =>
     item.technique === move
@@ -68,57 +81,87 @@ export function previewObstacles(move: Preview) {
   return o ? [o] : [];
 }
 
+export function simulateChain(
+  name: (typeof comboNames)[number],
+  speed: number,
+  mode: GameMode = "standard",
+  releaseAt = 0.55,
+) {
+  const group = previewObstacles(`combo:${name}`);
+  const g = new Run();
+  g.start(0, false, mode);
+  const section = chainSections.find((item) => item.name === name);
+  const expanded = Boolean(section);
+  g.x = section ? Math.max(section.start, group[0].x - 8) : group[0].x - 3;
+  g.upper = group[0].route === "upper";
+  g.y = ground(g.x, g.upper);
+  g.speed = speed;
+  g.previous = g.frame();
+  const frames: Frame[] = [],
+    pressed = new Set<number>();
+  for (
+    let tick = 0;
+    tick < 1200 &&
+    g.phase === "running" &&
+    (g.x < obstacleEnd(group[group.length - 1]) + 3 ||
+      !g.grounded ||
+      Boolean(g.traversal));
+    tick++
+  ) {
+    const next = g.next();
+    if (
+      !g.grounded &&
+      !g.traversal &&
+      g.vy < -10 &&
+      g.y - ground(g.x, g.upper) < 1.1
+    )
+      g.action("down");
+    if (
+      g.traversal?.move === "special" &&
+      isSwing(g.traversal.technique) &&
+      !g.traversal.released &&
+      g.frame().progress > releaseAt
+    )
+      g.action("forward");
+    if (
+      next &&
+      (!expanded || next.combo === name) &&
+      next.kind !== "drop" &&
+      !g.traversal &&
+      g.grounded &&
+      !pressed.has(next.x) &&
+      next.x - g.x <= (next.kind === "gap" ? 1.1 : 1.9)
+    ) {
+      g.action(
+        next.kind === "slide"
+          ? "down"
+          : next.feature === "window" ||
+              (next.combo === "Final Relay" && next.kind === "gap")
+            ? "forward"
+            : "up",
+      );
+      pressed.add(next.x);
+    }
+    g.step();
+    frames.push(g.frame());
+  }
+  return { run: g, frames, obstacles: group };
+}
+
 export function framesFor(
   move: Preview,
   entrySpeed: number,
   releaseAt = 0.55,
 ): Frame[] {
   const speed = Math.max(minimumPreviewSpeed(move), entrySpeed);
-  if (move.startsWith("combo:")) {
-    const group = previewObstacles(move);
-    const g = new Run();
-    g.start();
-    g.x = group[0].x - 3;
-    g.y = ground(g.x, false);
-    g.speed = speed;
-    const frames: Frame[] = [],
-      pressed = new Set<number>();
-    for (
-      let tick = 0;
-      tick < 1200 &&
-      g.phase === "running" &&
-      g.x < group[group.length - 1].x + 7;
-      tick++
-    ) {
-      const next = g.next();
-      if (
-        g.traversal?.move === "special" &&
-        isSwing(g.traversal.technique) &&
-        !g.traversal.released &&
-        g.frame().progress > releaseAt
-      )
-        g.action("forward");
-      if (
-        next &&
-        !g.traversal &&
-        g.grounded &&
-        !pressed.has(next.x) &&
-        next.x - g.x <= 1.9
-      ) {
-        g.action(
-          next.kind === "slide"
-            ? "down"
-            : next.feature === "window"
-              ? "forward"
-              : "up",
-        );
-        pressed.add(next.x);
-      }
-      g.step();
-      frames.push(g.frame());
-    }
-    return frames;
-  }
+  if (move.startsWith("combo:"))
+    return simulateChain(
+      move.slice(6) as (typeof comboNames)[number],
+      speed,
+      "standard",
+      releaseAt,
+    ).frames;
+
   const g = new Run();
   g.start();
   g.speed = speed;

@@ -1,4 +1,4 @@
-import { ground } from "./model";
+import { ground, movementPropFor } from "./model";
 import {
   speedZoom,
   easeZoom,
@@ -13,7 +13,13 @@ import { canMantle, Frame, obstacles, Run, STEP } from "./model";
 import { interpolateFrame, poseFor, runPose, STANCE, STRIDE } from "./motion";
 import { creativeObstacle } from "./obstacle-mesh";
 import { framesFor, previewObstacles, options } from "./lab-model";
-import { techniques, comboNames, isSwing } from "./combos";
+import {
+  techniques,
+  comboNames,
+  isSwing,
+  chainSections,
+  swingGripOffset,
+} from "./combos";
 import { limbSurface } from "../../assets/limb-surface";
 import { LEG_LENGTHS, makeRunner, solveJoint } from "./runner";
 
@@ -531,11 +537,13 @@ test("creative obstacle mesh contact planes match the simulation dimensions", ()
       )) {
         const mesh = creativeObstacle(o, kit);
         mesh.updateMatrixWorld(true);
-        const expected = feature === "solar" ? o.height! / 2 : o.height!;
+        const base = ground(o.x, o.route === "upper");
+        const expected =
+          base + (feature === "solar" ? o.height! / 2 : o.height!);
         const ray = new THREE.Raycaster(
           new THREE.Vector3(
             o.x + o.width / 2,
-            feature === "window" ? 2.5 : 8,
+            base + (feature === "window" ? 2.5 : 8),
             0.55,
           ),
           new THREE.Vector3(0, -1, 0),
@@ -548,12 +556,12 @@ test("creative obstacle mesh contact planes match the simulation dimensions", ()
         );
         if (feature === "window") {
           ray.set(
-            new THREE.Vector3(o.x + o.width / 2, 2.5, 0.55),
+            new THREE.Vector3(o.x + o.width / 2, base + 2.5, 0.55),
             new THREE.Vector3(0, 1, 0),
           );
           assert.ok(
             Math.abs(
-              ray.intersectObject(mesh, true)[0].point.y - o.openingTop!,
+              ray.intersectObject(mesh, true)[0].point.y - base - o.openingTop!,
             ) < 1e-6,
           );
         }
@@ -624,7 +632,7 @@ test("all signature poses remain finite throughout their real traversals", () =>
   }
 });
 
-test("movement lab samples every new technique and all 20 full chains", () => {
+test("movement lab samples every technique and all 28 full chains", () => {
   for (const technique of techniques) {
     const frames = framesFor(technique, 12);
     assert.ok(
@@ -639,14 +647,15 @@ test("movement lab samples every new technique and all 20 full chains", () => {
       props = previewObstacles(move);
     assert.equal(
       props.length,
-      [
-        "Wall Traverse",
-        "Monkey Relay",
-        "Descending Flow",
-        "Roof Rollout",
-      ].includes(name)
-        ? 4
-        : 5,
+      chainSections.find((section) => section.name === name)?.steps.length ??
+        ([
+          "Wall Traverse",
+          "Monkey Relay",
+          "Descending Flow",
+          "Roof Rollout",
+        ].includes(name)
+          ? 4
+          : 5),
     );
     const last = props[props.length - 1];
     assert.ok(
@@ -814,9 +823,179 @@ test("equipment designs keep solid tops, slide clearance and hatch void aligned 
     }
     assert.equal(
       designs.size,
-      8,
-      "all eight concepts are present on the course",
+      11,
+      "all eight original and three new concepts are present on the course",
     );
+  } finally {
+    box.dispose();
+    cylinder.dispose();
+    material.dispose();
+  }
+});
+
+test("new props replace about three in ten eligible obstacles in every sector", () => {
+  const added = ["freight-crate", "hose-station", "cable-gantry"];
+  for (let sector = 0; sector < 3; sector++) {
+    const eligible = obstacles.filter(
+      (o) =>
+        Math.floor(o.x / 1000) === sector &&
+        !o.landmark &&
+        (!o.design || added.includes(o.design)) &&
+        ((o.kind === "vault" && (!o.feature || o.feature === "vent-bank")) ||
+          (o.kind === "slide" && (!o.feature || o.feature === "pipe"))),
+    );
+    const fresh = eligible.filter((o) => added.includes(o.design ?? ""));
+    assert.ok(fresh.length / eligible.length >= 0.25);
+    assert.ok(fresh.length / eligible.length <= 0.35);
+    assert.equal(new Set(fresh.map((o) => o.design)).size, 3);
+    for (const route of ["lower", "upper"])
+      assert.ok(fresh.some((o) => !o.route || o.route === route));
+  }
+});
+
+test("other movement families keep originals alongside evenly distributed new props", () => {
+  const families = [...new Set(obstacles.map(movementPropFor).filter(Boolean))];
+  assert.equal(families.length, 8);
+  for (const family of families) {
+    const all = obstacles.filter((o) => movementPropFor(o) === family);
+    const fresh = all.filter((o) => o.appearance === family);
+    assert.equal(
+      fresh.length,
+      Math.min(all.length - 1, Math.max(1, Math.round(all.length * 0.3))),
+    );
+    assert.ok(fresh.length > 0 && fresh.length < all.length, family);
+    assert.ok(fresh.every((o) => !o.design && !o.landmark));
+  }
+  for (let sector = 0; sector < 3; sector++)
+    assert.ok(
+      obstacles.some((o) => o.appearance && Math.floor(o.x / 1000) === sector),
+    );
+});
+
+test("new movement props preserve jump voids, grips, walls and support planes", () => {
+  const box = new THREE.BoxGeometry();
+  const cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const kit = {
+    box,
+    cylinder,
+    face: material,
+    dark: material,
+    trim: material,
+    amber: material,
+    panel: material,
+  };
+  try {
+    for (const o of obstacles.filter((o) => o.appearance)) {
+      const mesh = creativeObstacle(o, kit);
+      mesh.updateMatrixWorld(true);
+      const base = ground(o.x, o.route === "upper");
+      const h = o.height ?? 1.1;
+      const cast = (
+        x: number,
+        y: number,
+        z: number,
+        dx: number,
+        dy: number,
+        dz: number,
+      ) =>
+        new THREE.Raycaster(
+          new THREE.Vector3(o.x + x, base + y, z),
+          new THREE.Vector3(dx, dy, dz),
+        ).intersectObject(mesh, true);
+      if (o.appearance === "expansion-joint") {
+        for (const f of [0.1, 0.5, 0.9])
+          assert.equal(cast(o.width * f, 8, 0, 0, -1, 0).length, 0);
+      } else if (o.appearance === "maintenance-gantry") {
+        const grip =
+          o.technique === "monkey" || o.technique === "shimmy"
+            ? 0.2
+            : swingGripOffset(o.width);
+        assert.ok(
+          Math.abs(cast(grip, 8, 0, 0, -1, 0)[0].point.y - base - h - 0.045) <
+            0.001,
+        );
+        assert.equal(cast(o.width / 2, 0.5, 0, 0, 0, 1).length, 0);
+      } else if (
+        o.appearance === "acoustic-wall" ||
+        o.appearance === "service-bulkhead"
+      ) {
+        const expected = o.appearance === "acoustic-wall" ? -0.71 : -0.77;
+        assert.ok(
+          Math.abs(
+            cast(o.width / 2, h * 0.5, 1, 0, 0, -1)[0].point.z - expected,
+          ) < 0.03,
+        );
+      } else {
+        const startY =
+          o.appearance === "loading-shutter" ? (h + o.openingTop!) / 2 : h + 8;
+        const expected = o.appearance === "loading-ramp" ? h / 2 : h;
+        assert.ok(
+          Math.abs(
+            cast(o.width / 2, startY, 0, 0, -1, 0)[0].point.y - base - expected,
+          ) < 0.025,
+          o.appearance,
+        );
+        if (o.appearance === "loading-shutter")
+          assert.ok(
+            Math.abs(
+              cast(o.width / 2, startY, 0, 0, 1, 0)[0].point.y -
+                base -
+                o.openingTop!,
+            ) < 0.001,
+          );
+      }
+      mesh.traverse((object) => {
+        if (object instanceof THREE.Mesh)
+          assert.ok(
+            object.scale.x > 0 && object.scale.y > 0 && object.scale.z > 0,
+            o.appearance,
+          );
+      });
+    }
+  } finally {
+    box.dispose();
+    cylinder.dispose();
+    material.dispose();
+  }
+});
+
+test("gap end beams sit below the building roof instead of flickering against it", () => {
+  const box = new THREE.BoxGeometry();
+  const cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const kit = {
+    box,
+    cylinder,
+    face: material,
+    dark: material,
+    trim: material,
+    amber: material,
+    panel: material,
+  };
+  try {
+    const gaps = obstacles.filter(
+      (o) => o.feature === "bridge" && o.kind === "gap",
+    );
+    assert.ok(gaps.some((o) => o.appearance === "expansion-joint"));
+    assert.ok(gaps.some((o) => !o.appearance));
+    for (const o of gaps) {
+      const mesh = creativeObstacle(o, kit);
+      mesh.updateMatrixWorld(true);
+      const base = ground(o.x, o.route === "upper");
+      for (const x of [-0.2, o.width + 0.2])
+        for (const z of [-0.3, 0, 0.3]) {
+          const hits = new THREE.Raycaster(
+            new THREE.Vector3(o.x + x, base + 2, z),
+            new THREE.Vector3(0, -1, 0),
+          ).intersectObject(mesh, true);
+          assert.ok(hits.length);
+          assert.ok(
+            hits[0].point.y <= base - 0.03,
+            `gap at ${o.x}: trim must stay below roof skin`,
+          );
+        }
+    }
   } finally {
     box.dispose();
     cylinder.dispose();

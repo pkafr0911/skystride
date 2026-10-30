@@ -618,18 +618,14 @@ export default function Scene({
       }
     }
     obstacles.forEach((o) => {
-      const y = isSwing(o.technique)
-        ? o.route === "upper"
-          ? 3.3
-          : 0
-        : ground(o.x, o.route === "upper");
+      const y = ground(o.x, o.route === "upper");
       const obstacleFace =
         o.kind === "slide"
           ? slideFace
           : o.kind === "ramp"
             ? rampFace
             : vaultFace;
-      if (o.feature || o.design) {
+      if (o.feature || o.design || o.appearance) {
         chunkFor(o.x).add(
           creativeObstacle(o, {
             box: boxGeometry,

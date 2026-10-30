@@ -23,7 +23,7 @@ export const SWING_GAP_EXTRA = 10.2;
 export const SWING_RELEASE_SPEED = 30;
 export const swingGripOffset = (width: number) => width - 0.2;
 export const SWING_DURATION = 0.55;
-export const comboNames = [
+export const legacyComboNames = [
   "Vent Relay",
   "Over–Under",
   "Planter Slalom",
@@ -45,6 +45,17 @@ export const comboNames = [
   "Beam Duck",
   "Roof Rollout",
 ] as const;
+export const newComboNames = [
+  "Service Run",
+  "Vent Climb",
+  "Window Rush",
+  "Roofline Sprint",
+  "Underpass Escape",
+  "Billboard Transfer",
+  "Crane Descent",
+  "Final Relay",
+] as const;
+export const comboNames = [...legacyComboNames, ...newComboNames] as const;
 const vault = (x: number, type: Obstacle["vault"] = "speed"): Obstacle => ({
   x,
   width: type === "kong" ? 2.4 : 1,
@@ -70,8 +81,8 @@ const slide = (x: number): Obstacle => ({
 });
 /** Authored contact phrases. Their final run-out belongs to the next approach. */
 export function comboCourse(): Obstacle[] {
-  let crossingOffset = 0;
-  return comboNames.flatMap((combo, i) => {
+  let sectionStart = 512;
+  return legacyComboNames.flatMap((combo, i) => {
     let steps: Obstacle[];
     switch (i) {
       case 0:
@@ -255,9 +266,11 @@ export function comboCourse(): Obstacle[] {
           vault(36),
         ];
     }
-    const offset = crossingOffset;
+    const start = sectionStart;
     const swing = steps.find((o) => isSwing(o.technique));
-    if (swing) crossingOffset += 8;
+    // Reserve the full swing landing corridor before the next section.
+    const sectionLength = swing ? 52 : 44;
+    sectionStart += sectionLength;
     return (["lower", "upper"] as const).flatMap((route) =>
       (route === "upper" && i === 11
         ? [
@@ -301,7 +314,7 @@ export function comboCourse(): Obstacle[] {
             ? vault(o.x, "kong")
             : o),
         ...(route === "lower" && isSwing(o.technique) ? { height: 2.3 } : {}),
-        x: 512 + i * 44 + offset + o.x + (swing && o.x > swing.x ? 8 : 0),
+        x: start + o.x + (swing && o.x > swing.x ? 8 : 0),
         route,
         landmark:
           route === "upper"
@@ -319,4 +332,159 @@ export function comboCourse(): Obstacle[] {
       })),
     );
   });
+}
+
+export type ChainSection = {
+  name: (typeof newComboNames)[number];
+  start: number;
+  end: number;
+  route: "lower" | "upper";
+  steps: Obstacle[];
+};
+const gap = (x: number, width = 7): Obstacle => ({
+  x,
+  width,
+  kind: "gap",
+  feature: "bridge",
+});
+const drop = (x: number): Obstacle => ({ x, width: 9, kind: "drop" });
+// Explicit reserved bounds include approach and landing space. Only the named
+// route is replaced; these sections never expand the three-kilometre course.
+export const chainSections: ChainSection[] = [
+  {
+    name: "Service Run",
+    start: 300,
+    end: 331,
+    route: "lower",
+    steps: [vault(302), slide(312), vault(323, "dash")],
+  },
+  {
+    name: "Vent Climb",
+    start: 310,
+    end: 376,
+    route: "upper",
+    steps: [vault(315, "kong"), gap(325), special(349, "precision"), drop(375)],
+  },
+  {
+    name: "Window Rush",
+    start: 1698,
+    end: 1765,
+    route: "lower",
+    steps: [
+      vault(1708, "lazy"),
+      {
+        x: 1720,
+        width: 3.4,
+        height: 0.85,
+        kind: "vault",
+        vault: "speed",
+        feature: "window",
+        openingTop: 3.45,
+      },
+      vault(1741),
+    ],
+  },
+  {
+    name: "Roofline Sprint",
+    start: 1790,
+    end: 1856,
+    route: "upper",
+    steps: [
+      {
+        ...vault(1795, "dash"),
+        width: 2.6,
+        height: 1.2,
+        design: "utility-cabinet",
+      },
+      gap(1809),
+      special(1831, "precision"),
+      drop(1855),
+    ],
+  },
+  {
+    name: "Underpass Escape",
+    start: 1878,
+    end: 1925,
+    route: "lower",
+    steps: [
+      slide(1880),
+      vault(1891),
+      { ...special(1902, "underbar"), height: 2.3 },
+    ],
+  },
+  {
+    name: "Billboard Transfer",
+    start: 2263,
+    end: 2336,
+    route: "upper",
+    steps: [
+      {
+        x: 2273,
+        width: 6,
+        height: 1.4,
+        kind: "encounter",
+        feature: "wall-billboard",
+        wallGap: true,
+      },
+      gap(2282, 7),
+      special(2309, "precision"),
+      drop(2335),
+    ],
+  },
+  {
+    name: "Crane Descent",
+    start: 2748,
+    end: 2816,
+    route: "upper",
+    steps: [
+      vault(2770, "kong"),
+      { ...special(2784, "lache"), landmark: "crane" },
+      drop(2815),
+    ],
+  },
+  {
+    name: "Final Relay",
+    start: 2933,
+    end: 3000,
+    route: "lower",
+    steps: [vault(2940), slide(2950), vault(2963, "kong"), gap(2980, 7)],
+  },
+];
+export function expandedChains(): Obstacle[] {
+  return chainSections.flatMap((section) =>
+    section.steps.map((o, i) => ({
+      ...o,
+      route: section.route,
+      combo: section.name,
+      contact: i + 1,
+    })),
+  );
+}
+/** Ignore placement and decoration; compare the actual ordered traversal types. */
+export function chainFingerprint(steps: Obstacle[]) {
+  return steps
+    .map(
+      (o) =>
+        o.technique ??
+        (o.feature === "window"
+          ? "window-dive"
+          : o.feature === "wall-billboard"
+            ? "wall-run"
+            : o.kind === "vault"
+              ? `vault:${o.vault}`
+              : o.kind),
+    )
+    .join(" > ");
+}
+
+/** Full support interval, including the landing side of a suspended crossing. */
+export function obstacleEnd(o: Pick<Obstacle, "x" | "width" | "technique">) {
+  return o.x + o.width + (isSwing(o.technique) ? SWING_GAP_EXTRA : 0);
+}
+export function overlapsChain(o: Obstacle, section: ChainSection) {
+  return (
+    (!o.route || o.route === section.route) &&
+    o.x < section.end &&
+    obstacleEnd(o) > section.start
+  );
 }

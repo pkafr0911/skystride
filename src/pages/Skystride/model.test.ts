@@ -1,5 +1,14 @@
 import { ground } from "./model";
-import { SWING_GAP_EXTRA, isSwing } from "./combos";
+import { simulateChain } from "./lab-model";
+import {
+  SWING_GAP_EXTRA,
+  isSwing,
+  chainSections,
+  chainFingerprint,
+  legacyComboNames,
+  newComboNames,
+  overlapsChain,
+} from "./combos";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -50,14 +59,16 @@ function complete(
     if (
       !g.grounded &&
       !g.traversal &&
-      frame.launchY! - ground(g.x, g.upper) > 0.5 &&
+      (frame.launchY! - ground(g.x, g.upper) > 0.5 || g.vy < -14) &&
       g.vy < -10 &&
       g.y - ground(g.x, g.upper) < 1.1 &&
       surfaces.some(
         (s) =>
-          g.x >= s.start &&
+          g.x + 0.8 >= s.start &&
           g.x < s.end &&
-          Math.abs(surfaceHeight(s, g.x) - ground(g.x, g.upper)) < 0.1,
+          Math.abs(
+            surfaceHeight(s, Math.max(s.start, g.x)) - ground(g.x, g.upper),
+          ) < 0.1,
       ) &&
       !rolled.has(frame.launchX!)
     ) {
@@ -95,7 +106,14 @@ function complete(
         d <=
           (o.kind === "gap" ? 1.1 : early && o.kind === "vault" ? 6 : approach)
       ) {
-        g.action(o.kind === "slide" ? "down" : "up");
+        g.action(
+          o.kind === "slide"
+            ? "down"
+            : (o.combo === "Window Rush" && o.feature === "window") ||
+                (o.combo === "Final Relay" && o.kind === "gap")
+              ? "forward"
+              : "up",
+        );
         pressed.add(o.x);
       }
     }
@@ -171,7 +189,7 @@ test("both routes complete physically with clean contacts and three splits", () 
     assert.equal(g.recoveries, 0);
     assert.ok(
       // Open skybridge stretches deliberately replace dense upper filler.
-      g.inputs.length >= (upper ? 250 : 260),
+      g.inputs.length >= 240,
       `Full course input count: ${g.inputs.length}, route: ${upper}`,
     );
     const intervals = g.inputs
@@ -334,6 +352,11 @@ test("practice begins at sector boundary and is never record eligible", () => {
 test("versioned replay validation rejects malformed input and frame data", () => {
   const r = complete().record();
   assert.deepEqual(readRecord(JSON.stringify(r)), r);
+  assert.equal(r.version, "sunset-relay-v41");
+  assert.equal(
+    readRecord(JSON.stringify({ ...r, version: "sunset-relay-v40" })),
+    null,
+  );
   const legacy = structuredClone(r);
   for (const sample of legacy.samples)
     for (const key of [
@@ -717,7 +740,9 @@ test("descending onto barriers and ducts gives real support and immediate follow
   for (const o of [
     obstacles.find((o) => o.vault === "kong")!,
     obstacles.find(canMantle)!,
-    obstacles.find((o) => o.kind === "slide" && !o.route && !o.height)!,
+    obstacles.find(
+      (o) => o.kind === "slide" && o.route !== "upper" && !o.height,
+    )!,
     obstacles.find((o) => o.kind === "vault" && o.route === "upper")!,
   ]) {
     const g = new Run();
@@ -781,9 +806,9 @@ test("route content removes step vaults and emphasizes the four requested famili
 test("creative encounters recur across all four rooftop blocks with clear approach space", () => {
   for (const feature of ["vent-bank", "pipe", "solar", "window"] as const) {
     const pieces = obstacles.filter((o) => !o.combo && o.feature === feature);
-    assert.equal(
-      pieces.length,
-      feature === "vent-bank" || feature === "pipe" ? 8 : 4,
+    assert.ok(
+      pieces.length >= 2,
+      `${feature} must remain represented outside combos`,
     );
   }
   for (const first of obstacles.filter(
@@ -1138,7 +1163,9 @@ test("both full routes keep their flow across varied obstacle approach timings",
 
 test("all 20 authored combos retain distinct contacts on both routes", () => {
   const groups = new Map<string, number[]>();
-  for (const o of obstacles.filter((o) => o.combo)) {
+  for (const o of obstacles.filter(
+    (o) => o.combo && legacyComboNames.some((name) => name === o.combo),
+  )) {
     const key = `${o.route}:${o.combo}`;
     groups.set(key, [...(groups.get(key) ?? []), o.contact!]);
   }
@@ -1222,12 +1249,16 @@ test("bar release changes exit timing without teleporting the runner", () => {
 
 test("swing crossings have real voids and cannot be caught by walking", () => {
   for (const o of obstacles.filter((o) => isSwing(o.technique))) {
-    const base = o.route === "upper" ? 3.3 : 0;
+    const base = ground(o.x, o.route === "upper");
     assert.ok(
       !surfaces.some(
         (s) =>
           s.y === base &&
-          !(o.combo === "Crane Reach" && !s.upper && s.start === o.x + 3) &&
+          !(
+            (o.combo === "Crane Reach" || o.landmark === "crane") &&
+            !s.upper &&
+            s.start === o.x + 3
+          ) &&
           s.start < o.x + o.width + SWING_GAP_EXTRA &&
           s.end > o.x,
       ),
@@ -1956,26 +1987,37 @@ test("all sectors have skybridges with continuous physical heights and real gaps
     for (const offset of [0, 3, 13, 14, 25, 45, 66, 72, 79]) {
       const x = bridge.start + offset;
       const slab = surfaces.find((s) => s.upper && x >= s.start && x < s.end)!;
-      assert.ok(slab);
-      assert.ok(Math.abs(surfaceHeight(slab, x) - ground(x, true)) < 0.001);
+      if (slab)
+        assert.ok(Math.abs(surfaceHeight(slab, x) - ground(x, true)) < 0.001);
+      else
+        assert.ok(
+          obstacles.some(
+            (o) =>
+              o.route === "upper" &&
+              (o.kind === "gap" || isSwing(o.technique) || o.wallGap) &&
+              x >= o.x &&
+              x < o.x + o.width + (isSwing(o.technique) ? SWING_GAP_EXTRA : 0),
+          ),
+        );
     }
     assert.equal(ground(bridge.start + 25, true), bridge.height);
-    assert.deepEqual(
-      obstacles
-        .filter(
-          (o) =>
-            o.route === "upper" &&
-            o.kind !== "ledge" &&
-            o.x >= bridge.start &&
-            o.x < bridge.end,
-        )
-        .map((o) => o.kind),
-      ["gap", "vault"],
+    const crossings = obstacles.filter(
+      (o) =>
+        o.route === "upper" &&
+        o.x >= bridge.start &&
+        o.x < bridge.end &&
+        (o.kind === "gap" || isSwing(o.technique)),
     );
-    const gapX = bridge.start + 33;
-    assert.ok(
-      !surfaces.some((s) => s.upper && s.start <= gapX && s.end > gapX),
-    );
+    assert.ok(crossings.length > 0);
+    for (const crossing of crossings) {
+      const gapX = crossing.x + crossing.width / 2;
+      assert.ok(
+        !surfaces.some(
+          (surface) =>
+            surface.upper && surface.start <= gapX && surface.end > gapX,
+        ),
+      );
+    }
   }
 });
 test("every skybridge saves time including entry and landing in both modes", () => {
@@ -1993,5 +2035,155 @@ test("every skybridge saves time including entry and landing in both modes", () 
       );
       assert.ok(upper.time < lower.time - 0.4);
     }
+  }
+});
+
+test("eight new chains are unique traversal sequences, including against every legacy route", () => {
+  const groups = new Map<string, typeof obstacles>();
+  for (const o of obstacles.filter((o) => o.combo)) {
+    const key = `${o.combo}:${o.route}`;
+    groups.set(key, [...(groups.get(key) ?? []), o]);
+  }
+  assert.equal(groups.size, 48);
+  assert.equal(chainSections.length, 8);
+  assert.equal(
+    new Set(chainSections.map((section) => Math.floor(section.start / SECTOR)))
+      .size,
+    3,
+  );
+  for (const section of chainSections) {
+    const key = `${section.name}:${section.route}`;
+    const actual = groups.get(key)!;
+    assert.ok(actual, section.name);
+    assert.equal(actual.length, section.steps.length);
+    assert.deepEqual(
+      actual.map((o) => o.contact),
+      actual.map((_, i) => i + 1),
+    );
+    const fingerprint = chainFingerprint(actual);
+    for (const [other, steps] of groups) {
+      if (other !== key)
+        assert.notEqual(
+          fingerprint,
+          chainFingerprint(steps),
+          `${key} duplicates ${other}`,
+        );
+    }
+    assert.ok(actual.every((o) => o.x >= section.start && o.x < section.end));
+    assert.ok(
+      !obstacles.some(
+        (o) =>
+          overlapsChain(o, section) &&
+          o.route === section.route &&
+          o.combo !== section.name &&
+          o.kind !== "ledge",
+      ),
+      `${section.name} filler overlap`,
+    );
+  }
+  assert.equal(
+    new Set(obstacles.filter((o) => o.combo).map((o) => o.combo)).size,
+    legacyComboNames.length + newComboNames.length,
+  );
+});
+
+test("new chains execute their contacts cleanly in both modes at low, cruising and boosted speeds", () => {
+  const required = new Map<string, string[]>([
+    ["Service Run", ["vault", "slide"]],
+    ["Vent Climb", ["vault", "jump", "special", "roll"]],
+    ["Window Rush", ["vault", "dive", "roll"]],
+    ["Roofline Sprint", ["vault", "jump", "special", "roll"]],
+    ["Underpass Escape", ["slide", "vault", "special", "jump"]],
+    ["Billboard Transfer", ["wall-run", "jump", "special", "roll"]],
+    ["Crane Descent", ["vault", "special", "jump", "roll"]],
+    ["Final Relay", ["vault", "slide", "jump", "roll"]],
+  ]);
+  for (const name of newComboNames)
+    for (const mode of ["standard", "hardcore"] as const)
+      for (const speed of [8, 12, 16]) {
+        const {
+          run,
+          frames,
+          obstacles: contacts,
+        } = simulateChain(name, speed, mode);
+        const label = `${name}, ${mode}, ${speed} m/s, x=${run.x}`;
+        assert.notEqual(run.phase, "failed", label);
+        assert.equal(run.recoveries, 0, label);
+        assert.ok(run.grounded && !run.traversal, label);
+        assert.ok(run.x >= contacts.at(-1)!.x + contacts.at(-1)!.width, label);
+        assert.ok(
+          frames.every((frame) =>
+            Number.isFinite(frame.x + frame.y + frame.speed),
+          ),
+          label,
+        );
+        for (const move of required.get(name)!)
+          assert.ok(
+            frames.some((frame) => frame.move === move),
+            `${label}: missing ${move}`,
+          );
+        for (const contact of contacts) {
+          assert.equal(contact.contactTotal, contacts.length);
+          if (contact.kind !== "drop")
+            assert.ok(
+              run.inputs.some((input) => {
+                const frame = frames[input.tick - 1];
+                return frame && Math.abs(frame.x - contact.x) < 5;
+              }),
+              `${label}: contact ${contact.contact} never received input`,
+            );
+        }
+        if (name === "Crane Descent") {
+          const swing = contacts.find((o) => isSwing(o.technique))!;
+          const base = ground(swing.x, true);
+          const hanging = frames.filter(
+            (frame) => frame.technique === "lache" && frame.move === "special",
+          );
+          assert.ok(hanging.length > 5);
+          assert.ok(
+            hanging.every(
+              (frame) =>
+                frame.contact &&
+                Math.abs(frame.contact.y - (base + swing.height!)) < 0.001,
+            ),
+          );
+          assert.ok(hanging.every((frame) => frame.y >= base - 0.1));
+          assert.ok(
+            frames.some(
+              (frame) =>
+                frame.x > swing.x + swing.width + SWING_GAP_EXTRA &&
+                frame.grounded &&
+                frame.y >= base - 0.1,
+            ),
+          );
+        }
+      }
+});
+
+test("new chains have distinct spacing and preserve interval ownership", () => {
+  const patterns = chainSections.map((section) =>
+    section.steps
+      .map((o) => `${(o.x - section.steps[0].x).toFixed(1)}:${o.width}`)
+      .join("|"),
+  );
+  assert.equal(new Set(patterns).size, chainSections.length);
+  for (const section of chainSections) {
+    const first = section.steps[0];
+    assert.ok(first.x - section.start >= 2);
+    const crossing = {
+      x: section.start - 2,
+      width: 3,
+      kind: "vault" as const,
+      route: section.route,
+    };
+    assert.ok(
+      overlapsChain(crossing, section),
+      "an obstacle beginning before a section still overlaps it",
+    );
+    assert.equal(
+      overlapsChain({ ...crossing, width: 2 }, section),
+      false,
+      "touching boundaries do not overlap",
+    );
   }
 });

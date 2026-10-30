@@ -1,6 +1,7 @@
 import { SWING_GAP_EXTRA, swingGripOffset } from "./combos";
 import * as THREE from "three";
 import { equipmentObstacle } from "./equipment-mesh";
+import { movementObstacle } from "./movement-obstacle-mesh";
 import { ground, Obstacle } from "./model";
 
 export type ObstacleKit = {
@@ -15,6 +16,7 @@ export type ObstacleKit = {
 
 /** Shared by the course and offline studies; every mesh uses caller-owned resources. */
 export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
+  if (o.appearance) return movementObstacle(o, kit);
   if (o.design) return equipmentObstacle(o, kit);
   const group = new THREE.Group();
   group.name = o.feature ?? "obstacle";
@@ -252,7 +254,9 @@ export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
     box(w + 1.5, h + 0.02, 1.32, 3, 0.04, 0.06, kit.amber);
   } else if (o.feature === "bridge") {
     for (const x of [-0.45, w + 0.45]) {
-      box(x, -0.12, 0, 0.9, 0.24, 2.8, kit.face);
+      // The building already supplies the walkable roof at y=0. Recess this
+      // decorative end beam so its top cannot compete with that roof skin.
+      box(x, -0.14, 0, 0.9, 0.2, 2.8, kit.face);
       box(x, 0.02, 1.42, 0.9, 0.04, 0.06, kit.amber);
       box(x, 0.55, -1.4, 0.09, 1.1, 0.09, kit.trim);
       box(x, 1.1, -1.4, 1, 0.07, 0.07, kit.trim);

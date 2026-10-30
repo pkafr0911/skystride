@@ -7,7 +7,15 @@ import {
 } from "./characters";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { Frame, STEP, ground, lowerRoofDrops } from "./model";
+import {
+  Frame,
+  STEP,
+  ground,
+  lowerRoofDrops,
+  surfaces,
+  surfaceHeight,
+  wallRunLedges,
+} from "./model";
 import {
   options,
   Preview,
@@ -15,7 +23,13 @@ import {
   minimumPreviewSpeed,
   previewObstacles,
 } from "./lab-model";
-import { SWING_GAP_EXTRA, techniques, isSwing, Technique } from "./combos";
+import {
+  SWING_GAP_EXTRA,
+  techniques,
+  isSwing,
+  Technique,
+  chainSections,
+} from "./combos";
 import { creativeObstacle } from "./obstacle-mesh";
 import { makeRunner } from "./runner";
 import { interpolateFrame, motionPhase } from "./motion";
@@ -155,6 +169,9 @@ export default function MovementLab() {
       o = previewItems[0],
       base = o ? ground(o.x, o.route === "upper") : 0;
     const start = samples[0].x;
+    const courseChain = chainSections.some(
+      (section) => move === `combo:${section.name}`,
+    );
     if (move === "front-flip") {
       const drop = lowerRoofDrops[0];
       box(drop.x - 10, -2, 20, 4);
@@ -166,6 +183,22 @@ export default function MovementLab() {
     } else if (move === "roll" || move === "landing") {
       box(191, 1.3, 8, 4);
       box(206, -2, 22, 4);
+    } else if (courseChain) {
+      const end = previewItems.at(-1)!.x + previewItems.at(-1)!.width + 10;
+      for (const slab of [...surfaces, ...wallRunLedges]) {
+        const left = Math.max(start - 8, slab.start),
+          right = Math.min(end, slab.end);
+        if (right <= left) continue;
+        const y0 = surfaceHeight(slab, left),
+          y1 = surfaceHeight(slab, right);
+        const mesh = new THREE.Mesh(geometry, roof);
+        mesh.position.set((left + right) / 2, (y0 + y1) / 2 - 0.45, 0);
+        mesh.scale.set(right - left, 0.9, 2.5);
+        mesh.updateMatrix();
+        mesh.matrix.elements[1] = y1 - y0;
+        mesh.matrixAutoUpdate = false;
+        environment.add(mesh);
+      }
     } else {
       const floorLength = Math.max(
         40,
@@ -195,7 +228,7 @@ export default function MovementLab() {
     }
     const cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
     for (const o of previewItems) {
-      if (o.feature || o.design) {
+      if (o.feature || o.design || o.appearance) {
         environment.add(
           creativeObstacle(o, {
             box: geometry,
@@ -207,15 +240,16 @@ export default function MovementLab() {
             panel: roof,
           }),
         );
-      } else if (o.kind !== "gap") {
+      } else if (o.kind !== "gap" && o.kind !== "drop") {
         const bottom = o.kind === "slide" ? 1.25 : 0;
+        const contactBase = ground(o.x, o.route === "upper");
         box(
           o.x + o.width / 2,
-          base + (bottom + o.height!) / 2,
+          contactBase + (bottom + o.height!) / 2,
           o.width,
           o.height! - bottom,
         );
-        box(o.x + o.width / 2, base + o.height!, o.width, 0.045, amber);
+        box(o.x + o.width / 2, contactBase + o.height!, o.width, 0.045, amber);
       }
     }
     if (move === "slide") box(93.75, 1.8, 5.5, 1.1);
@@ -308,7 +342,7 @@ export default function MovementLab() {
         showSheet ? 0 : f.x + 0.8,
         showSheet
           ? 1.9
-          : move === "front-flip"
+          : move === "front-flip" || courseChain
             ? f.y + 1.2
             : Math.max(base + 1.9, f.y + 1.2),
         18,

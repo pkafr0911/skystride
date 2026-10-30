@@ -11,6 +11,9 @@ import {
   SWING_DURATION,
   SWING_RELEASE_SPEED,
   comboCourse,
+  chainSections,
+  expandedChains,
+  overlapsChain,
   isSwing,
   techniques,
   Technique,
@@ -18,7 +21,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v40";
+export const VERSION = "sunset-relay-v41";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -81,9 +84,23 @@ export type ObstacleDesign =
   | "roof-hatch"
   | "duct-elbow"
   | "safety-barricade"
-  | "antenna-base";
+  | "antenna-base"
+  | "freight-crate"
+  | "hose-station"
+  | "cable-gantry";
 export type Landmark = "crane" | "billboard" | "skylights";
+export type MovementProp =
+  | "expansion-joint"
+  | "loading-shutter"
+  | "acoustic-wall"
+  | "maintenance-gantry"
+  | "chimney-plinth"
+  | "fire-escape"
+  | "loading-ramp"
+  | "service-bulkhead";
 export type Obstacle = {
+  /** Alternate physical prop with the same traversal/contact geometry. */
+  appearance?: MovementProp;
   /** The wall spans a real void, starting one metre after the approach marker. */
   wallGap?: boolean;
   /** Visual equipment design; collision and traversal still use the authored kind. */
@@ -106,6 +123,8 @@ export type Obstacle = {
   technique?: Technique;
   combo?: string;
   contact?: number;
+  /** Authored obstacles in this route variant, not the number of button presses. */
+  contactTotal?: number;
   side?: 1 | -1;
   feature?: Feature;
   part?: "planter" | "ledge" | "glass";
@@ -338,7 +357,13 @@ const courseAnchors: Obstacle[] = [
   { x: 2940, width: 1.6, height: 1, kind: "vault", vault: "kong" },
   { x: 2960, width: 4.2, kind: "slide" },
   { x: 2980, width: 6, kind: "gap" },
-].sort((a, b) => a.x - b.x) as Obstacle[];
+]
+  .filter(
+    (o) =>
+      !chainSections.some((section) => overlapsChain(o as Obstacle, section)),
+  )
+  .concat(expandedChains())
+  .sort((a, b) => a.x - b.x) as Obstacle[];
 // Each high shortcut bypasses a slower, forgiving service passage.
 for (const bridge of skybridges)
   courseAnchors.find(
@@ -412,6 +437,12 @@ function denseLane(start: number, end: number, route: "upper" | "lower") {
     }
   }
   return additions.filter((o) => {
+    if (
+      chainSections.some(
+        (section) => route === section.route && overlapsChain(o, section),
+      )
+    )
+      return false;
     // The skybridge is a short, open momentum line with authored contacts only.
     if (route === "upper" && skybridgeAt(o.x)) return false;
     if (
@@ -465,6 +496,17 @@ export const obstacles: Obstacle[] = [
 ]
   .filter(
     (o) =>
+      !(
+        o.kind === "ledge" &&
+        o.route === "upper" &&
+        chainSections.some(
+          (section) =>
+            (section.name === "Billboard Transfer" ||
+              section.name === "Crane Descent") &&
+            o.x >= section.start &&
+            o.x < section.end,
+        )
+      ) &&
       !lowerRoofDrops.some((d) =>
         o.route === "upper"
           ? o.x >= d.x && o.x < d.end + 3
@@ -510,6 +552,70 @@ for (const route of ["lower", "upper"] as const) {
     filler.width = 2.4;
   }
 }
+
+// Refresh three of each ten eligible props independently in every sector/lane.
+// Preserve authored equipment, windows, landmarks and all traversal dimensions.
+for (let sector = 0; sector < 3; sector++) {
+  for (const route of [undefined, "lower", "upper"] as const) {
+    const eligible = obstacles.filter(
+      (o) =>
+        Math.floor(o.x / SECTOR) === sector &&
+        o.route === route &&
+        !o.design &&
+        !o.landmark &&
+        ((o.kind === "vault" && (!o.feature || o.feature === "vent-bank")) ||
+          (o.kind === "slide" && (!o.feature || o.feature === "pipe"))),
+    );
+    let vaultIndex = sector;
+    eligible.forEach((o, i) => {
+      if (![1, 4, 7].includes(i % 10)) return;
+      o.design =
+        o.kind === "slide"
+          ? "cable-gantry"
+          : vaultIndex++ % 2 === 0
+            ? "freight-crate"
+            : "hose-station";
+    });
+  }
+}
+
+// Other move families get their own partial refresh, preserving landmark props.
+export function movementPropFor(o: Obstacle): MovementProp | undefined {
+  if (o.design || o.landmark) return;
+  if (o.kind === "gap" && o.feature === "bridge") return "expansion-joint";
+  if (o.feature === "window") return "loading-shutter";
+  if (o.feature === "wall-billboard") return "acoustic-wall";
+  if (isSwing(o.technique) || o.technique === "shimmy")
+    return "maintenance-gantry";
+  if (o.technique === "precision") return "chimney-plinth";
+  if (o.kind === "ledge") return "fire-escape";
+  if (o.kind === "ramp" && o.feature !== "side-ramp") return "loading-ramp";
+  if (o.technique === "tic-tac" || o.technique === "rebound")
+    return "service-bulkhead";
+}
+const propGroups = new Map<MovementProp, Obstacle[]>();
+for (const o of obstacles) {
+  const prop = movementPropFor(o);
+  if (prop) propGroups.set(prop, [...(propGroups.get(prop) ?? []), o]);
+}
+for (const [prop, group] of propGroups) {
+  // Evenly distribute a rounded 30% through the course, keeping originals.
+  const count = Math.min(
+    group.length - 1,
+    Math.max(1, Math.round(group.length * 0.3)),
+  );
+  for (let i = 0; i < count; i++)
+    group[Math.floor(((i + 0.5) * group.length) / count)].appearance = prop;
+}
+
+const chainTotals = new Map<string, number>();
+for (const o of obstacles)
+  if (o.combo) {
+    const key = `${o.route}:${o.combo}`;
+    chainTotals.set(key, (chainTotals.get(key) ?? 0) + 1);
+  }
+for (const o of obstacles)
+  if (o.combo) o.contactTotal = chainTotals.get(`${o.route}:${o.combo}`);
 
 export function canMantle(o: Obstacle) {
   return (
@@ -1834,7 +1940,7 @@ export class Run {
       if (bar) {
         this.signature(bar, true);
         const t = this.traversal!,
-          base = bar.route === "upper" ? 3.3 : 0;
+          base = ground(bar.x, bar.route === "upper");
         t.y0 = base;
         t.y1 = base;
         t.contact = {
