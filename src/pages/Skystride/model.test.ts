@@ -1,5 +1,6 @@
 import {
   harborRun,
+  saigonRooftops,
   sunsetRelay,
   levels,
   readLevel,
@@ -9,6 +10,7 @@ import { ground } from "./model";
 import { simulateChain } from "./lab-model";
 import {
   SWING_GAP_EXTRA,
+  SWING_RELEASE_SPEED,
   isSwing,
   chainSections,
   chainFingerprint,
@@ -361,7 +363,7 @@ test("practice begins at sector boundary and is never record eligible", () => {
 test("versioned replay validation rejects malformed input and frame data", () => {
   const r = complete().record();
   assert.deepEqual(readRecord(JSON.stringify(r)), r);
-  assert.equal(r.version, "sunset-relay-v41");
+  assert.equal(r.version, sunsetRelay.version);
   assert.equal(
     readRecord(JSON.stringify({ ...r, version: "sunset-relay-v40" })),
     null,
@@ -1312,13 +1314,8 @@ test("jump catch and manual release land across every bar gap", () => {
         g.step();
       assert.equal(g.phase, "running");
       assert.equal(g.grounded, true, `${o.technique} ${o.route} far bank`);
-      if (o.landmark === "crane" && releaseAt < 0.5) {
-        assert.equal(g.upper, false);
-        assert.ok(g.speed < 25);
-      } else {
-        assert.ok(g.x >= o.x + o.width + SWING_GAP_EXTRA);
-        assert.equal(g.recoveries, 0);
-      }
+      assert.ok(g.x >= o.x + o.width + SWING_GAP_EXTRA);
+      assert.equal(g.recoveries, 0);
     }
   }
 });
@@ -1705,34 +1702,68 @@ test("sector practice starts on the changed rooftop rather than above it", () =>
   assert.equal(g.grounded, true);
 });
 
-test("crane timing chooses fast upper exit or slower lower recovery", () => {
-  const o = obstacles.find(
-    (o) => o.landmark === "crane" && isSwing(o.technique),
-  )!;
-  const results = [0.4, 0.6, 0.9].map((releaseAt) => {
-    const g = new Run();
-    g.start();
-    g.x = o.x - 1.9;
-    g.y = 3.3;
-    g.upper = true;
-    g.speed = 12;
-    g.action("up");
-    for (let i = 0; i < 150 && !g.traversal; i++) g.step();
-    assert.ok(g.traversal);
-    while (g.traversal && g.frame().progress < releaseAt) g.step();
-    g.action("forward");
-    g.step();
-    const releaseSpeed = g.speed;
-    for (let i = 0; i < 240 && !g.grounded; i++) g.step();
-    assert.equal(g.phase, "running");
-    assert.equal(g.grounded, true);
-    return { g, releaseSpeed };
-  });
-  assert.equal(results[1].g.upper, true);
-  assert.equal(results[0].g.upper, false);
-  assert.equal(results[2].g.upper, false);
-  assert.ok(results[1].releaseSpeed > results[0].releaseSpeed);
-  assert.ok(results[1].g.flow > results[0].g.flow);
+test("cranes keep full bar launch strength at early, perfect, late and automatic release", () => {
+  for (const level of levels) {
+    for (const mode of ["standard", "hardcore"] as const) {
+      for (const o of level.obstacles.filter(
+        (o) => o.landmark === "crane" && isSwing(o.technique),
+      )) {
+        for (const releaseAt of [0.4, 0.6, 0.9, null]) {
+          const g = new Run(level);
+          g.start(0, false, mode);
+          g.x = o.x - 1.9;
+          g.upper = o.route === "upper";
+          g.y = level.ground(g.x, g.upper);
+          g.speed = 12;
+          g.action("up");
+          for (let i = 0; i < 150 && !g.traversal; i++) g.step();
+          assert.ok(g.traversal, `catch ${level.id} at ${o.x}`);
+          g.flow = 3;
+          if (releaseAt !== null) {
+            while (g.traversal && g.frame().progress < releaseAt) g.step();
+            g.action("forward");
+            g.step();
+          } else {
+            for (let i = 0; i < 150 && g.traversal; i++) g.step();
+          }
+          assert.equal(g.traversal, null);
+          assert.ok(
+            g.speed >= SWING_RELEASE_SPEED - 0.1,
+            `${level.id} ${releaseAt}: full release speed`,
+          );
+          assert.ok(g.vy > 0, "release launches upward instead of forced drop");
+          assert.ok(g.flow >= 3, "release does not erase flow");
+          if (releaseAt === 0.6)
+            assert.ok(g.flow > 3, "perfect timing still earns flow");
+          // Late release can land on a descending roof: prepare the normal
+          // landing roll, just as for any other high bar exit.
+          let rolled = false;
+          for (
+            let i = 0;
+            i < 240 && !g.grounded && g.phase === "running";
+            i++
+          ) {
+            if (!rolled && g.vy < 0 && g.y - level.ground(g.x, g.upper) < 1.1) {
+              g.action("down");
+              rolled = true;
+            }
+            g.step();
+          }
+          assert.equal(g.phase, "running");
+          assert.equal(g.grounded, true);
+          assert.ok(
+            g.x >= o.x + o.width + SWING_GAP_EXTRA,
+            "clears the bar gap",
+          );
+          assert.equal(
+            g.recoveries,
+            0,
+            `${level.id} ${o.x} ${releaseAt}: ${g.x} ${g.y} ${g.message}`,
+          );
+        }
+      }
+    }
+  }
 });
 
 test("upper landmarks replace contact chains and skylight gaps have no glass footing", () => {
@@ -2248,7 +2279,7 @@ test("level geometry and records remain isolated across simultaneous runs", () =
   assert.notEqual(sunset.next()?.x, harbor.next()?.x);
   assert.equal(
     recordStorage("standard"),
-    "skystride.sunset-relay-v41.standard.best",
+    "skystride.sunset-relay-v42.standard.best",
   );
   assert.notEqual(
     recordStorage("standard", sunsetRelay),
@@ -2258,7 +2289,17 @@ test("level geometry and records remain isolated across simultaneous runs", () =
     recordStorage("standard", harborRun),
     recordStorage("hardcore", harborRun),
   );
-  assert.equal(readLevel("bad-value"), sunsetRelay);
+  assert.equal(readLevel("bad-value"), harborRun);
+  assert.equal(readLevel(null), harborRun);
+  assert.equal(readLevel("sunset-relay"), sunsetRelay);
+  assert.deepEqual(
+    levels.map(({ number, tutorial }) => ({ number, tutorial })),
+    [
+      { number: "01", tutorial: true },
+      { number: "02", tutorial: false },
+      { number: "03", tutorial: false },
+    ],
+  );
   assert.equal(readLevel("harbor-run"), harborRun);
 });
 test("every level has safe sector practice starts and bounded surfaces", () => {
@@ -2279,5 +2320,97 @@ test("every level has safe sector practice starts and bounded surfaces", () => {
       assert.equal(run.eligible, false);
     }
     assert.ok(level.surfaces.every((s) => s.end > s.start));
+  }
+});
+
+for (const mode of ["standard", "hardcore"] as const) {
+  for (const upper of [false, true]) {
+    test(`Saigon Rooftops completes ${upper ? "upper" : "lower"} route in ${mode} with Sunset Relay timing`, () => {
+      const run = complete(upper, false, 1.9, mode, undefined, saigonRooftops);
+      assert.equal(
+        run.phase,
+        "finished",
+        `Stopped at ${run.x}, y=${run.y}; next=${JSON.stringify(run.next())}`,
+      );
+      assert.equal(run.splits.length, 3);
+      assert.ok(run.eligible);
+      const baseline = complete(upper, false, 1.9, mode);
+      assert.ok(
+        Math.abs(run.time - baseline.time) / baseline.time < 0.25,
+        `Times differ: Saigon ${run.time}, Sunset ${baseline.time}`,
+      );
+      assert.ok(run.inputs.length > 100);
+      const record = JSON.stringify(run.record());
+      assert.ok(readRecord(record, mode, saigonRooftops));
+      assert.equal(readRecord(record, mode, sunsetRelay), null);
+      assert.equal(readRecord(record, mode, harborRun), null);
+    });
+  }
+}
+test("Saigon authors independent routes with shared timing rules", () => {
+  const signature = (o: (typeof obstacles)[number]) =>
+    JSON.stringify([
+      o.kind,
+      o.width,
+      o.height,
+      o.technique,
+      o.route,
+      o.openingTop,
+      o.wallGap,
+    ]);
+  assert.notDeepEqual(
+    saigonRooftops.obstacles.map(signature).sort(),
+    sunsetRelay.obstacles.map(signature).sort(),
+  );
+  const oldCombos = new Set(
+    sunsetRelay.obstacles.map((o) => o.combo).filter(Boolean),
+  );
+  assert.ok(
+    saigonRooftops.obstacles
+      .filter((o) => o.combo)
+      .every((o) => !oldCombos.has(o.combo)),
+  );
+  for (const o of saigonRooftops.obstacles) {
+    const window = timingWindow(o);
+    assert.ok(
+      o.route === "upper"
+        ? window >= 0.2 && window <= 0.25
+        : window >= 0.3 && window <= 0.4,
+    );
+    if (isSwing(o.technique))
+      assert.equal(o.height, o.route === "upper" ? 3 : 2.3);
+  }
+  assert.ok(
+    saigonRooftops.obstacles.every((o) => !sunsetRelay.obstacles.includes(o)),
+  );
+  assert.ok(sunsetRelay.obstacles.every((o) => o.vietnam === undefined));
+  assert.equal(
+    new Set(saigonRooftops.obstacles.map((o) => o.vietnam).filter(Boolean))
+      .size,
+    8,
+  );
+  assert.notDeepEqual(
+    saigonRooftops.obstacles.map((o) => [o.x, o.kind]),
+    sunsetRelay.obstacles.map((o) => [o.x, o.kind]),
+  );
+  for (const o of saigonRooftops.obstacles) {
+    assert.ok(o.x >= 0 && o.x + o.width <= saigonRooftops.finish);
+  }
+});
+
+test("Saigon elevated exits provide clear lower landing corridors", () => {
+  for (const bridge of saigonRooftops.skybridges) {
+    assert.ok(
+      !saigonRooftops.obstacles.some(
+        (o) =>
+          o.route === "lower" && o.x >= bridge.end && o.x < bridge.end + 18,
+      ),
+      `Blocked landing at ${bridge.end}`,
+    );
+    assert.ok(
+      saigonRooftops.surfaces.some(
+        (s) => !s.upper && s.start <= bridge.end && s.end >= bridge.end + 18,
+      ),
+    );
   }
 });

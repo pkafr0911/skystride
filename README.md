@@ -1,6 +1,6 @@
 # Skystride
 
-A standalone, fullscreen rooftop parkour time-trial game. Choose between two 3 km levels, each with three sectors, elevated route choices, contextual traversal, swipe controls, and its own local personal-best ghost.
+A standalone, fullscreen rooftop parkour time-trial game. Choose between three 3 km levels, each with three sectors, elevated route choices, contextual traversal, swipe controls, and its own local personal-best ghost.
 
 ## Development
 
@@ -92,11 +92,19 @@ Other movement props: roof expansion joints (jumps), loading shutters (dives), a
 
 ## Levels and course selection
 
-The course menu now presents two selectable maps with sector previews, Standard/Hardcore difficulty, full-course time trials, and practice from any sector. Runner, camera, sound, swipe sensitivity, and fullscreen controls are grouped under **Runner & settings**. The selected level is remembered on this device.
+The course menu now presents three selectable maps with sector previews, Standard/Hardcore difficulty, full-course time trials, and practice from any sector. Runner, camera, sound, swipe sensitivity, and fullscreen controls are grouped under **Runner & settings**. The selected level is remembered on this device. New players start on Harbor Run, which shows contextual action and timing guidance on the right. Sunset Relay and subsequent non-tutorial levels hide that guidance panel.
 
-- **Level 1 — Sunset Relay:** the original three-sector course, with its existing layout and v41 records preserved.
-- **Level 2 — Harbor Run:** Warehouse Row, Crane District, and Port Skyline. Features freight equipment, six optional elevated routes, two crane-bar crossings, and two five-metre rooftop drops with roll-out corridors. Cool morning light, water, freight stacks, and harbor cranes distinguish the setting.
+- **Level 1 — Harbor Run (tutorial):** Warehouse Row, Crane District, and Port Skyline. Features freight equipment, six optional elevated routes, two crane-bar crossings, and two five-metre rooftop drops with roll-out corridors. Cool morning light, water, freight stacks, and harbor cranes distinguish the setting.
+- **Level 2 — Sunset Relay:** the original three-sector course, with its existing layout.
+- **Level 3 — Saigon Rooftops:** Alley Roofs, Market Quarter, and Riverfront. Vietnamese tube houses, balconies, striped awnings, rooftop gardens, water tanks and river scenery. Eight new object designs retain existing vault, slide, wall-run, dive, swing, precision and ramp contacts. No tutorial guidance.
 
 Each `Run` owns a `LevelDefinition` from `src/pages/Skystride/levels.ts`; simulation, obstacle meshes, scene geometry, practice starts, split markers, and finish detection read that same definition. Sunset geometry is authored in `sunset-course.ts`, Harbor geometry in `harbor-course.ts`. Movement Lab and existing offline studies continue to default to Sunset Relay.
 
-Records are isolated by course version and difficulty. Sunset keeps `skystride.sunset-relay-v41.<mode>.best`; Harbor uses `skystride.harbor-run-v1.<mode>.best`. Practice and paused runs remain ineligible. Ghost validation rejects another map's course version.
+Records are isolated by course version and difficulty. Current swing physics use `skystride.sunset-relay-v42.<mode>.best` and `skystride.harbor-run-v2.<mode>.best`. Earlier records remain stored under their old versions and are not compared with the faster crane releases. Practice and paused runs remain ineligible. Ghost validation rejects another map's course version.
+
+Crane swing releases now use the same 30 m/s forward launch and upward impulse as other bar swings, including early, late, and automatic releases. Perfect timing still awards bonus flow; Down remains the deliberate drop action.
+
+
+Saigon uses an independently authored `saigon-course.ts`: 24 new ground-level contact phrases, six elevated routes, and three courtyard descents. Combo orders, obstacle positions, crossings and route entrances are specific to this map. Shared movement physics and action windows remain unchanged (0.30–0.40 seconds below, 0.20–0.25 seconds above). Full-course simulations cover both routes in both modes. Its revised layout uses `skystride.saigon-rooftops-v2.<mode>.best`, keeping old-layout ghosts separate.
+
+See the [implemented Vietnam objects](docs/saigon-implemented-objects.png), rendered from the actual meshes. Regenerate with `node scripts/obstacle-study.cjs --vietnam`, then `node scripts/render-obstacle-study.cjs docs/saigon-implemented-objects.png --vietnam` with `sharp` on the Node module path. The [original concept board](docs/vietnam-map-concept.png) remains a visual reference; final models use the existing game's simpler procedural style.

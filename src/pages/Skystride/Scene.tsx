@@ -50,6 +50,7 @@ export default function Scene({
       skybridges,
     } = game.level;
     const harbor = game.level.atmosphere === "harbor";
+    const saigon = game.level.atmosphere === "saigon";
     const container = host.current!;
     const audio = new TraversalAudio();
     audio.setEnabled(soundRef.current);
@@ -85,17 +86,25 @@ export default function Scene({
     renderer.toneMappingExposure = 1.25;
     container.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(harbor ? 0x9fc8cf : 0xa59abb, 60, 170);
+    scene.fog = new THREE.Fog(
+      harbor ? 0x9fc8cf : saigon ? 0xc5ac9a : 0xa59abb,
+      60,
+      170,
+    );
     const camera = new THREE.OrthographicCamera(-16, 16, 9, -9, 0.1, 240);
     const motionPreference = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     );
     camera.zoom = speedZoom(game.speed, motionPreference.matches);
     scene.add(
-      new THREE.HemisphereLight(harbor ? 0xd9f7f5 : 0xffd3b2, 0x25354e, 1.25),
+      new THREE.HemisphereLight(
+        harbor ? 0xd9f7f5 : saigon ? 0xffe6b5 : 0xffd3b2,
+        0x25354e,
+        1.25,
+      ),
     );
     const sunlight = new THREE.DirectionalLight(
-      harbor ? 0xe4f6ed : 0xffae6b,
+      harbor ? 0xe4f6ed : saigon ? 0xffd6a0 : 0xffae6b,
       1.6,
     );
     sunlight.position.set(-12, 18, -9);
@@ -130,8 +139,8 @@ export default function Scene({
       materials.push(m);
       return m;
     };
-    const roof = material(0x35465a),
-      side = material(0x182a43),
+    const roof = material(saigon ? 0x8b8171 : 0x35465a),
+      side = material(saigon ? 0xb8a081 : 0x182a43),
       edge = material(harbor ? 0x9fe5d5 : 0xf3ae65);
     // Mid-tone matte steel preserves panel detail under the warm sunlight.
     const vaultFace = material(0x5e7084),
@@ -163,17 +172,17 @@ export default function Scene({
       warmWindow = material(0xc99868);
     const buildingFaces = [
       side,
-      material(0x24364b),
-      material(0x303c50),
-      material(0x1c3040),
+      material(saigon ? 0xc9ad7e : 0x24364b),
+      material(saigon ? 0xb97e68 : 0x303c50),
+      material(saigon ? 0x7d9b90 : 0x1c3040),
     ];
     // Roof skins receive shadows; their solid building bodies cast them.
     // Dedicated materials keep the instanced batches separate from obstacles.
     const buildingCaps = [
-      material(0x35465a),
-      material(0x455063),
-      material(0x394c59),
-      material(0x40506a),
+      material(saigon ? 0xb6a78e : 0x35465a),
+      material(saigon ? 0xc5b79d : 0x455063),
+      material(saigon ? 0xa6a58c : 0x394c59),
+      material(saigon ? 0xb8ab95 : 0x40506a),
     ];
     const receiveOnlyMaterials = new Set<THREE.Material>([
       ...buildingCaps,
@@ -181,6 +190,20 @@ export default function Scene({
       windowGlass,
       warmWindow,
     ]);
+    const vietnamPalette = saigon
+      ? {
+          wood: material(0x9a7151),
+          cream: material(0xddc9a0),
+          jade: material(0x397d77),
+          coral: material(0xc56d54),
+          leaf: material(0x4c7850),
+          steel: material(0xa4b0ad),
+        }
+      : undefined;
+    if (vietnamPalette) {
+      vietnamPalette.steel.metalness = 0.5;
+      vietnamPalette.steel.roughness = 0.4;
+    }
     const chunks = new Map<number, THREE.Group>();
     const chunkFor = (x: number) => {
       const key = Math.floor(x / 80);
@@ -627,9 +650,10 @@ export default function Scene({
           : o.kind === "ramp"
             ? rampFace
             : vaultFace;
-      if (o.feature || o.design || o.appearance) {
+      if (o.vietnam || o.feature || o.design || o.appearance) {
         chunkFor(o.x).add(
           creativeObstacle(o, {
+            vietnamPalette,
             ground,
             box: boxGeometry,
             cylinder: cylinderGeometry,
@@ -781,6 +805,90 @@ export default function Scene({
     for (const x of game.level.sectors.map((s) => s.end)) {
       box(scene, x, 2.5, -2, 0.12, 5, 0.12, metal);
       box(scene, x + 1, 4.5, -2, 2, 0.65, 0.08, x === FINISH ? metal : roof);
+    }
+    if (saigon && vietnamPalette) {
+      const { cream, jade, coral, leaf, steel } = vietnamPalette;
+      const water = material(0x648c89);
+      // Narrow tube houses, balconies and rooftop life stay behind the running lane.
+      for (let x = 0, i = 0; x < FINISH; x += 24, i++) {
+        const sector = Math.min(2, Math.floor(x / 1000));
+        const height = 9 + (i % 4) * 1.6;
+        const top = height - 9;
+        const face = buildingFaces[i % buildingFaces.length];
+        box(scene, x + 8, top - height / 2, -10, 8.5, height, 6, face);
+        box(scene, x + 8, top + 0.1, -10, 9, 0.2, 6.3, cream);
+        for (let floor = -6; floor < top - 1; floor += 2.8) {
+          box(scene, x + 8, floor, -6.94, 3.8, 1.6, 0.1, jade);
+          for (const dx of [-2.1, 2.1])
+            box(scene, x + 8 + dx, floor, -6.78, 0.4, 1.7, 0.18, jade);
+          box(scene, x + 8, floor - 0.85, -6.2, 5, 0.15, 1.6, cream);
+          box(scene, x + 8, floor - 0.4, -5.48, 5, 0.06, 0.06, steel);
+          for (let dx = -2; dx <= 2; dx++)
+            box(
+              scene,
+              x + 8 + dx,
+              floor - 0.65,
+              -5.48,
+              0.045,
+              0.5,
+              0.045,
+              steel,
+            );
+        }
+        // Ribbed water tanks and tropical terrace planters are recognizable silhouettes.
+        if (i % 3 === 0) {
+          const tank = new THREE.Mesh(cylinderGeometry, steel);
+          tank.position.set(x + 7, top + 1.3, -10);
+          tank.scale.set(0.9, 2.2, 0.9);
+          chunkFor(x).add(tank);
+          box(scene, x + 7, top + 0.15, -10, 2.1, 0.3, 2.1, cream);
+        }
+        for (const dx of [4.8, 11]) {
+          box(scene, x + dx, top + 0.2, -7.5, 1.1, 0.4, 0.8, coral);
+          for (let n = 0; n < 3; n++)
+            box(
+              scene,
+              x + dx + (n - 1) * 0.24,
+              top + 0.8,
+              -7.5,
+              0.12,
+              1.1,
+              0.5,
+              leaf,
+            ).rotation.z = (n - 1) * 0.5;
+        }
+        if (sector === 1) {
+          for (let stripe = 0; stripe < 8; stripe++) {
+            const awning = box(
+              scene,
+              x + 4.5 + stripe,
+              top - 2.2,
+              -5.8,
+              1,
+              0.1,
+              2.2,
+              stripe % 2 ? cream : coral,
+            );
+            awning.rotation.x = 0.18;
+          }
+          box(scene, x + 8, top - 1, -6.7, 3.2, 1, 0.15, cream);
+          box(scene, x + 8, top - 1, -6.59, 0.7, 0.5, 0.08, coral);
+          // Rear laundry line: the playable drying racks are separate collision props.
+          box(scene, x + 8, top + 1.9, -11.5, 6, 0.04, 0.04, steel);
+          for (let dx = 6; dx <= 10; dx += 2)
+            box(
+              scene,
+              x + dx,
+              top + 1.35,
+              -11.5,
+              0.8,
+              1,
+              0.03,
+              dx % 4 ? cream : jade,
+            );
+        }
+        if (sector === 2) box(scene, x + 12, -10.5, -27, 24, 0.15, 26, water);
+      }
     }
     if (harbor) {
       const water = material(0x528d9e);

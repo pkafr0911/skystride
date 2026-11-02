@@ -1,3 +1,4 @@
+import { vietnamObstacle } from "./vietnam-obstacle-mesh";
 import { SWING_GAP_EXTRA, swingGripOffset } from "./combos";
 import * as THREE from "three";
 import { equipmentObstacle } from "./equipment-mesh";
@@ -5,6 +6,14 @@ import { movementObstacle } from "./movement-obstacle-mesh";
 import { ground, Obstacle } from "./model";
 
 export type ObstacleKit = {
+  vietnamPalette?: {
+    wood: THREE.Material;
+    cream: THREE.Material;
+    jade: THREE.Material;
+    coral: THREE.Material;
+    leaf: THREE.Material;
+    steel: THREE.Material;
+  };
   /** Active map elevation; offline studies default to Sunset Relay. */
   ground?: typeof ground;
   box: THREE.BufferGeometry;
@@ -18,6 +27,7 @@ export type ObstacleKit = {
 
 /** Shared by the course and offline studies; every mesh uses caller-owned resources. */
 export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
+  if (o.vietnam) return vietnamObstacle(o, kit);
   if (o.appearance) return movementObstacle(o, kit);
   if (o.design) return equipmentObstacle(o, kit);
   const group = new THREE.Group();

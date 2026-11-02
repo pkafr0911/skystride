@@ -20,7 +20,7 @@ import {
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
 export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v41";
+export const VERSION = "sunset-relay-v42";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -99,7 +99,18 @@ export type MovementProp =
   | "fire-escape"
   | "loading-ramp"
   | "service-bulkhead";
+export type VietnamProp =
+  | "fruit-crate-bench"
+  | "awning-crossbar"
+  | "water-tank-deck"
+  | "cafe-sign"
+  | "market-shutter"
+  | "drying-rack"
+  | "terrazzo-planter"
+  | "plank-ramp";
 export type Obstacle = {
+  /** Vietnam-themed geometry; retains the authored movement/contact dimensions. */
+  vietnam?: VietnamProp;
   /** Alternate physical prop with the same traversal/contact geometry. */
   appearance?: MovementProp;
   /** The wall spans a real void, starting one metre after the approach marker. */
@@ -748,8 +759,9 @@ export class Run {
         const releasePhase = t.elapsed / t.duration;
         const perfect =
           t.landmark === "crane" && releasePhase >= 0.5 && releasePhase <= 0.72;
-        const recovery = t.landmark === "crane" && !perfect;
-        this.speed = recovery ? 18 : Math.max(this.speed, SWING_RELEASE_SPEED);
+        // Every bar shares the same launch. Crane timing awards flow without
+        // weakening early, late, or automatic releases.
+        this.speed = Math.max(this.speed, SWING_RELEASE_SPEED);
         this.vy = 2.5 + clamp(t.elapsed / t.duration, 0, 1) * 1.5;
         if (!this.upper && t.obstacle) {
           // The lower exit passes below the upper deck: project a low arc
@@ -761,21 +773,12 @@ export class Run {
           );
           this.vy = (0.3 - this.y + 33 * 0.5 * flight * flight) / flight;
         }
-        if (recovery) {
-          this.vy = -2;
-          this.flow = 0;
-          this.feedbackEvent("impact", 0.5);
-        } else if (perfect) this.reward("PERFECT RELEASE · FAST EXIT");
+        if (perfect) this.reward("PERFECT RELEASE · FAST EXIT");
         this.traversal = null;
         this.grounded = false;
         this.lastGround = -1;
         this.setMove("jump");
-        if (!perfect)
-          this.say(
-            recovery
-              ? "LATE / EARLY RELEASE · LOWER SCAFFOLD RECOVERY"
-              : "RELEASE · CARRY INTO THE NEXT CONTACT",
-          );
+        if (!perfect) this.say("RELEASE · CARRY INTO THE NEXT CONTACT");
         return true;
       }
       if (

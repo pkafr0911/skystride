@@ -1239,3 +1239,48 @@
     }
   }
 }
+
+.saigonStage {
+  background: linear-gradient(
+    #edbb91 0%,
+    #f3cda2 38%,
+    #c1b8a0 72%,
+    #728f8c 100%
+  );
+}
+.saigonCard {
+  color: #f3d493;
+  background: linear-gradient(125deg, #315a56, #95734e);
+}
+@media (min-width: 761px) {
+  .levelLibrary .mapArt {
+    height: 88px;
+  }
+  .levelLibrary .levelCard {
+    padding-top: 15px;
+    padding-bottom: 15px;
+  }
+}
+@media (max-width: 760px) {
+  .levelLibrary {
+    grid-template-columns: 1fr;
+  }
+  .levelLibrary .mapArt {
+    height: 70px;
+  }
+  .levelLibrary .cardBottom {
+    display: flex;
+    h2 {
+      font-size: 21px;
+    }
+    p {
+      min-height: 0;
+    }
+    > span {
+      text-align: right;
+      br {
+        display: block;
+      }
+    }
+  }
+}

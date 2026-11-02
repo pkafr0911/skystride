@@ -1,7 +1,8 @@
+import { saigonGeometry } from "./saigon-course";
 import * as sunset from "./sunset-course";
 import { harborGeometry } from "./harbor-course";
 
-export type LevelId = "sunset-relay" | "harbor-run";
+export type LevelId = "sunset-relay" | "harbor-run" | "saigon-rooftops";
 export type SectorDefinition = {
   name: string;
   start: number;
@@ -30,18 +31,20 @@ export type LevelDefinition = Geometry & {
   version: string;
   name: string;
   number: string;
+  tutorial: boolean;
   tagline: string;
   description: string;
   finish: number;
   sectors: SectorDefinition[];
-  atmosphere: "sunset" | "harbor";
+  atmosphere: "sunset" | "harbor" | "saigon";
 };
 export const sunsetRelay: LevelDefinition = {
   ...sunset,
   id: "sunset-relay",
-  version: "sunset-relay-v41",
+  version: "sunset-relay-v42",
   name: "Sunset Relay",
-  number: "01",
+  number: "02",
+  tutorial: false,
   tagline: "Golden hour. Endless rooftops.",
   description:
     "Chase the warm skyline through rooftop shortcuts and intricate parkour chains. The original Skystride course.",
@@ -71,12 +74,13 @@ export const sunsetRelay: LevelDefinition = {
 export const harborRun: LevelDefinition = {
   ...harborGeometry(),
   id: "harbor-run",
-  version: "harbor-run-v1",
+  version: "harbor-run-v2",
   name: "Harbor Run",
-  number: "02",
-  tagline: "Sea air. Steel nerves.",
+  number: "01",
+  tutorial: true,
+  tagline: "Learn the moves. Find your flow.",
   description:
-    "Run the waterfront from freight warehouses to crane crossings and high port roofs. Open lines below; faster, technical routes above.",
+    "Your tutorial course. Learn vaults, slides, jumps, crane crossings, and landing rolls with on-screen guidance across three waterfront sectors.",
   finish: 3000,
   atmosphere: "harbor",
   sectors: [
@@ -100,8 +104,45 @@ export const harborRun: LevelDefinition = {
     },
   ],
 };
-export const levels: LevelDefinition[] = [sunsetRelay, harborRun];
+export const saigonRooftops: LevelDefinition = {
+  ...saigonGeometry(),
+  id: "saigon-rooftops",
+  version: "saigon-rooftops-v2",
+  name: "Saigon Rooftops",
+  number: "03",
+  tutorial: false,
+  tagline: "Above the alleys. Beyond the ordinary.",
+  description:
+    "A Vietnamese rooftop run through narrow townhouses, market terraces, and the riverfront. Sunset Relay difficulty, with original rooftop routes and contact sequences.",
+  finish: 3000,
+  atmosphere: "saigon",
+  sectors: [
+    {
+      name: "Alley Roofs",
+      start: 0,
+      end: 1000,
+      description: "Vault the neighborhood roofline",
+    },
+    {
+      name: "Market Quarter",
+      start: 1000,
+      end: 2000,
+      description: "Link shutters, signs, and drying bars",
+    },
+    {
+      name: "Riverfront",
+      start: 2000,
+      end: 3000,
+      description: "Take the high line home",
+    },
+  ],
+};
+export const levels: LevelDefinition[] = [
+  harborRun,
+  sunsetRelay,
+  saigonRooftops,
+];
 export const LEVEL_STORAGE = "skystride.selected-level";
 export function readLevel(value: string | null): LevelDefinition {
-  return levels.find((level) => level.id === value) ?? sunsetRelay;
+  return levels.find((level) => level.id === value) ?? harborRun;
 }

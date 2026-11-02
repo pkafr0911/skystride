@@ -1,4 +1,4 @@
-import { harborRun } from "./levels";
+import { harborRun, saigonRooftops } from "./levels";
 import { ground, movementPropFor } from "./model";
 import {
   speedZoom,
@@ -1341,6 +1341,91 @@ test("obstacle meshes use the selected map elevation, including delegated prop d
     const prop = obstacles.find((o) => o.appearance)!;
     const mesh = creativeObstacle(prop, { ...kit, ground: () => -5 });
     assert.equal(mesh.position.y, -5);
+  } finally {
+    box.dispose();
+    cylinder.dispose();
+    material.dispose();
+  }
+});
+
+test("Vietnam props preserve solid tops, dive openings and swing grips", () => {
+  const box = new THREE.BoxGeometry(),
+    cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const kit = {
+    box,
+    cylinder,
+    face: material,
+    dark: material,
+    trim: material,
+    amber: material,
+    panel: material,
+    ground: saigonRooftops.ground,
+  };
+  try {
+    for (const o of saigonRooftops.obstacles.filter((o) => o.vietnam)) {
+      const mesh = creativeObstacle(o, kit);
+      mesh.updateMatrixWorld(true);
+      const base = saigonRooftops.ground(o.x, o.route === "upper");
+      assert.equal(mesh.position.y, base);
+      const h = o.height ?? (o.kind === "slide" ? 2.35 : 1.1);
+      if (
+        [
+          "fruit-crate-bench",
+          "awning-crossbar",
+          "water-tank-deck",
+          "terrazzo-planter",
+        ].includes(o.vietnam!)
+      ) {
+        const ray = new THREE.Raycaster(
+          new THREE.Vector3(o.x + o.width / 2, base + h + 0.5, 0),
+          new THREE.Vector3(0, -1, 0),
+        );
+        const hit = ray.intersectObject(mesh, true)[0];
+        assert.ok(hit, o.vietnam);
+        assert.ok(
+          Math.abs(hit.point.y - base - h) < 0.025,
+          `${o.vietnam} top ${hit.point.y}, expected ${base + h}`,
+        );
+      }
+      if (o.vietnam === "market-shutter") {
+        const ray = new THREE.Raycaster(
+          new THREE.Vector3(o.x - 0.1, base + (h + o.openingTop!) / 2, 0),
+          new THREE.Vector3(1, 0, 0),
+          0,
+          o.width + 0.2,
+        );
+        assert.equal(
+          ray.intersectObject(mesh, true).length,
+          0,
+          "Dive opening must stay clear",
+        );
+      }
+      if (o.vietnam === "awning-crossbar") {
+        const ray = new THREE.Raycaster(
+          new THREE.Vector3(o.x - 0.1, base + 1, 0),
+          new THREE.Vector3(1, 0, 0),
+          0,
+          o.width + 0.2,
+        );
+        assert.equal(
+          ray.intersectObject(mesh, true).length,
+          0,
+          "Slide lane must stay clear",
+        );
+      }
+      if (o.vietnam === "drying-rack" && o.technique === "lache") {
+        const ray = new THREE.Raycaster(
+          new THREE.Vector3(o.x + o.width - 0.2, base + h + 0.3, 0),
+          new THREE.Vector3(0, -1, 0),
+        );
+        assert.ok(
+          Math.abs(
+            ray.intersectObject(mesh, true)[0].point.y - (base + h + 0.045),
+          ) < 0.001,
+        );
+      }
+    }
   } finally {
     box.dispose();
     cylinder.dispose();

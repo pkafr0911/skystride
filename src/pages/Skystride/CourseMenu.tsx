@@ -3,7 +3,7 @@ import { levels, LevelDefinition } from "./levels";
 import { formatTime, GameMode, RecordRun, recordStorage } from "./model";
 import styles from "./styles.less";
 
-function Skyline({ harbor }: { harbor: boolean }) {
+function Skyline({ harbor, saigon }: { harbor: boolean; saigon: boolean }) {
   return (
     <svg viewBox="0 0 520 165" aria-hidden="true" className={styles.mapArt}>
       <circle
@@ -22,6 +22,24 @@ function Skyline({ harbor }: { harbor: boolean }) {
         <g stroke="currentColor" fill="none" strokeWidth="3" opacity=".65">
           <path d="M115 127V21L197 42H86M115 22L179 42M182 42V80M354 118V17L442 37H324M354 17L423 37M429 37V72" />
           <path d="M0 149H520M30 156H190M300 156H460" opacity=".4" />
+        </g>
+      )}
+      {saigon && (
+        <g fill="currentColor" opacity=".7">
+          {[45, 140, 245, 340, 450].map((x, i) => (
+            <g key={x}>
+              <rect x={x} y={70 - (i % 2) * 18} width="35" height="60" />
+              <rect
+                x={x + 7}
+                y={58 - (i % 2) * 18}
+                width="16"
+                height="12"
+                rx="4"
+              />
+              <path d={`M${x - 3} 100h41l-4 8h-33z`} />
+              <rect x={x + 12} y="88" width="9" height="14" fill="#245b58" />
+            </g>
+          ))}
         </g>
       )}
       <path
@@ -74,7 +92,7 @@ export default function CourseMenu({
         <div>
           <div className={styles.wordmark}>SKYSTRIDE ↗</div>
           <h1>Find your next line.</h1>
-          <p>Two places to run. A thousand ways to flow.</p>
+          <p>Three skylines. Find your favorite line.</p>
         </div>
         <span className={styles.menuStamp}>
           ROOFTOP TIME TRIALS
@@ -86,7 +104,7 @@ export default function CourseMenu({
         <section className={styles.levelLibrary} aria-label="Choose a level">
           <div className={styles.sectionHeading}>
             <span>01 / CHOOSE YOUR COURSE</span>
-            <small>2 LEVELS</small>
+            <small>{levels.length} LEVELS</small>
           </div>
           {levels.map((item) => (
             <button
@@ -94,15 +112,21 @@ export default function CourseMenu({
               type="button"
               aria-pressed={item.id === level.id}
               onClick={() => onLevel(item)}
-              className={`${styles.levelCard} ${item.atmosphere === "harbor" ? styles.harborCard : styles.sunsetCard} ${item.id === level.id ? styles.levelSelected : ""}`}
+              className={`${styles.levelCard} ${item.atmosphere === "harbor" ? styles.harborCard : item.atmosphere === "saigon" ? styles.saigonCard : styles.sunsetCard} ${item.id === level.id ? styles.levelSelected : ""}`}
             >
               <div className={styles.cardTop}>
-                <span>LEVEL {item.number}</span>
+                <span>
+                  LEVEL {item.number}
+                  {item.tutorial ? " · TUTORIAL" : ""}
+                </span>
                 <span>
                   {item.id === level.id ? "SELECTED ↗" : "EXPLORE ↗"}
                 </span>
               </div>
-              <Skyline harbor={item.atmosphere === "harbor"} />
+              <Skyline
+                harbor={item.atmosphere === "harbor"}
+                saigon={item.atmosphere === "saigon"}
+              />
               <div className={styles.cardBottom}>
                 <div>
                   <h2>{item.name}</h2>
@@ -119,7 +143,10 @@ export default function CourseMenu({
         <section className={styles.runSetup} aria-label="Set up your run">
           <div className={styles.sectionHeading}>
             <span>02 / MAKE IT YOUR RUN</span>
-            <small>LEVEL {level.number}</small>
+            <small>
+              LEVEL {level.number}
+              {level.tutorial ? " · TUTORIAL" : ""}
+            </small>
           </div>
           <h2>
             {level.name}

@@ -20,60 +20,110 @@ const kit = {
   amber: materials[3],
   panel: materials[4],
 };
+const vietnamStudy = process.argv.includes("--vietnam");
+const vietnamCourse = vietnamStudy
+  ? require("../src/pages/Skystride/levels").saigonRooftops
+  : null;
+if (vietnamStudy) {
+  const colors = {
+    wood: 0x9a7151,
+    cream: 0xddc9a0,
+    jade: 0x397d77,
+    coral: 0xc56d54,
+    leaf: 0x4c7850,
+    steel: 0xa4b0ad,
+  };
+  kit.vietnamPalette = Object.fromEntries(
+    Object.entries(colors).map(([key, color]) => {
+      const material = new THREE.MeshBasicMaterial({ color });
+      materials.push(material);
+      return [key, material];
+    }),
+  );
+  kit.ground = () => 0;
+}
 const panels = [];
 const signatureStudy = process.argv.includes("--signatures");
 const equipmentStudy = process.argv.includes("--equipment");
 const movementStudy = process.argv.includes("--movement-props");
-const entries = movementStudy
-  ? [...new Set(obstacles.map((o) => o.appearance).filter(Boolean))].map(
-      (name) => [name, name.replaceAll("-", " ").toUpperCase()],
-    )
-  : equipmentStudy
-    ? [
-        ["ac-condenser", "AC CONDENSER"],
-        ["cable-reels", "CABLE REELS"],
-        ["utility-cabinet", "UTILITY CABINET"],
-        ["maintenance-cart", "MAINTENANCE CART"],
-        ["roof-hatch", "ROOF ACCESS HATCH"],
-        ["duct-elbow", "DUCT ELBOW"],
-        ["safety-barricade", "SAFETY BARRICADE"],
-        ["antenna-base", "ANTENNA BASE"],
-        ["freight-crate", "STRAPPED FREIGHT CRATE"],
-        ["hose-station", "HOSE-REEL STATION"],
-        ["cable-gantry", "OVERHEAD CABLE TRAY"],
-      ]
-    : signatureStudy
-      ? require("../src/pages/Skystride/combos").techniques.map((t) => [
-          t,
-          t.replaceAll("-", " ").toUpperCase(),
-        ])
-      : [
-          ["vent-bank", "SPLIT VENTILATION BANK"],
-          ["pipe", "PIPE CROSSING"],
-          ["solar", "SOLAR LAUNCH RAMP"],
-          ["window", "CONSTRUCTION WINDOW"],
-          ["tank", "WATER-TANK CRADLE"],
-          ["wall-billboard", "WALL-RUN BILLBOARD"],
-          ["bridge", "BROKEN MAINTENANCE BRIDGE"],
-          ["greenhouse", "GREENHOUSE SERVICE LINE"],
-          ["scaffold", "HANGING SCAFFOLD"],
-          ["balcony", "STAGGERED BALCONIES"],
-        ];
-for (const [feature, title] of entries) {
-  const pieces = movementStudy
-    ? obstacles.filter((o) => o.appearance === feature).slice(0, 1)
+const entries = vietnamStudy
+  ? [
+      ["fruit-crate-bench", "FRUIT CRATE BENCH / VAULT"],
+      ["awning-crossbar", "AWNING CROSSBAR / SLIDE"],
+      ["water-tank-deck", "WATER TANK SERVICE DECK / CLIMB"],
+      ["cafe-sign", "CAFE SIGN / WALL RUN"],
+      ["market-shutter", "MARKET SHUTTER / DIVE"],
+      ["drying-rack", "DRYING RACK / GRAB AND SWING"],
+      ["terrazzo-planter", "TERRAZZO PLANTER / PRECISION"],
+      ["plank-ramp", "MAINTENANCE PLANK RAMP / JUMP"],
+    ]
+  : movementStudy
+    ? [...new Set(obstacles.map((o) => o.appearance).filter(Boolean))].map(
+        (name) => [name, name.replaceAll("-", " ").toUpperCase()],
+      )
     : equipmentStudy
-      ? obstacles.filter((o) => o.design === feature).slice(0, 1)
+      ? [
+          ["ac-condenser", "AC CONDENSER"],
+          ["cable-reels", "CABLE REELS"],
+          ["utility-cabinet", "UTILITY CABINET"],
+          ["maintenance-cart", "MAINTENANCE CART"],
+          ["roof-hatch", "ROOF ACCESS HATCH"],
+          ["duct-elbow", "DUCT ELBOW"],
+          ["safety-barricade", "SAFETY BARRICADE"],
+          ["antenna-base", "ANTENNA BASE"],
+          ["freight-crate", "STRAPPED FREIGHT CRATE"],
+          ["hose-station", "HOSE-REEL STATION"],
+          ["cable-gantry", "OVERHEAD CABLE TRAY"],
+        ]
       : signatureStudy
-        ? obstacles
-            .filter((o) => o.technique === feature && o.route === "lower")
-            .slice(0, 1)
-        : obstacles.filter((o) => o.feature === feature && o.x < 480);
+        ? require("../src/pages/Skystride/combos").techniques.map((t) => [
+            t,
+            t.replaceAll("-", " ").toUpperCase(),
+          ])
+        : [
+            ["vent-bank", "SPLIT VENTILATION BANK"],
+            ["pipe", "PIPE CROSSING"],
+            ["solar", "SOLAR LAUNCH RAMP"],
+            ["window", "CONSTRUCTION WINDOW"],
+            ["tank", "WATER-TANK CRADLE"],
+            ["wall-billboard", "WALL-RUN BILLBOARD"],
+            ["bridge", "BROKEN MAINTENANCE BRIDGE"],
+            ["greenhouse", "GREENHOUSE SERVICE LINE"],
+            ["scaffold", "HANGING SCAFFOLD"],
+            ["balcony", "STAGGERED BALCONIES"],
+          ];
+for (const [feature, title] of entries) {
+  const pieces = vietnamStudy
+    ? vietnamCourse.obstacles
+        .filter(
+          (o) =>
+            o.vietnam === feature &&
+            (feature !== "plank-ramp" ||
+              (o.height > 0 && o.feature !== "side-ramp")) &&
+            (feature !== "drying-rack" || o.technique === "lache") &&
+            (feature !== "terrazzo-planter" || o.technique === "precision"),
+        )
+        .slice(0, 1)
+    : movementStudy
+      ? obstacles.filter((o) => o.appearance === feature).slice(0, 1)
+      : equipmentStudy
+        ? obstacles.filter((o) => o.design === feature).slice(0, 1)
+        : signatureStudy
+          ? obstacles
+              .filter((o) => o.technique === feature && o.route === "lower")
+              .slice(0, 1)
+          : obstacles.filter((o) => o.feature === feature && o.x < 480);
+  if (pieces.length === 0) {
+    console.warn(
+      `Skipping obstacle study entry "${feature}": no matching obstacles.`,
+    );
+    continue;
+  }
   const start = pieces[0].x,
     end =
       pieces.at(-1).x +
       pieces.at(-1).width +
-      (feature === "wall-billboard" ? 3 : 0);
+      (feature === "wall-billboard" || feature === "cafe-sign" ? 3 : 0);
   const scene = new THREE.Group();
   for (const o of pieces)
     scene.add(
@@ -85,7 +135,15 @@ for (const [feature, title] of entries) {
   const roof = new THREE.Mesh(box, materials[1]);
   roof.position.set(0, -0.15, 0);
   roof.scale.set(end - start + 2, 0.3, 4);
-  if (["underbar", "lache", "monkey", "maintenance-gantry"].includes(feature)) {
+  if (
+    [
+      "underbar",
+      "lache",
+      "monkey",
+      "maintenance-gantry",
+      "drying-rack",
+    ].includes(feature)
+  ) {
     for (const [a, b] of [
       [start - 3, start],
       [end + SWING_GAP_EXTRA, end + SWING_GAP_EXTRA + 3],

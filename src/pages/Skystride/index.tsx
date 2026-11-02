@@ -34,7 +34,7 @@ import {
 import styles from "./styles.less";
 const Scene = lazy(() => import("./Scene"));
 export default function Skystride() {
-  const [game, setGame] = useState(() => new Run());
+  const [game, setGame] = useState(() => new Run(readLevel(null)));
   const level = game.level;
   const { finish: FINISH, skybridges, skybridgeAt, canMantle } = level;
   const [sound, setSound] = useState(true);
@@ -296,7 +296,7 @@ export default function Skystride() {
       <main className={styles.page}>
         <div
           ref={stage}
-          className={`${styles.stage} ${styles.expanded} ${level.atmosphere === "harbor" ? styles.harborStage : ""}`}
+          className={`${styles.stage} ${styles.expanded} ${level.atmosphere === "harbor" ? styles.harborStage : level.atmosphere === "saigon" ? styles.saigonStage : ""}`}
           tabIndex={0}
           role="region"
           aria-label="Skystride parkour course. Up or Space to jump, Down to slide, R to restart, Escape to pause. On touch, swipe up or down."
@@ -463,37 +463,38 @@ export default function Skystride() {
                     : ""}
                 </span>
               </div>
-              {(game.move === "special" ||
-                onTop ||
-                (next && distance < 23 && !game.traversal)) && (
-                <div
-                  className={`${styles.cue} ${distance >= range.near && distance <= range.far ? styles.clean : ""}`}
-                >
-                  {next?.combo && (
+              {level.tutorial &&
+                (game.move === "special" ||
+                  onTop ||
+                  (next && distance < 23 && !game.traversal)) && (
+                  <div
+                    className={`${styles.cue} ${distance >= range.near && distance <= range.far ? styles.clean : ""}`}
+                  >
+                    {next?.combo && (
+                      <small>
+                        {next.combo} · {next.contact}/{next.contactTotal}
+                        <br />
+                      </small>
+                    )}
+                    {cue}
                     <small>
-                      {next.combo} · {next.contact}/{next.contactTotal}
-                      <br />
+                      {onTop
+                        ? "TOP CONTACT · CHOOSE YOUR EXIT"
+                        : next
+                          ? `${Math.round(timingWindow(next) * 1000)} MS CLEAN WINDOW`
+                          : ""}
                     </small>
-                  )}
-                  {cue}
-                  <small>
-                    {onTop
-                      ? "TOP CONTACT · CHOOSE YOUR EXIT"
-                      : next
-                        ? `${Math.round(timingWindow(next) * 1000)} MS CLEAN WINDOW`
-                        : ""}
-                  </small>
-                  <small>
-                    {onTop
-                      ? "KEEP YOUR MOMENTUM"
-                      : distance > range.far
-                        ? "READ THE APPROACH"
-                        : distance >= range.near
-                          ? "FLOW WINDOW"
-                          : "COMMIT"}
-                  </small>
-                </div>
-              )}
+                    <small>
+                      {onTop
+                        ? "KEEP YOUR MOMENTUM"
+                        : distance > range.far
+                          ? "READ THE APPROACH"
+                          : distance >= range.near
+                            ? "FLOW WINDOW"
+                            : "COMMIT"}
+                    </small>
+                  </div>
+                )}
               <div className={styles.feedback}>
                 {game.time < game.messageUntil
                   ? game.message
