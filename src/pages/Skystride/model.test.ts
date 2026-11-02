@@ -2339,7 +2339,10 @@ for (const mode of ["standard", "hardcore"] as const) {
         Math.abs(run.time - baseline.time) / baseline.time < 0.25,
         `Times differ: Saigon ${run.time}, Sunset ${baseline.time}`,
       );
-      assert.ok(run.inputs.length > 100);
+      assert.ok(
+        run.inputs.length >= 175,
+        "Saigon should sustain its denser action rhythm",
+      );
       const record = JSON.stringify(run.record());
       assert.ok(readRecord(record, mode, saigonRooftops));
       assert.equal(readRecord(record, mode, sunsetRelay), null);

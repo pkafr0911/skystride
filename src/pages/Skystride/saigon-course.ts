@@ -124,6 +124,30 @@ export function saigonGeometry() {
   phrase(2801, "Lantern Crossing", "0:s 11:a 16:g 33:k 57:u 85:d");
   phrase(2921, "Saigon Home", "0:w 14:p 26:s 38:k 50:d");
 
+  // Link the main encounters with short alternating phrases. Sector starts,
+  // swing landings and elevated exits retain their dedicated recovery space.
+  phrase(96, "Breakfast Rush", "0:k 10:s 20:d");
+  phrase(190, "Courtyard Gate", "0:s 10:k");
+  phrase(432, "Garden Weave", "0:d 10:s 20:k 30:p");
+  phrase(665, "Tile Finish", "0:k 10:s");
+  phrase(841, "Balcony Steps", "0:k 10:s");
+  phrase(932, "Neighborhood Dash", "0:s 10:k 20:w 32:d");
+  phrase(1097, "Stall Queue", "0:k 10:s");
+  phrase(1257, "Canopy Exit", "0:s 10:d");
+  phrase(1353, "Market Crush", "0:k 10:s 20:w 32:d 42:p");
+  phrase(1473, "Terrace Lip", "0:k");
+  phrase(1594, "Basket Weave", "0:k 10:s");
+  phrase(1757, "Shade Exit", "0:s 10:k");
+  phrase(1855, "Cafe Rush", "0:d 10:s 20:k 30:p");
+  phrase(1964, "Last Orders", "0:k 10:s");
+  phrase(2104, "Quay Gate", "0:s 10:k");
+  phrase(2268, "River Steps", "0:s 10:k");
+  phrase(2483, "Coffee Exit", "0:k");
+  phrase(2649, "Breeze Finish", "0:k 10:s");
+  phrase(2743, "Lantern Market", "0:k 10:s 20:w 32:d 42:p");
+  phrase(2899, "Home Stretch", "0:s 10:k");
+  phrase(2983, "Last Crate", "0:k");
+
   // Six distinct high routes, with independently placed entrances and returns.
   const skybridges = [211, 685, 1117, 1619, 2127, 2497].map((start, i) => ({
     start: start + 6,
@@ -134,12 +158,12 @@ export function saigonGeometry() {
     height: 7,
   }));
   const highPhrases = [
-    "0:s 12:p 24:g 41:k",
+    "0:s 10:k 20:p 30:g 47:k 57:s",
     "0:w 24:l 52:d 64:p",
     "0:p 24:u 52:s 64:k",
-    "0:k 12:g 28:w 42:p",
+    "0:k 10:s 20:g 36:w 50:p 60:d",
     "0:s 24:m 52:p 64:d",
-    "0:c 17:s 29:p 41:g",
+    "0:c 16:s 26:k 36:p 46:g 63:d",
   ];
   skybridges.forEach((b, i) => {
     obstacles.push({ x: b.start - 6, width: 6, kind: "branch" });

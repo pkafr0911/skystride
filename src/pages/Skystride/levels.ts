@@ -107,13 +107,13 @@ export const harborRun: LevelDefinition = {
 export const saigonRooftops: LevelDefinition = {
   ...saigonGeometry(),
   id: "saigon-rooftops",
-  version: "saigon-rooftops-v2",
+  version: "saigon-rooftops-v3",
   name: "Saigon Rooftops",
   number: "03",
   tutorial: false,
   tagline: "Above the alleys. Beyond the ordinary.",
   description:
-    "A Vietnamese rooftop run through narrow townhouses, market terraces, and the riverfront. Sunset Relay difficulty, with original rooftop routes and contact sequences.",
+    "A Vietnamese rooftop run through narrow townhouses, market terraces, and the riverfront. Dense rooftop chains, quick transitions, and demanding elevated routes.",
   finish: 3000,
   atmosphere: "saigon",
   sectors: [
