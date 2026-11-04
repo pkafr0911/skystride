@@ -4,7 +4,7 @@ import {
   DEFAULT_CHARACTER,
   CHARACTER_STORAGE,
   readCharacter,
-} from "./characters";
+} from "./characters/characters";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import {
@@ -15,24 +15,24 @@ import {
   surfaces,
   surfaceHeight,
   wallRunLedges,
-} from "./model";
+} from "./game/model";
 import {
   options,
   Preview,
   framesFor,
   minimumPreviewSpeed,
   previewObstacles,
-} from "./lab-model";
+} from "./game/lab-model";
 import {
   SWING_GAP_EXTRA,
   techniques,
   isSwing,
   Technique,
   chainSections,
-} from "./combos";
-import { creativeObstacle } from "./obstacle-mesh";
-import { makeRunner } from "./runner";
-import { interpolateFrame, motionPhase } from "./motion";
+} from "./game/combos";
+import { creativeObstacle } from "./obstacles/obstacle-mesh";
+import { makeRunner } from "./characters/runner";
+import { interpolateFrame, motionPhase } from "./game/motion";
 import styles from "./styles.less";
 
 /** Isolated animation inspection uses the same simulation and runner as the playable course. */

@@ -3,9 +3,9 @@ process.env.TS_NODE_PROJECT = "src/pages/Skystride/tsconfig.test.json";
 require("ts-node/register");
 const fs = require("node:fs");
 const THREE = require("three");
-const { SWING_GAP_EXTRA } = require("../src/pages/Skystride/combos");
-const { obstacles } = require("../src/pages/Skystride/model");
-const { creativeObstacle } = require("../src/pages/Skystride/obstacle-mesh");
+const { SWING_GAP_EXTRA } = require("../src/pages/Skystride/game/combos");
+const { obstacles } = require("../src/pages/Skystride/game/model");
+const { creativeObstacle } = require("../src/pages/Skystride/obstacles/obstacle-mesh");
 const box = new THREE.BoxGeometry(),
   cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
 const materials = [0x40506a, 0x101c2c, 0x718097, 0xf3ae65, 0x203958].map(
@@ -22,7 +22,7 @@ const kit = {
 };
 const vietnamStudy = process.argv.includes("--vietnam");
 const vietnamCourse = vietnamStudy
-  ? require("../src/pages/Skystride/levels").saigonRooftops
+  ? require("../src/pages/Skystride/courses/levels").saigonRooftops
   : null;
 if (vietnamStudy) {
   const colors = {
@@ -76,7 +76,7 @@ const entries = vietnamStudy
           ["cable-gantry", "OVERHEAD CABLE TRAY"],
         ]
       : signatureStudy
-        ? require("../src/pages/Skystride/combos").techniques.map((t) => [
+        ? require("../src/pages/Skystride/game/combos").techniques.map((t) => [
             t,
             t.replaceAll("-", " ").toUpperCase(),
           ])

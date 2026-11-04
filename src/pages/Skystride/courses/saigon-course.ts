@@ -1,6 +1,6 @@
-import type { Obstacle, VietnamProp } from "./model";
+import type { Obstacle, VietnamProp } from "../game/model";
 import type { Surface } from "./sunset-course";
-import { isSwing, SWING_GAP_EXTRA } from "./combos";
+import { isSwing, SWING_GAP_EXTRA } from "../game/combos";
 
 export function vietnamPropFor(o: Obstacle): VietnamProp | undefined {
   if (o.feature === "tank") return "water-tank-deck";

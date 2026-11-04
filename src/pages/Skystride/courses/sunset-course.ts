@@ -1,4 +1,4 @@
-import type { Obstacle, Vault, MovementProp } from "./model";
+import type { Obstacle, Vault, MovementProp } from "../game/model";
 import {
   comboCourse,
   chainSections,
@@ -6,7 +6,7 @@ import {
   overlapsChain,
   isSwing,
   SWING_GAP_EXTRA,
-} from "./combos";
+} from "../game/combos";
 const SECTOR = 1000;
 const FINISH = SECTOR * 3;
 const opening: Obstacle[] = [

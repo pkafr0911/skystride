@@ -1,6 +1,6 @@
 import React from "react";
-import { levels, LevelDefinition } from "./levels";
-import { formatTime, GameMode, RecordRun, recordStorage } from "./model";
+import { levels, LevelDefinition } from "./courses/levels";
+import { formatTime, GameMode, RecordRun, recordStorage } from "./game/model";
 import styles from "./styles.less";
 
 function Skyline({ harbor, saigon }: { harbor: boolean; saigon: boolean }) {

@@ -75,7 +75,7 @@ Combo update: the technical district includes 20 named three- to five-contact ch
 Bar crossings (v14): jump into hand reach, catch, then release across a real roof gap. Movement-lab previews include the same gaps and airborne approach; walking into a bar no longer starts the move.
 Bar crossings v15 widen to 12.6 m with a faster 0.55 s swing, a stronger release impulse, and extended landing corridors. Movement-lab shares the updated geometry and physics.
 
-Choose a character in the course or pause menu: Rooftop Courier, Rooftop Climber (default), Hop Bot, or Original Silhouette. The choice is saved on this device and applies to the runner and ghost. Available designs are registered in `src/pages/Skystride/characters.ts`.
+Choose a character in the course or pause menu: Rooftop Courier, Rooftop Climber (default), Hop Bot, or Original Silhouette. The choice is saved on this device and applies to the runner and ghost. Available designs are registered in `src/pages/Skystride/characters/characters.ts`.
 
 Eight equipment designs now appear throughout the course: AC condensers, secured cable reels, utility cabinets, maintenance carts, roof hatches, duct elbows, safety barricades and antenna bases. See the [implemented equipment preview](docs/implemented-obstacles-v2.png) and the original [concept sheet](docs/obstacle-concepts-v2.png). Equipment follows the existing traversal dimensions; reels have a flat service tread, duct risers sit behind the slide lane, and hatch rims leave the jump opening clear.
 
@@ -98,7 +98,7 @@ The course menu now presents three selectable maps with sector previews, Standar
 - **Level 2 — Sunset Relay:** the original three-sector course, with its existing layout.
 - **Level 3 — Saigon Rooftops:** Alley Roofs, Market Quarter, and Riverfront. Vietnamese tube houses, balconies, striped awnings, rooftop gardens, water tanks and river scenery. Eight new object designs retain existing vault, slide, wall-run, dive, swing, precision and ramp contacts. No tutorial guidance.
 
-Each `Run` owns a `LevelDefinition` from `src/pages/Skystride/levels.ts`; simulation, obstacle meshes, scene geometry, practice starts, split markers, and finish detection read that same definition. Sunset geometry is authored in `sunset-course.ts`, Harbor geometry in `harbor-course.ts`. Movement Lab and existing offline studies continue to default to Sunset Relay.
+Each `Run` owns a `LevelDefinition` from `src/pages/Skystride/courses/levels.ts`; simulation, obstacle meshes, scene geometry, practice starts, split markers, and finish detection read that same definition. Course geometry is grouped in `src/pages/Skystride/courses/`. Movement Lab and existing offline studies continue to default to Sunset Relay.
 
 Records are isolated by course version and difficulty. Current swing physics use `skystride.sunset-relay-v42.<mode>.best` and `skystride.harbor-run-v2.<mode>.best`. Earlier records remain stored under their old versions and are not compared with the faster crane releases. Practice and paused runs remain ineligible. Ghost validation rejects another map's course version.
 

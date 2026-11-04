@@ -1,19 +1,19 @@
-import { TraversalAudio } from "./audio";
-import { CharacterId } from "./characters";
-import { SWING_GAP_EXTRA, isSwing } from "./combos";
+import { TraversalAudio } from "./game/audio";
+import { CharacterId } from "./characters/characters";
+import { SWING_GAP_EXTRA, isSwing } from "./game/combos";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { Frame, RecordRun, Run, STEP } from "./model";
-import { creativeObstacle } from "./obstacle-mesh";
-import { makeRunner } from "./runner";
+import { Frame, RecordRun, Run, STEP } from "./game/model";
+import { creativeObstacle } from "./obstacles/obstacle-mesh";
+import { makeRunner } from "./characters/runner";
 import {
   CameraView,
   viewAngle,
   speedZoom,
   easeZoom,
   traversalZoom,
-} from "./camera";
-import { interpolateFrame } from "./motion";
+} from "./game/camera";
+import { interpolateFrame } from "./game/motion";
 
 export default function Scene({
   game,

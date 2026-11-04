@@ -1,6 +1,6 @@
-import { sunsetRelay, type LevelDefinition } from "./levels";
-import { timingRange, surfaceHeight } from "./sunset-course";
-export * from "./sunset-course";
+import { sunsetRelay, type LevelDefinition } from "../courses/levels";
+import { timingRange, surfaceHeight } from "../courses/sunset-course";
+export * from "../courses/sunset-course";
 import {
   blend,
   poseFor,

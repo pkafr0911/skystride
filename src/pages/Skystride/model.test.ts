@@ -5,9 +5,9 @@ import {
   levels,
   readLevel,
   type LevelDefinition,
-} from "./levels";
-import { ground } from "./model";
-import { simulateChain } from "./lab-model";
+} from "./courses/levels";
+import { ground } from "./game/model";
+import { simulateChain } from "./game/lab-model";
 import {
   SWING_GAP_EXTRA,
   SWING_RELEASE_SPEED,
@@ -17,7 +17,7 @@ import {
   legacyComboNames,
   newComboNames,
   overlapsChain,
-} from "./combos";
+} from "./game/combos";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -41,7 +41,7 @@ import {
   lowerRoofDrops,
   surfaceHeight,
   formatTime,
-} from "./model";
+} from "./game/model";
 function advance(g: Run, seconds: number) {
   for (let i = 0; i < Math.ceil(seconds / STEP); i++) g.step();
 }

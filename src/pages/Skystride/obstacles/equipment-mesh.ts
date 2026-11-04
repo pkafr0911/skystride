@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { ground, Obstacle } from "./model";
+import { ground, Obstacle } from "../game/model";
 import type { ObstacleKit } from "./obstacle-mesh";
 
 /** Real rooftop equipment, built from the scene's shared, batchable resources. */

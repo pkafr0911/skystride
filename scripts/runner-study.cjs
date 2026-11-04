@@ -2,8 +2,8 @@ process.env.TS_NODE_PROJECT = "src/pages/Skystride/tsconfig.test.json";
 require("ts-node/register");
 const fs = require("node:fs");
 const THREE = require("three");
-const { makeRunner } = require("../src/pages/Skystride/runner");
-const { Run, obstacles, ground } = require("../src/pages/Skystride/model");
+const { makeRunner } = require("../src/pages/Skystride/characters/runner");
+const { Run, obstacles, ground } = require("../src/pages/Skystride/game/model");
 const scene = new THREE.Scene(),
   runner = makeRunner(
     scene,
@@ -106,7 +106,7 @@ if (process.argv.includes("--wall")) {
 }
 if (process.argv.includes("--front-flip")) {
   samples.length = 0;
-  const { framesFor } = require("../src/pages/Skystride/lab-model");
+  const { framesFor } = require("../src/pages/Skystride/game/lab-model");
   const frames = framesFor("front-flip", 12);
   for (const progress of [0, 0.2, 0.4, 0.6, 0.8, 0.98]) {
     const frame = frames.find(
@@ -123,7 +123,7 @@ if (process.argv.includes("--kash")) {
   const {
     framesFor,
     previewObstacles,
-  } = require("../src/pages/Skystride/lab-model");
+  } = require("../src/pages/Skystride/game/lab-model");
   const frames = framesFor("kash", 12).filter((f) => f.move === "vault");
   const obstacle = previewObstacles("kash")[0];
   for (const [title, progress] of [
@@ -151,7 +151,7 @@ if (process.argv.includes("--vaults")) {
   const {
     framesFor,
     previewObstacles,
-  } = require("../src/pages/Skystride/lab-model");
+  } = require("../src/pages/Skystride/game/lab-model");
   for (const move of [
     "speed",
     "hurdle",

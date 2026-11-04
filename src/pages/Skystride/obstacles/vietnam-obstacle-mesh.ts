@@ -1,8 +1,8 @@
 import * as THREE from "three";
-import type { Obstacle } from "./model";
+import type { Obstacle } from "../game/model";
 import type { ObstacleKit } from "./obstacle-mesh";
-import { ground } from "./sunset-course";
-import { SWING_GAP_EXTRA, swingGripOffset } from "./combos";
+import { ground } from "../courses/sunset-course";
+import { SWING_GAP_EXTRA, swingGripOffset } from "../game/combos";
 
 /** All decoration is outside the travel lane; collision planes match the course. */
 export function vietnamObstacle(o: Obstacle, kit: ObstacleKit) {

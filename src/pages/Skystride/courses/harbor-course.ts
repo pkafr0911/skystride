@@ -1,6 +1,6 @@
-import type { Obstacle } from "./model";
+import type { Obstacle } from "../game/model";
 import type { Surface } from "./sunset-course";
-import { isSwing, SWING_GAP_EXTRA } from "./combos";
+import { isSwing, SWING_GAP_EXTRA } from "../game/combos";
 
 // Six authored blocks per district, with clear sector starts and landing corridors.
 // The lower service line is always available beneath optional elevated crossings.

@@ -1,14 +1,14 @@
 import CourseMenu from "./CourseMenu";
-import { levels, LEVEL_STORAGE, readLevel, LevelDefinition } from "./levels";
-import { CameraView } from "./camera";
+import { levels, LEVEL_STORAGE, readLevel, LevelDefinition } from "./courses/levels";
+import { CameraView } from "./game/camera";
 import CharacterPicker from "./CharacterPicker";
 import {
   CharacterId,
   DEFAULT_CHARACTER,
   CHARACTER_STORAGE,
   readCharacter,
-} from "./characters";
-import { isSwing } from "./combos";
+} from "./characters/characters";
+import { isSwing } from "./game/combos";
 import { Button, ConfigProvider, theme } from "antd";
 import React, {
   lazy,
@@ -30,7 +30,7 @@ import {
   LONG_JUMP_SPEED,
   GameMode,
   recordStorage,
-} from "./model";
+} from "./game/model";
 import styles from "./styles.less";
 const Scene = lazy(() => import("./Scene"));
 export default function Skystride() {

@@ -3,8 +3,8 @@ process.env.TS_NODE_PROJECT = "src/pages/Skystride/tsconfig.test.json";
 require("ts-node/register");
 const fs = require("node:fs");
 const THREE = require("three");
-const { makeRunner } = require("../src/pages/Skystride/runner");
-const { Run } = require("../src/pages/Skystride/model");
+const { makeRunner } = require("../src/pages/Skystride/characters/runner");
+const { Run } = require("../src/pages/Skystride/game/model");
 global.FileReader = class {
   readAsArrayBuffer(blob) {
     blob.arrayBuffer().then((result) => {

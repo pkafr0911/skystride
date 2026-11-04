@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import * as THREE from "three";
-import { CHARACTERS, CharacterId, DEFAULT_CHARACTER } from "./characters";
-import { makeRunner } from "./runner";
-import { Run } from "./model";
+import { CHARACTERS, CharacterId, DEFAULT_CHARACTER } from "./characters/characters";
+import { makeRunner } from "./characters/runner";
+import { Run } from "./game/model";
 import styles from "./styles.less";
 
 /** Static portraits of the real rigs, rendered once with a single temporary context. */

@@ -1,28 +1,28 @@
-import { harborRun, saigonRooftops } from "./levels";
-import { ground, movementPropFor } from "./model";
+import { harborRun, saigonRooftops } from "./courses/levels";
+import { ground, movementPropFor } from "./game/model";
 import {
   speedZoom,
   easeZoom,
   viewAngle,
   CAMERA_VIEWS,
   traversalZoom,
-} from "./camera";
+} from "./game/camera";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
-import { canMantle, Frame, obstacles, Run, STEP } from "./model";
-import { interpolateFrame, poseFor, runPose, STANCE, STRIDE } from "./motion";
-import { creativeObstacle } from "./obstacle-mesh";
-import { framesFor, previewObstacles, options } from "./lab-model";
+import { canMantle, Frame, obstacles, Run, STEP } from "./game/model";
+import { interpolateFrame, poseFor, runPose, STANCE, STRIDE } from "./game/motion";
+import { creativeObstacle } from "./obstacles/obstacle-mesh";
+import { framesFor, previewObstacles, options } from "./game/lab-model";
 import {
   techniques,
   comboNames,
   isSwing,
   chainSections,
   swingGripOffset,
-} from "./combos";
+} from "./game/combos";
 import { limbSurface } from "../../assets/limb-surface";
-import { LEG_LENGTHS, makeRunner, solveJoint } from "./runner";
+import { LEG_LENGTHS, makeRunner, solveJoint } from "./characters/runner";
 
 test("sprint support feet remain fixed in world space until toe-off", () => {
   for (const s of [0, 1]) {

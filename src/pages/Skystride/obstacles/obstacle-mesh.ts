@@ -1,9 +1,9 @@
 import { vietnamObstacle } from "./vietnam-obstacle-mesh";
-import { SWING_GAP_EXTRA, swingGripOffset } from "./combos";
+import { SWING_GAP_EXTRA, swingGripOffset } from "../game/combos";
 import * as THREE from "three";
 import { equipmentObstacle } from "./equipment-mesh";
 import { movementObstacle } from "./movement-obstacle-mesh";
-import { ground, Obstacle } from "./model";
+import { ground, Obstacle } from "../game/model";
 
 export type ObstacleKit = {
   vietnamPalette?: {

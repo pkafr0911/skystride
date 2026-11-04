@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { ground, Obstacle } from "./model";
-import { SWING_GAP_EXTRA, swingGripOffset } from "./combos";
+import { ground, Obstacle } from "../game/model";
+import { SWING_GAP_EXTRA, swingGripOffset } from "../game/combos";
 import type { ObstacleKit } from "./obstacle-mesh";
 
 /** Alternate rooftop objects; the existing movement determines every contact plane. */

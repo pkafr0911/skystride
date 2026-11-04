@@ -1,10 +1,10 @@
 import * as THREE from "three";
-import { limbSurface } from "../../assets/limb-surface";
-import { runnerGeometry } from "../../assets/runner-model";
+import { limbSurface } from "../../../assets/limb-surface";
+import { runnerGeometry } from "../../../assets/runner-model";
 import { CHARACTERS, CharacterId, DEFAULT_CHARACTER } from "./characters";
-import { Frame } from "./model";
-import { clamp, Point, poseFor } from "./motion";
-export { poseFor } from "./motion";
+import { Frame } from "../game/model";
+import { clamp, Point, poseFor } from "../game/motion";
+export { poseFor } from "../game/motion";
 export const LEG_LENGTHS = { thigh: 0.51, shin: 0.55 } as const;
 
 /** Stable two-bone IK. Pole projection defines the joint plane, including at full extension. */
