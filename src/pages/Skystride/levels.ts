@@ -107,7 +107,7 @@ export const harborRun: LevelDefinition = {
 export const saigonRooftops: LevelDefinition = {
   ...saigonGeometry(),
   id: "saigon-rooftops",
-  version: "saigon-rooftops-v3",
+  version: "saigon-rooftops-v4",
   name: "Saigon Rooftops",
   number: "03",
   tutorial: false,

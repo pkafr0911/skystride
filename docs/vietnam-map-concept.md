@@ -1,6 +1,6 @@
 # Level 3 — Saigon Rooftops — concept and implementation
 
-Implemented as Level 3 with three sectors and eight procedural prop families. The original concept below is retained as an art-direction reference. See `saigon-implemented-objects.png` for the actual meshes. The route is independently authored: 24 main street-level combos, 21 short connecting phrases, six elevated routes, and three courtyard descents. It retains shared movement rules and obstacle timing windows, with new contact orders, placements and roof transitions.
+Implemented as Level 3 with three sectors and eight procedural prop families. The original concept below is retained as an art-direction reference. See `saigon-implemented-objects.png` for the actual meshes. The route is independently authored: 24 main street-level combos, 21 short connecting phrases, six elevated routes, and three courtyard descents. It retains shared movement rules and obstacle timing windows, with new contact orders, placements and roof transitions. The harder revision tightens many switches to eight metres and extends ground and elevated chains.
 
 ## Course proposal
 

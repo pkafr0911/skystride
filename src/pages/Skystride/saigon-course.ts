@@ -97,54 +97,54 @@ export function saigonGeometry() {
     }
   };
   // Alley roofs: short alternating contacts, courtyard crossings, water decks.
-  phrase(33, "Morning Deliveries", "0:s 10:k 21:p 33:v 45:g");
-  phrase(129, "Courtyard Stitch", "0:w 13:d 24:s 36:r 48:k");
+  phrase(33, "Morning Deliveries", "0:s 8:k 16:p 24:v 32:s 45:g");
+  phrase(129, "Courtyard Stitch", "0:w 10:d 18:s 26:r 34:k 42:s 50:d");
   phrase(247, "Laundry Cut", "0:p 24:l 51:s 62:d 90:g");
-  phrase(363, "Water Garden", "0:t 14:p 26:k 38:w 51:s");
-  phrase(479, "Coffee Corner", "0:c 16:s 27:d 39:p 51:g");
+  phrase(363, "Water Garden", "0:t 12:p 20:k 28:s 36:w 47:d 55:s");
+  phrase(479, "Coffee Corner", "0:c 16:s 24:d 32:p 40:k 51:g");
   phrase(598, "Tile Hop", "0:k 11:r 23:a 28:g 44:v 55:s");
   phrase(731, "Balcony Errands", "0:s 12:w 26:p 50:u 98:d");
-  phrase(861, "Alley Exit", "0:g 16:t 31:k 43:s 55:p");
+  phrase(861, "Alley Exit", "0:g 16:t 29:k 37:s 45:p 53:d 61:s");
   // Market: shutter/awning rhythms with longer rack transfers between stalls.
-  phrase(1037, "Opening Stalls", "0:w 13:s 24:k 36:p 48:d");
+  phrase(1037, "Opening Stalls", "0:w 11:s 19:k 27:p 35:d 43:s 51:k");
   phrase(1151, "Canopy Thread", "0:s 11:p 35:m 63:w 93:k");
-  phrase(1283, "Fruit Exchange", "0:k 12:s 23:c 40:d 52:g");
-  phrase(1409, "Market Terraces", "0:p 12:t 28:w 41:r 53:v");
-  phrase(1531, "Basket Sprint", "0:d 11:g 27:s 38:k 50:p");
-  phrase(1657, "Shade Crossing", "0:u 28:k 40:w 53:s 65:d");
+  phrase(1283, "Fruit Exchange", "0:k 8:s 17:c 31:d 39:p 52:g");
+  phrase(1409, "Market Terraces", "0:p 9:t 23:w 34:r 42:v 50:s");
+  phrase(1531, "Basket Sprint", "0:d 11:g 27:s 35:k 43:p 51:d");
+  phrase(1657, "Shade Crossing", "0:u 28:k 36:w 47:s 55:d 63:p");
   phrase(1781, "Cafe Delivery", "0:c 17:p 29:s 40:a 45:g 61:k");
-  phrase(1903, "Closing Shutters", "0:s 11:w 25:d 37:r 49:p");
+  phrase(1903, "Closing Shutters", "0:s 8:w 19:d 27:r 35:p 43:s 51:k");
   // Riverfront: separated roof islands, launch planks and exposed high lines.
-  phrase(2039, "River Approach", "0:p 12:g 28:k 40:s 51:w");
+  phrase(2039, "River Approach", "0:p 12:g 28:k 36:s 44:w 55:d");
   phrase(2163, "Quay Transfer", "0:a 5:g 22:d 46:l 92:p");
-  phrase(2291, "Floating Gardens", "0:t 15:s 26:p 38:k 50:g");
-  phrase(2417, "Riverside Coffee", "0:w 14:c 31:s 43:r 55:d");
+  phrase(2291, "Floating Gardens", "0:t 13:s 21:p 29:k 37:d 50:g");
+  phrase(2417, "Riverside Coffee", "0:w 12:c 29:s 37:r 45:d 53:p");
   phrase(2543, "Breeze Line", "0:k 24:m 52:p 64:w 94:s");
-  phrase(2673, "Terrace Descent", "0:g 17:d 29:t 44:p 56:s");
+  phrase(2673, "Terrace Descent", "0:g 17:d 25:t 39:p 47:s 55:k");
   phrase(2801, "Lantern Crossing", "0:s 11:a 16:g 33:k 57:u 85:d");
-  phrase(2921, "Saigon Home", "0:w 14:p 26:s 38:k 50:d");
+  phrase(2921, "Saigon Home", "0:w 11:p 19:s 27:k 35:d 43:s 51:p");
 
   // Link the main encounters with short alternating phrases. Sector starts,
   // swing landings and elevated exits retain their dedicated recovery space.
-  phrase(96, "Breakfast Rush", "0:k 10:s 20:d");
+  phrase(96, "Breakfast Rush", "0:k 8:s 16:d 24:p");
   phrase(190, "Courtyard Gate", "0:s 10:k");
-  phrase(432, "Garden Weave", "0:d 10:s 20:k 30:p");
+  phrase(432, "Garden Weave", "0:d 8:s 16:k 24:p 32:d");
   phrase(665, "Tile Finish", "0:k 10:s");
   phrase(841, "Balcony Steps", "0:k 10:s");
-  phrase(932, "Neighborhood Dash", "0:s 10:k 20:w 32:d");
+  phrase(932, "Neighborhood Dash", "0:s 8:k 16:w 27:d 35:p");
   phrase(1097, "Stall Queue", "0:k 10:s");
   phrase(1257, "Canopy Exit", "0:s 10:d");
-  phrase(1353, "Market Crush", "0:k 10:s 20:w 32:d 42:p");
+  phrase(1353, "Market Crush", "0:k 8:s 16:w 27:d 35:p 43:k");
   phrase(1473, "Terrace Lip", "0:k");
   phrase(1594, "Basket Weave", "0:k 10:s");
   phrase(1757, "Shade Exit", "0:s 10:k");
-  phrase(1855, "Cafe Rush", "0:d 10:s 20:k 30:p");
+  phrase(1855, "Cafe Rush", "0:d 8:s 16:k 24:p 32:d");
   phrase(1964, "Last Orders", "0:k 10:s");
   phrase(2104, "Quay Gate", "0:s 10:k");
   phrase(2268, "River Steps", "0:s 10:k");
   phrase(2483, "Coffee Exit", "0:k");
   phrase(2649, "Breeze Finish", "0:k 10:s");
-  phrase(2743, "Lantern Market", "0:k 10:s 20:w 32:d 42:p");
+  phrase(2743, "Lantern Market", "0:k 8:s 16:w 27:d 35:p 43:k");
   phrase(2899, "Home Stretch", "0:s 10:k");
   phrase(2983, "Last Crate", "0:k");
 
@@ -158,12 +158,12 @@ export function saigonGeometry() {
     height: 7,
   }));
   const highPhrases = [
-    "0:s 10:k 20:p 30:g 47:k 57:s",
-    "0:w 24:l 52:d 64:p",
-    "0:p 24:u 52:s 64:k",
-    "0:k 10:s 20:g 36:w 50:p 60:d",
-    "0:s 24:m 52:p 64:d",
-    "0:c 16:s 26:k 36:p 46:g 63:d",
+    "0:s 8:k 16:p 24:g 41:k 49:s 57:d",
+    "0:w 12:k 24:l 52:d 60:p",
+    "0:p 12:k 24:u 52:s 60:k",
+    "0:k 8:s 18:g 34:w 45:p 53:d 61:s",
+    "0:s 12:k 24:m 52:p 60:d",
+    "0:c 17:s 25:k 33:p 43:g 60:d 68:s",
   ];
   skybridges.forEach((b, i) => {
     obstacles.push({ x: b.start - 6, width: 6, kind: "branch" });

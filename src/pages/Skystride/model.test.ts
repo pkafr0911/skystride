@@ -2340,7 +2340,7 @@ for (const mode of ["standard", "hardcore"] as const) {
         `Times differ: Saigon ${run.time}, Sunset ${baseline.time}`,
       );
       assert.ok(
-        run.inputs.length >= 175,
+        run.inputs.length >= 210,
         "Saigon should sustain its denser action rhythm",
       );
       const record = JSON.stringify(run.record());
