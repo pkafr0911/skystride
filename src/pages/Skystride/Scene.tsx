@@ -129,6 +129,7 @@ export default function Scene({
     const sphereGeometry = new THREE.SphereGeometry(1, 10, 8);
     const cylinderGeometry = new THREE.CylinderGeometry(1, 1, 1, 12);
     const materials: THREE.Material[] = [];
+    const sceneryGeometries: THREE.BufferGeometry[] = [];
     const material = (color: number, opacity = 1) => {
       const m = new THREE.MeshStandardMaterial({
         color,
@@ -809,6 +810,22 @@ export default function Scene({
     if (saigon && vietnamPalette) {
       const { cream, jade, coral, leaf, steel } = vietnamPalette;
       const water = material(0x648c89);
+      const flagRed = material(0xda251d);
+      const flagGold = material(0xffff00);
+      flagGold.side = THREE.DoubleSide;
+      // Vietnam's 3:2 flag has one centered, upright five-pointed star.
+      const star = new THREE.Shape();
+      for (let point = 0; point < 10; point++) {
+        const angle = Math.PI / 2 + (point * Math.PI) / 5;
+        const radius = point % 2 === 0 ? 0.48 : 0.48 * 0.381966;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (point === 0) star.moveTo(x, y);
+        else star.lineTo(x, y);
+      }
+      star.closePath();
+      const starGeometry = new THREE.ShapeGeometry(star);
+      sceneryGeometries.push(starGeometry);
       // Narrow tube houses, balconies and rooftop life stay behind the running lane.
       for (let x = 0, i = 0; x < FINISH; x += 24, i++) {
         const sector = Math.min(2, Math.floor(x / 1000));
@@ -834,6 +851,17 @@ export default function Scene({
               0.045,
               steel,
             );
+        }
+        // Occasional rooftop flags face the running lane, clear of all contacts.
+        if (i % 7 === 0) {
+          const poleX = x + 5;
+          box(scene, poleX, top + 1.8, -6.4, 0.055, 3.6, 0.055, steel);
+          box(scene, poleX + 1.2, top + 2.7, -6.4, 2.4, 1.6, 0.035, flagRed);
+          for (const side of [-1, 1]) {
+            const emblem = new THREE.Mesh(starGeometry, flagGold);
+            emblem.position.set(poleX + 1.2, top + 2.7, -6.4 + side * 0.025);
+            chunkFor(x).add(emblem);
+          }
         }
         // Ribbed water tanks and tropical terrace planters are recognizable silhouettes.
         if (i % 3 === 0) {
@@ -1167,6 +1195,7 @@ export default function Scene({
       sphereGeometry.dispose();
       cylinderGeometry.dispose();
       sunGeometry.dispose();
+      sceneryGeometries.forEach((geometry) => geometry.dispose());
       materials.forEach((m) => m.dispose());
       player.dispose();
       rival.dispose();
