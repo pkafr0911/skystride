@@ -1,12 +1,15 @@
+import { dodgeCameraBlend } from "./game/camera";
 import {
   harborRun,
   saigonRooftops,
   sunsetRelay,
+  streetLevel,
   levels,
   readLevel,
   type LevelDefinition,
 } from "./courses/levels";
 import { ground } from "./game/model";
+import { poseFor } from "./game/motion";
 import { simulateChain } from "./game/lab-model";
 import {
   SWING_GAP_EXTRA,
@@ -45,6 +48,16 @@ import {
 function advance(g: Run, seconds: number) {
   for (let i = 0; i < Math.ceil(seconds / STEP); i++) g.step();
 }
+function dodgePilot(run: Run) {
+  const zone = run.level.dodge!;
+  const next = zone.hazards.find((h) => h.x + h.length + 0.6 > run.x);
+  const safe = next
+    ? zone.lanes.findIndex(
+        (z) => !zone.hazards.some((h) => h.x === next.x && h.z === z),
+      )
+    : 1;
+  if (safe !== run.dodgeLane) run.steer(safe < run.dodgeLane ? -1 : 1);
+}
 function complete(
   upper = false,
   early = false,
@@ -66,6 +79,9 @@ function complete(
   for (let tick = 0; tick < 60000 && g.phase === "running"; tick++) {
     if (branchStart !== undefined && g.x >= branchStart + 92 && g.grounded)
       break;
+    if (g.dodging) {
+      dodgePilot(g);
+    }
     const frame = g.frame();
     if (
       !g.grounded &&
@@ -1161,7 +1177,9 @@ test("both full routes keep their flow across varied obstacle approach timings",
       );
       assert.equal(g.recoveries, 0, `route ${upper}, approach ${approach}`);
       assert.ok(g.time >= 180 && g.time <= 300);
-      const inputs = g.inputs.filter((i) => i.action !== "down");
+      const inputs = g.inputs.filter(
+        (i) => i.action === "up" || i.action === "forward",
+      );
       for (let i = 1; i < inputs.length; i++) {
         assert.ok(
           (inputs[i].tick - inputs[i - 1].tick) * STEP >= 0.15,
@@ -2279,7 +2297,7 @@ test("level geometry and records remain isolated across simultaneous runs", () =
   assert.notEqual(sunset.next()?.x, harbor.next()?.x);
   assert.equal(
     recordStorage("standard"),
-    "skystride.sunset-relay-v42.standard.best",
+    "skystride.sunset-relay-v47.standard.best",
   );
   assert.notEqual(
     recordStorage("standard", sunsetRelay),
@@ -2298,9 +2316,11 @@ test("level geometry and records remain isolated across simultaneous runs", () =
       { number: "01", tutorial: true },
       { number: "02", tutorial: false },
       { number: "03", tutorial: false },
+      { number: "04", tutorial: false },
     ],
   );
   assert.equal(readLevel("harbor-run"), harborRun);
+  assert.equal(readLevel("street-level"), streetLevel);
 });
 test("every level has safe sector practice starts and bounded surfaces", () => {
   for (const level of levels) {
@@ -2416,4 +2436,194 @@ test("Saigon elevated exits provide clear lower landing corridors", () => {
       ),
     );
   }
+});
+
+test("street steering clamps to the road, pauses safely and resets for practice", () => {
+  const run = new Run(streetLevel);
+  run.start(0, true);
+  run.steer(-1);
+  advance(run, 1.2);
+  assert.ok(run.lateral >= 0.55 - streetLevel.dodge!.halfWidth + 0.4);
+  assert.equal(run.lateral, streetLevel.dodge!.lanes[0]);
+  assert.equal(run.dodgeLane, 0);
+  const lane = run.lateral;
+  run.pause();
+  advance(run, 1);
+  assert.equal(run.lateral, lane);
+  run.pause();
+  advance(run, 0.1);
+  assert.equal(run.lateral, lane);
+  run.start(0, true);
+  assert.equal(run.lateral, 0.55);
+  assert.equal(run.lateralSpeed, 0);
+  run.action("forward");
+  run.action("up");
+  run.step();
+  assert.equal(run.y, 0);
+  assert.equal(run.move, "run");
+});
+
+test("dodge collision uses both axes, counts each obstacle once and penalizes speed", () => {
+  for (const hit of [false, true]) {
+    const level = {
+      ...streetLevel,
+      dodge: {
+        ...streetLevel.dodge!,
+        hazards: streetLevel.dodge!.hazards.filter((hazard) => hazard.x === 70),
+      },
+    };
+    const run = new Run(level);
+    run.start(0, true);
+    run.x = 69;
+    run.speed = 30;
+    run.dodgeLane = hit ? 0 : 1;
+    run.lateral = streetLevel.dodge!.lanes[run.dodgeLane];
+    advance(run, 0.3);
+    assert.equal(run.recoveries, hit ? 1 : 0);
+    if (hit) {
+      assert.ok(run.speed <= 9);
+      assert.equal(run.move, "stumble");
+      advance(run, 0.75);
+      assert.ok(run.speed <= 9, "the slowdown remains visible after impact");
+      advance(run, 0.75);
+      assert.ok(run.speed > 9, "speed recovers after the penalty period");
+    }
+  }
+});
+
+test("dodge practice completes and smoothly rejoins the original running line", () => {
+  const run = new Run(streetLevel);
+  run.start(0, true);
+  run.steer(1);
+  while (run.phase === "running") run.step();
+  assert.equal(run.x, streetLevel.finish);
+  assert.ok(Math.abs(run.lateral - 0.55) < 0.03);
+  assert.ok(run.splits[0] > 0);
+  assert.equal(run.eligible, false);
+});
+
+test("dodge steering input replays deterministically and ghosts preserve lateral motion", () => {
+  const first = new Run(streetLevel);
+  first.start(0, true);
+  for (let tick = 1; tick <= 600; tick++) {
+    if (tick === 1) first.steer(1);
+    if (tick === 100) first.steer(0);
+    if (tick === 200) first.steer(-1);
+    if (tick === 300) first.steer(0);
+    first.step();
+  }
+  const replay = new Run(streetLevel);
+  replay.start(0, true);
+  for (let tick = 1; tick <= 600; tick++) {
+    for (const input of first.inputs.filter((input) => input.tick === tick))
+      replay.action(input.action);
+    replay.step();
+  }
+  assert.deepEqual(replay.samples, first.samples);
+  assert.ok(
+    first.samples.some(({ frame }) => Math.abs(frame.lane! - 0.55) > 2),
+  );
+  assert.ok(
+    readRecord(JSON.stringify(complete().record()), "standard", sunsetRelay),
+  );
+});
+
+test("dodge camera has clear approach and exit buffers", () => {
+  assert.equal(dodgeCameraBlend(0, 0, 700), 0);
+  assert.equal(dodgeCameraBlend(55, 0, 700), 1);
+  assert.equal(dodgeCameraBlend(660, 0, 700), 1);
+  assert.equal(dodgeCameraBlend(700, 0, 700), 0);
+  assert.ok(dodgeCameraBlend(25, 0, 700) > 0);
+  assert.ok(dodgeCameraBlend(25, 0, 700) < 1);
+});
+
+test("three-lane dodge uses one adjacent lane per input and clamps at both edges", () => {
+  const run = new Run(streetLevel);
+  run.start(0, true);
+  run.steer(1);
+  advance(run, 0.1);
+  assert.ok(run.lateral > 0.55 && run.lateral < 3.55);
+  advance(run, 1);
+  assert.equal(run.dodgeLane, 2);
+  assert.equal(run.lateral, 3.55);
+  run.steer(1);
+  advance(run, 0.3);
+  assert.equal(run.lateral, 3.55);
+  run.steer(-1);
+  advance(run, 0.21);
+  assert.equal(run.dodgeLane, 1);
+  assert.equal(run.lateral, 0.55);
+  run.steer(-1);
+  run.steer(-1);
+  advance(run, 0.3);
+  assert.equal(run.dodgeLane, 0);
+  assert.equal(run.lateral, -2.45);
+});
+
+test("dodge steering animates the runner's upper body and counterbalancing arms", () => {
+  const frame = new Run(streetLevel).frame();
+  const neutral = poseFor(frame);
+  const left = poseFor({ ...frame, steering: -1 });
+  const right = poseFor({ ...frame, steering: 1 });
+  assert.ok(left.chest[2] < neutral.chest[2]);
+  assert.ok(right.chest[2] > neutral.chest[2]);
+  assert.ok(left.hands[0][2] > neutral.hands[0][2]);
+  assert.ok(right.hands[0][2] < neutral.hands[0][2]);
+});
+
+test("all difficult dodge gates have a clean reachable route at maximum speed", () => {
+  const zone = streetLevel.dodge!;
+  assert.equal(zone.start, 0);
+  assert.equal(zone.end - zone.start, 700);
+  assert.ok(
+    streetLevel.surfaces.some(
+      (surface) =>
+        !surface.upper &&
+        surface.start <= zone.start &&
+        surface.end >= zone.end,
+    ),
+    "Street Level stays on a continuous ground-level surface",
+  );
+  assert.equal(zone.hazards.length, 72);
+  assert.deepEqual(
+    [...new Set(zone.hazards.map((hazard) => hazard.kind))].sort(),
+    [
+      "hydrant",
+      "parked-car",
+      "planter",
+      "road-barrier",
+      "scaffold",
+      "trash-bins",
+    ].sort(),
+  );
+  for (const x of new Set(zone.hazards.map((h) => h.x))) {
+    const gate = zone.hazards.filter((h) => h.x === x);
+    assert.equal(gate.length, 2);
+    assert.equal(new Set(gate.map((h) => h.z)).size, 2);
+    assert.ok(gate.every((h) => zone.lanes.includes(h.z)));
+  }
+  for (const mode of ["standard", "hardcore"] as const) {
+    const run = new Run(streetLevel);
+    run.start(0, true, mode);
+    run.speed = 22;
+    for (let tick = 0; tick < 4500 && run.phase === "running"; tick++) {
+      dodgePilot(run);
+      run.step();
+    }
+    assert.equal(run.phase, "finished");
+    assert.equal(run.recoveries, 0, `${mode}: ${run.message}`);
+    assert.equal(run.speed, 22);
+  }
+});
+
+test("crossing an occupied lane still collides during a lane change", () => {
+  const run = new Run(streetLevel);
+  run.start(0, true);
+  run.x = 70;
+  run.dodgeLane = 1;
+  run.lateral = 0.55;
+  run.speed = 22;
+  run.steer(1);
+  advance(run, 0.1);
+  assert.equal(run.recoveries, 1);
 });

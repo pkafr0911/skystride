@@ -59,3 +59,12 @@ export function traversalZoom(
   const wide = gapWidth >= 10 ? 0.85 : 1.02;
   return base + (Math.min(base, wide) - base) * anticipation;
 }
+
+/** Distance-based transitions stay stable when paused or practising a sector. */
+export function dodgeCameraBlend(x: number, start: number, end: number) {
+  const smooth = (t: number) => {
+    const u = Math.max(0, Math.min(1, t));
+    return u * u * (3 - 2 * u);
+  };
+  return smooth((x - start) / 55) * smooth((end - x) / 40);
+}

@@ -798,6 +798,14 @@
     #5f829c 100%
   );
 }
+.streetStage {
+  background: linear-gradient(
+    #aeb9b5 0%,
+    #d3d0c1 38%,
+    #9caaa8 70%,
+    #536368 100%
+  );
+}
 .overlay.menuOverlay {
   padding: 40px max(24px, 5vw) 28px;
   background: linear-gradient(115deg, #0a1725f7, #101f30ee 60%, #143241dc);
@@ -903,6 +911,10 @@
 .harborCard {
   color: #a8dfd6;
   background: linear-gradient(125deg, #193b47, #355e68);
+}
+.streetCard {
+  color: #f0d483;
+  background: linear-gradient(125deg, #343f43, #69766d);
 }
 .levelSelected {
   border-color: currentColor;
@@ -1282,5 +1294,28 @@
         display: block;
       }
     }
+  }
+}
+
+.dodgeHint {
+  position: absolute;
+  left: 50%;
+  bottom: 3%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 20px;
+  border: 1px solid #e4b860;
+  border-radius: 12px;
+  background: rgba(15, 25, 36, 0.88);
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+  width: max-content;
+  max-width: 85%;
+  strong {
+    color: #f5c96d;
+    letter-spacing: 0.16em;
   }
 }

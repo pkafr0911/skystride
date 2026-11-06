@@ -1492,6 +1492,17 @@ function continuousJoints(p: Pose, yaw = 0): Pose {
 export function poseFor(f: Frame): Pose {
   if (f.renderPose) return f.renderPose;
   const p = flatPose(f);
+  if (f.move === "run" && f.steering) {
+    const lean = clamp(f.steering, -1, 1);
+    p.chest[2] += lean * 0.12;
+    p.head[2] += lean * 0.18;
+    p.chest[0] -= Math.abs(lean) * 0.035;
+    for (let side = 0; side < 2; side++) {
+      p.hands[side][2] -= lean * 0.14;
+      p.elbows[side][2] -= lean * 0.08;
+      p.feet[side][2] += lean * (side ? -0.07 : 0.07);
+    }
+  }
   if (f.move === "run" && (f.anticipation ?? 0) > 0) {
     const prepare = f.anticipation!;
     p.chest[0] += prepare * 0.1;
@@ -1677,6 +1688,7 @@ export function interpolateFrame(a: Frame, b: Frame, t: number): Frame {
     anticipation: mix(a.anticipation ?? 0, b.anticipation ?? 0, t),
     slope: mix(a.slope ?? 0, b.slope ?? 0, t),
     lane: mix(a.lane ?? 0.55, b.lane ?? 0.55, t),
+    steering: mix(a.steering ?? 0, b.steering ?? 0, t),
     moveTime: sameMove ? mix(a.moveTime, b.moveTime, t) : a.moveTime,
     progress: sameMove ? mix(a.progress, b.progress, t) : a.progress,
     landingAge:

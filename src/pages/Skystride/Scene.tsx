@@ -8,6 +8,7 @@ import { creativeObstacle } from "./obstacles/obstacle-mesh";
 import { makeRunner } from "./characters/runner";
 import {
   CameraView,
+  dodgeCameraBlend,
   viewAngle,
   speedZoom,
   easeZoom,
@@ -51,6 +52,7 @@ export default function Scene({
     } = game.level;
     const harbor = game.level.atmosphere === "harbor";
     const saigon = game.level.atmosphere === "saigon";
+    const street = game.level.atmosphere === "street";
     const container = host.current!;
     const audio = new TraversalAudio();
     audio.setEnabled(soundRef.current);
@@ -87,7 +89,7 @@ export default function Scene({
     container.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(
-      harbor ? 0x9fc8cf : saigon ? 0xc5ac9a : 0xa59abb,
+      harbor ? 0x9fc8cf : saigon ? 0xc5ac9a : street ? 0xa8b5b3 : 0xa59abb,
       60,
       170,
     );
@@ -98,13 +100,19 @@ export default function Scene({
     camera.zoom = speedZoom(game.speed, motionPreference.matches);
     scene.add(
       new THREE.HemisphereLight(
-        harbor ? 0xd9f7f5 : saigon ? 0xffe6b5 : 0xffd3b2,
-        0x25354e,
+        harbor
+          ? 0xd9f7f5
+          : saigon
+            ? 0xffe6b5
+            : street
+              ? 0xe7eeeb
+              : 0xffd3b2,
+        street ? 0x384343 : 0x25354e,
         1.25,
       ),
     );
     const sunlight = new THREE.DirectionalLight(
-      harbor ? 0xe4f6ed : saigon ? 0xffd6a0 : 0xffae6b,
+      harbor ? 0xe4f6ed : saigon ? 0xffd6a0 : street ? 0xf2e5cf : 0xffae6b,
       1.6,
     );
     sunlight.position.set(-12, 18, -9);
@@ -140,9 +148,9 @@ export default function Scene({
       materials.push(m);
       return m;
     };
-    const roof = material(saigon ? 0x8b8171 : 0x35465a),
-      side = material(saigon ? 0xb8a081 : 0x182a43),
-      edge = material(harbor ? 0x9fe5d5 : 0xf3ae65);
+    const roof = material(saigon ? 0x8b8171 : street ? 0x333d43 : 0x35465a),
+      side = material(saigon ? 0xb8a081 : street ? 0x343b3c : 0x182a43),
+      edge = material(harbor ? 0x9fe5d5 : street ? 0xf1c85b : 0xf3ae65);
     // Mid-tone matte steel preserves panel detail under the warm sunlight.
     const vaultFace = material(0x5e7084),
       slideFace = material(0x586f83),
@@ -161,7 +169,15 @@ export default function Scene({
       finish.metalness = 0;
     }
     const metal = material(0x40506a),
-      black = material(0x101c2c);
+      black = material(0x101c2c),
+      streetAsphalt = material(0x3f4a4b),
+      streetSidewalk = material(0x9a9b91),
+      streetMarking = material(0xe4dfc9),
+      streetBrick = material(0x766c61),
+      streetGlass = material(0x71918f),
+      streetAwning = material(0xc65d43),
+      streetGreen = material(0x607a4d),
+      streetRed = material(0xb64435);
     // Atmospheric props have a deliberately lighter, quieter value range.
     const decor = new THREE.MeshBasicMaterial({ color: 0x9797ad });
     const decorDark = new THREE.MeshBasicMaterial({ color: 0x838ba2 });
@@ -252,10 +268,14 @@ export default function Scene({
       skyline.add(buildings);
       skylineLayers.push(buildings);
       const mat = new THREE.MeshBasicMaterial({
-        color: [0xb9a8bd, 0xa39bb5, 0x9297b0][layer],
+        color: street
+          ? [0xaeb8b3, 0x969f9e, 0x7e8d90][layer]
+          : [0xb9a8bd, 0xa39bb5, 0x9297b0][layer],
       });
       const glass = new THREE.MeshBasicMaterial({
-        color: [0xc4adc0, 0xada4bc, 0xa0a5bc][layer],
+        color: street
+          ? [0xc2c9bd, 0xaebbb4, 0x9bacaa][layer]
+          : [0xc4adc0, 0xada4bc, 0xa0a5bc][layer],
       });
       materials.push(mat, glass);
       for (let i = 0; i < 125; i++) {
@@ -284,7 +304,10 @@ export default function Scene({
         }
       }
     }
-    const sunMat = new THREE.MeshBasicMaterial({ color: 0xffdc9d, fog: false });
+    const sunMat = new THREE.MeshBasicMaterial({
+      color: street ? 0xe9dfbd : 0xffdc9d,
+      fog: false,
+    });
     materials.push(sunMat);
     const sunGeometry = new THREE.CircleGeometry(2.3, 48);
     const sun = new THREE.Mesh(sunGeometry, sunMat);
@@ -344,7 +367,7 @@ export default function Scene({
           edge,
         );
     }
-    const renderSurfaces = surfaces.flatMap((slab) => {
+    const renderSurfaces = street ? [] : surfaces.flatMap((slab) => {
       if (!slab.upper) return [slab];
       const boundaries = [
         slab.start,
@@ -357,6 +380,7 @@ export default function Scene({
     });
     // Physical roof heights and connecting ramps come from the collision surfaces.
     for (const slab of renderSurfaces) {
+      if (game.level.dodge && slab.start >= game.level.dodge.start) continue;
       const upper = slab.upper;
       const narrow =
         upper &&
@@ -798,10 +822,254 @@ export default function Scene({
       if (o.kind === "branch")
         box(scene, o.x + o.width, 3.32, -0.8, 0.24, 0.06, 2.6, edge);
     });
-    // Background buildings use quiet architectural masses, never obstacle-like props.
-    for (let i = 0; i < Math.ceil(FINISH / 22); i++) {
-      const x = i * 22 - 10;
-      box(scene, x + 2, -7, -11, 17, 14, 6, decorDark);
+    const dodgeZone = game.level.dodge;
+    if (dodgeZone) {
+      const { start, end, halfWidth, hazards } = dodgeZone;
+      if (street) {
+        const roadCenter = 0.55;
+        for (let x = start; x < end + 20; x += 10) {
+          box(
+            scene,
+            x + 5,
+            -0.025,
+            roadCenter,
+            10,
+            0.05,
+            halfWidth * 2,
+            streetAsphalt,
+          );
+          for (const sign of [-1, 1]) {
+            const curbZ = roadCenter + sign * (halfWidth + 0.12);
+            box(scene, x + 5, 0.08, curbZ, 10, 0.16, 0.2, streetSidewalk);
+            box(
+              scene,
+              x + 5,
+              0.035,
+              roadCenter + sign * (halfWidth + 0.85),
+              10,
+              0.05,
+              1.45,
+              streetSidewalk,
+            );
+          }
+          for (const z of [-0.95, 2.05])
+            box(
+              scene,
+              x + 3.1,
+              0.008,
+              z,
+              4.1,
+              0.016,
+              0.09,
+              streetMarking,
+            );
+        }
+      } else {
+        // Separate slabs keep chunk culling valid along the entire sector.
+        for (let x = start; x < end + 20; x += 10) {
+          box(scene, x + 5, -0.5, 0.55, 10, 1, halfWidth * 2, roof);
+          for (const z of [0.55 - halfWidth, 0.55 + halfWidth])
+            box(scene, x + 5, 0.12, z, 10, 0.24, 0.12, edge);
+          for (const z of [-0.95, 2.05])
+            box(scene, x + 5, 0.015, z, 6, 0.03, 0.08, edge);
+        }
+      }
+      for (const h of hazards) {
+        const x = h.x + h.length / 2;
+        const z = h.z;
+        box(scene, x, 0.12, z, h.length + 0.18, 0.24, h.width + 0.2, black);
+        if (h.kind === "parked-car") {
+          box(scene, x, 0.62, z, h.length, 0.88, h.width - 0.2, streetRed);
+          box(scene, x + 0.08, 1.14, z, h.length * 0.48, 0.28, h.width * 0.6, streetGlass);
+          box(scene, x + 0.82, 0.54, z, 0.42, 0.12, h.width + 0.04, edge);
+          box(scene, x - 0.82, 0.54, z, 0.42, 0.12, h.width + 0.04, edge);
+          for (const dx of [-0.72, 0.72])
+            for (const side of [-1, 1])
+              box(
+                scene,
+                x + dx,
+                0.32,
+                z + side * (h.width / 2 - 0.05),
+                0.38,
+                0.38,
+                0.12,
+                black,
+              );
+          box(scene, x + 0.98, 0.78, z - 0.72, 0.08, 0.22, 0.3, streetMarking);
+          box(scene, x + 0.98, 0.78, z + 0.72, 0.08, 0.22, 0.3, streetMarking);
+        } else if (h.kind === "road-barrier") {
+          box(scene, x, 0.48, z, h.length, 0.82, h.width, streetSidewalk);
+          box(scene, x, 0.9, z, h.length + 0.12, 0.1, h.width + 0.1, streetRed);
+          for (const dx of [-0.72, 0, 0.72]) {
+            const stripe = box(
+              scene,
+              x + dx,
+              0.53,
+              z,
+              0.24,
+              0.72,
+              h.width + 0.04,
+              streetMarking,
+            );
+            stripe.rotation.y = -0.55;
+          }
+          for (const dx of [-0.92, 0.92])
+            box(scene, x + dx, 1.08, z, 0.1, 0.3, 0.1, edge);
+        } else if (h.kind === "trash-bins") {
+          for (const dx of [-0.58, 0.58]) {
+            const binColor = dx < 0 ? streetGreen : streetBrick;
+            box(scene, x + dx, 0.56, z, 0.82, 1, 0.92, binColor);
+            box(scene, x + dx, 1.08, z, 0.92, 0.12, 1.02, black);
+            box(scene, x + dx, 0.52, z + 0.47, 0.58, 0.52, 0.04, streetSidewalk);
+            for (const side of [-1, 1])
+              box(scene, x + dx + side * 0.25, 0.12, z + 0.32, 0.16, 0.2, 0.13, black);
+          }
+        } else if (h.kind === "planter") {
+          box(scene, x, 0.34, z, h.length, 0.62, h.width, streetBrick);
+          box(scene, x, 0.68, z, h.length - 0.18, 0.12, h.width - 0.18, black);
+          for (const dx of [-0.72, 0, 0.72]) {
+            box(scene, x + dx, 0.98, z - 0.25, 0.18, 0.7, 0.18, streetGreen);
+            box(scene, x + dx - 0.18, 0.82, z + 0.18, 0.48, 0.14, 0.38, streetGreen);
+            box(scene, x + dx + 0.16, 1.16, z + 0.12, 0.4, 0.16, 0.4, streetGreen);
+          }
+        } else if (h.kind === "hydrant") {
+          const hydrant = new THREE.Mesh(cylinderGeometry, streetRed);
+          hydrant.position.set(x, 0.58, z);
+          hydrant.scale.set(0.35, 1.05, 0.35);
+          chunkFor(x).add(hydrant);
+          const cap = new THREE.Mesh(cylinderGeometry, streetRed);
+          cap.position.set(x, 1.12, z);
+          cap.scale.set(0.43, 0.12, 0.43);
+          chunkFor(x).add(cap);
+          for (const side of [-1, 1]) {
+            box(scene, x + side * 0.37, 0.68, z, 0.32, 0.22, 0.3, streetRed);
+            const outlet = new THREE.Mesh(cylinderGeometry, alloy);
+            outlet.position.set(x + side * 0.5, 0.68, z);
+            outlet.scale.set(0.14, 0.25, 0.14);
+            outlet.rotation.z = Math.PI / 2;
+            chunkFor(x).add(outlet);
+          }
+          box(scene, x, 0.12, z, 0.9, 0.22, 0.9, streetBrick);
+        } else if (h.kind === "scaffold") {
+          box(scene, x, 0.38, z, h.length + 0.1, 0.24, h.width + 0.1, streetRed);
+          for (const dx of [-1, 1])
+            for (const side of [-1, 1])
+              box(scene, x + dx, 0.78, z + side, 0.09, 1.1, 0.09, alloy);
+          for (const y of [0.48, 1.04])
+            box(scene, x, y, z, h.length + 0.1, 0.08, h.width + 0.1, streetMarking);
+          for (const dx of [-0.62, 0.62]) {
+            const brace = box(scene, x + dx, 0.72, z, 0.08, 0.9, h.width, black);
+            brace.rotation.y = dx < 0 ? 0.6 : -0.6;
+          }
+        }
+      }
+    }
+    if (street) {
+      for (let x = -10, block = 0; x < FINISH; x += 22, block++) {
+        const height = 8 + (block % 4) * 1.8;
+        const face = [streetBrick, buildingFaces[1], buildingFaces[2]][block % 3];
+        for (const sign of [-1, 1]) {
+          const centerZ = 0.55 + sign * 11;
+          box(scene, x + 11, height / 2, centerZ, 20.5, height, 7.5, face);
+          box(
+            scene,
+            x + 11,
+            height + 0.12,
+            centerZ,
+            20.8,
+            0.24,
+            7.8,
+            streetSidewalk,
+          );
+          for (const dx of [5, 11, 17]) {
+            box(
+              scene,
+              x + dx,
+              2.4,
+              centerZ - sign * 3.78,
+              3.8,
+              2.8,
+              0.08,
+              streetGlass,
+            );
+            box(
+              scene,
+              x + dx,
+              0.85,
+              centerZ - sign * 3.79,
+              2.3,
+              1.7,
+              0.1,
+              black,
+            );
+          }
+          box(
+            scene,
+            x + 11,
+            4.2,
+            centerZ - sign * 3.92,
+            18.5,
+            0.34,
+            0.42,
+            block % 2 ? streetAwning : streetRed,
+          );
+          for (const dx of [-8, 8])
+            box(
+              scene,
+              x + 11 + dx,
+              1.45,
+              centerZ - sign * 3.86,
+              0.12,
+              2.9,
+              0.12,
+              alloy,
+            );
+        }
+      }
+      for (let x = 26; x < FINISH; x += 44) {
+        for (const sign of [-1, 1]) {
+          const pole = new THREE.Mesh(cylinderGeometry, metal);
+          pole.position.set(x, 2.5, 0.55 + sign * 6.7);
+          pole.scale.set(0.1, 5, 0.1);
+          chunkFor(x).add(pole);
+          box(
+            scene,
+            x + 0.45,
+            4.95,
+            0.55 + sign * 6.7,
+            0.9,
+            0.12,
+            0.12,
+            streetMarking,
+          );
+          box(
+            scene,
+            x + 0.8,
+            4.82,
+            0.55 + sign * 6.7,
+            0.34,
+            0.24,
+            0.34,
+            edge,
+          );
+          box(
+            scene,
+            x - 0.2,
+            1.05,
+            0.55 + sign * 6.15,
+            0.8,
+            1.6,
+            0.12,
+            sign < 0 ? streetRed : streetGreen,
+          );
+        }
+      }
+    } else {
+      // Background buildings use quiet architectural masses, never obstacle-like props.
+      for (let i = 0; i < Math.ceil(FINISH / 22); i++) {
+        const x = i * 22 - 10;
+        box(scene, x + 2, -7, -11, 17, 14, 6, decorDark);
+      }
     }
     for (const x of game.level.sectors.map((s) => s.end)) {
       box(scene, x, 2.5, -2, 0.12, 5, 0.12, metal);
@@ -990,6 +1258,18 @@ export default function Scene({
       });
     enableShadows(scene);
     let activeCharacter = characterRef.current;
+    const steeringRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.62, 0.78, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0xffd06c,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+      }),
+    );
+    steeringRing.rotation.x = -Math.PI / 2;
+    steeringRing.visible = false;
+    scene.add(steeringRing);
     let player = makeRunner(scene, false, activeCharacter);
     let rival = makeRunner(scene, true, activeCharacter);
     enableShadows(player.group);
@@ -1070,15 +1350,23 @@ export default function Scene({
         visual.y + 1.1,
         closeFraming,
       );
+      const zone = game.level.dodge;
+      const dodgeBlend = zone ? dodgeCameraBlend(x, zone.start, zone.end) : 0;
+      steeringRing.visible = dodgeBlend > 0.2;
+      steeringRing.position.set(visual.x, visual.y + 0.04, visual.lane ?? 0.55);
       if (!game.paused) {
         camera.zoom = easeZoom(
           camera.zoom,
-          traversalZoom(
-            visual.speed,
-            anticipationDistance,
-            flightGap,
-            !visual.grounded,
-            motionPreference.matches,
+          THREE.MathUtils.lerp(
+            traversalZoom(
+              visual.speed,
+              anticipationDistance,
+              flightGap,
+              !visual.grounded,
+              motionPreference.matches,
+            ),
+            camera.top / 25,
+            dodgeBlend,
           ),
           Math.min(dt, 0.05),
         );
@@ -1109,7 +1397,15 @@ export default function Scene({
           (1 - Math.exp(-Math.min(dt, 0.05) * 4));
       }
       const focusX = x + 9.5 / camera.zoom;
-      camera.position.set(focusX + angle.x, focusHeight + angle.elevation, 32);
+      const aimX = THREE.MathUtils.lerp(focusX, x + 12, dodgeBlend);
+      const aimY = THREE.MathUtils.lerp(focusHeight, 0, dodgeBlend);
+      const aimZ = 0.55 * dodgeBlend;
+      camera.up.set(dodgeBlend, 1 - dodgeBlend, 0).normalize();
+      camera.position.set(
+        aimX + angle.x * (1 - dodgeBlend),
+        aimY + THREE.MathUtils.lerp(angle.elevation, 42, dodgeBlend),
+        THREE.MathUtils.lerp(32, 0.55, dodgeBlend),
+      );
       const impactAge = game.time - game.feedback.time;
       const impactNudge =
         !motionPreference.matches &&
@@ -1122,7 +1418,7 @@ export default function Scene({
             game.feedback.strength
           : 0;
       camera.position.y -= impactNudge;
-      camera.lookAt(focusX, focusHeight, 0);
+      camera.lookAt(aimX, aimY, aimZ);
       sunlight.position.set(x - 12, 22, 10);
       sunlight.target.position.set(x + 5, 0, 0);
       // Use Three's geometry bounds for culling. A long roof can span many
@@ -1191,6 +1487,8 @@ export default function Scene({
       observer.disconnect();
       renderer.domElement.removeEventListener("webglcontextlost", lost);
       batches.forEach((mesh) => mesh.dispose());
+      steeringRing.geometry.dispose();
+      steeringRing.material.dispose();
       boxGeometry.dispose();
       sphereGeometry.dispose();
       cylinderGeometry.dispose();

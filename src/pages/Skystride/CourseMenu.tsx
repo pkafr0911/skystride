@@ -3,7 +3,15 @@ import { levels, LevelDefinition } from "./courses/levels";
 import { formatTime, GameMode, RecordRun, recordStorage } from "./game/model";
 import styles from "./styles.less";
 
-function Skyline({ harbor, saigon }: { harbor: boolean; saigon: boolean }) {
+function Skyline({
+  harbor,
+  saigon,
+  street,
+}: {
+  harbor: boolean;
+  saigon: boolean;
+  street: boolean;
+}) {
   return (
     <svg viewBox="0 0 520 165" aria-hidden="true" className={styles.mapArt}>
       <circle
@@ -40,6 +48,15 @@ function Skyline({ harbor, saigon }: { harbor: boolean; saigon: boolean }) {
               <rect x={x + 12} y="88" width="9" height="14" fill="#245b58" />
             </g>
           ))}
+        </g>
+      )}
+      {street && (
+        <g fill="currentColor" opacity=".58">
+          <path d="M197 0h126v165H197z" fill="#26353b" />
+          <path d="M255 0h9v16h-9zm0 28h9v16h-9zm0 28h9v16h-9zm0 28h9v16h-9zm0 28h9v16h-9z" fill="#f3d37b" />
+          <path d="M0 112h184V56h-40V31h-36v53H74V42H30v70zm336 0h184V76h-38V24h-42v45h-35V35h-41v77z" />
+          <path d="M24 91h22v18H24zm57 2h20v17H81zm73-27h21v22h-21zm188 6h21v20h-21zm58-24h25v22h-25zm68 22h23v18h-23z" fill="#d4b77a" />
+          <path d="M213 8h7v10h-7zm91 35h7v10h-7zm-91 45h7v10h-7zm91 37h7v10h-7z" fill="#f5e7bb" />
         </g>
       )}
       <path
@@ -92,10 +109,10 @@ export default function CourseMenu({
         <div>
           <div className={styles.wordmark}>SKYSTRIDE ↗</div>
           <h1>Find your next line.</h1>
-          <p>Three skylines. Find your favorite line.</p>
+          <p>Four city routes. Find your favorite line.</p>
         </div>
         <span className={styles.menuStamp}>
-          ROOFTOP TIME TRIALS
+          URBAN TIME TRIALS
           <br />
           YOUR CITY. YOUR PACE.
         </span>
@@ -112,7 +129,7 @@ export default function CourseMenu({
               type="button"
               aria-pressed={item.id === level.id}
               onClick={() => onLevel(item)}
-              className={`${styles.levelCard} ${item.atmosphere === "harbor" ? styles.harborCard : item.atmosphere === "saigon" ? styles.saigonCard : styles.sunsetCard} ${item.id === level.id ? styles.levelSelected : ""}`}
+              className={`${styles.levelCard} ${item.atmosphere === "harbor" ? styles.harborCard : item.atmosphere === "saigon" ? styles.saigonCard : item.atmosphere === "street" ? styles.streetCard : styles.sunsetCard} ${item.id === level.id ? styles.levelSelected : ""}`}
             >
               <div className={styles.cardTop}>
                 <span>
@@ -126,6 +143,7 @@ export default function CourseMenu({
               <Skyline
                 harbor={item.atmosphere === "harbor"}
                 saigon={item.atmosphere === "saigon"}
+                street={item.atmosphere === "street"}
               />
               <div className={styles.cardBottom}>
                 <div>
@@ -133,8 +151,9 @@ export default function CourseMenu({
                   <p>{item.tagline}</p>
                 </div>
                 <span>
-                  3 KM
-                  <br />3 SECTORS
+                  {item.finish / 1000} KM
+                  <br />
+                  {item.sectors.length} SECTORS
                 </span>
               </div>
             </button>
@@ -161,7 +180,7 @@ export default function CourseMenu({
                   <strong>{sector.name}</strong>
                   <small>{sector.description}</small>
                 </div>
-                <small>1 KM</small>
+                <small>{(sector.end - sector.start) / 1000} KM</small>
               </li>
             ))}
           </ol>
@@ -217,7 +236,13 @@ export default function CourseMenu({
             <span>↗</span>
           </button>
           <p className={styles.runHint}>
-            ↑ Jump & vault <span>↓ Slide & roll</span> → Long jump
+            {level.dodge && practice === level.sectors.length - 1 ? (
+              "3 LANES · tap ← → / A D · swipe to switch"
+            ) : (
+              <>
+                ↑ Jump & vault <span>↓ Slide & roll</span> → Long jump
+              </>
+            )}
           </p>
           {notice && <p role="status">{notice}</p>}
         </section>

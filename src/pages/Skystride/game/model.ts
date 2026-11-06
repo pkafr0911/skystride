@@ -19,8 +19,8 @@ import {
 } from "./combos";
 export const STEP = 1 / 120;
 export const SECTOR = 1000;
-export const FINISH = SECTOR * 3;
-export const VERSION = "sunset-relay-v42";
+export const FINISH = 3000;
+export const VERSION = "sunset-relay-v47";
 export const RUN_SPEED = 12;
 export const RUN_ACCELERATION = 3;
 export const LONG_JUMP_SPEED = 11.5;
@@ -175,11 +175,13 @@ export type Frame = {
   lead?: number;
   slope?: number;
   lane?: number;
+  steering?: number;
   technique?: Technique;
   side?: 1 | -1;
 };
 export type Sample = { time: number; frame: Frame };
-export type Input = { tick: number; action: Action };
+export type Steering = "steer-left" | "steer-right" | "steer-stop";
+export type Input = { tick: number; action: Action | Steering };
 export type RecordRun = {
   mode: GameMode;
   version: string;
@@ -256,7 +258,14 @@ export function readRecord(
           input.tick >= 1 &&
           input.tick <= Math.ceil(r.time / STEP) &&
           input.tick >= (r.inputs[i - 1]?.tick || 0) &&
-          ["up", "down", "forward"].includes(input.action),
+          [
+            "up",
+            "down",
+            "forward",
+            "steer-left",
+            "steer-right",
+            "steer-stop",
+          ].includes(input.action),
       )
     )
       return null;
@@ -361,6 +370,24 @@ export class Run {
   }
   mode: GameMode = "standard";
   phase: "ready" | "running" | "finished" | "failed" = "ready";
+  lateral = 0.55;
+  lateralSpeed = 0;
+  dodgeLane = 1;
+  private dodgeHits = new Set<number>();
+  private dodgePenaltyUntil = 0;
+  get dodging() {
+    const zone = this.level.dodge;
+    return Boolean(zone && this.x >= zone.start && this.x < zone.end);
+  }
+  steer(direction: -1 | 0 | 1) {
+    this.action(
+      direction < 0
+        ? "steer-left"
+        : direction > 0
+          ? "steer-right"
+          : "steer-stop",
+    );
+  }
   x = 0;
   y = 0;
   time = 0;
@@ -394,7 +421,7 @@ export class Run {
   messageUntil = 0;
   onChange = () => {};
   previous: Frame;
-  private pending: Action[] = [];
+  private pending: (Action | Steering)[] = [];
   private buffered: { action: Action; until: number } | null = null;
   private lastGround = 0;
   private cleanVaultLanding = false;
@@ -415,6 +442,11 @@ export class Run {
   private sideLaneStart = -10;
   private sideLaneEnd = -10;
   start(sector = 0, practice = false, mode: GameMode = this.mode) {
+    this.lateral = 0.55;
+    this.lateralSpeed = 0;
+    this.dodgeLane = 1;
+    this.dodgeHits.clear();
+    this.dodgePenaltyUntil = 0;
     this.mode = mode;
     this.phase = "running";
     this.startSector = sector;
@@ -480,6 +512,7 @@ export class Run {
   pause() {
     if (this.phase !== "running") return;
     this.paused = !this.paused;
+    this.lateralSpeed = 0;
     this.eligible = false;
     this.pending = [];
     this.buffered = null;
@@ -573,7 +606,7 @@ export class Run {
         : "CRASH · GET UP AND VAULT",
     );
   }
-  action(action: Action) {
+  action(action: Action | Steering) {
     if (this.phase === "running" && !this.paused && this.pending.length < 4)
       this.pending.push(action);
   }
@@ -1548,17 +1581,34 @@ export class Run {
     this.moveTime += STEP;
     for (const action of this.pending) {
       this.inputs.push({ tick: this.ticks, action });
+      if (
+        action === "steer-left" ||
+        action === "steer-right" ||
+        action === "steer-stop"
+      ) {
+        if (this.dodging && action !== "steer-stop")
+          this.dodgeLane = clamp(
+            this.dodgeLane + (action === "steer-left" ? -1 : 1),
+            0,
+            2,
+          );
+        continue;
+      }
+      if (this.dodging) continue;
       if (action === "up" || action === "forward") this.jumpIntent = this.time;
       if (action === "up") this.ledgeIntent = this.time;
       this.buffered = { action, until: this.time + BUFFER };
       if (this.tryAction(action)) this.buffered = null;
     }
     this.pending = [];
+    if (this.dodging) this.buffered = null;
     if (this.buffered) {
       if (this.buffered.until < this.time) this.buffered = null;
       else if (this.tryAction(this.buffered.action)) this.buffered = null;
     }
-    if (this.traversal) {
+    if (this.dodging) {
+      this.stepDodge();
+    } else if (this.traversal) {
       const t = this.traversal;
       const previousY = this.y;
       t.elapsed += STEP * (t.released ? 1.35 : 1);
@@ -1825,6 +1875,54 @@ export class Run {
     }
     if (this.ticks % 6 === 0) this.onChange();
   }
+  private stepDodge() {
+    const zone = this.level.dodge!;
+    this.traversal = null;
+    this.buffered = null;
+    this.upper = false;
+    this.y = 0;
+    this.vy = 0;
+    this.grounded = true;
+    const penalized = this.time < this.dodgePenaltyUntil;
+    this.move = penalized ? "stumble" : "run";
+    const topSpeed = penalized
+      ? this.mode === "hardcore"
+        ? 7
+        : 9
+      : 22;
+    this.speed = Math.min(topSpeed, this.speed + 4.5 * STEP);
+    const oldX = this.x;
+    const oldZ = this.lateral;
+    this.x += this.speed * STEP;
+    const exiting = this.x > zone.end - 40;
+    if (exiting) this.dodgeLane = 1;
+    const target = zone.lanes[this.dodgeLane];
+    // A lane takes 0.2 seconds; every intermediate position still collides.
+    const shift = clamp(target - this.lateral, -15 * STEP, 15 * STEP);
+    this.lateral += shift;
+    this.lateralSpeed = shift / STEP;
+    zone.hazards.forEach((h, i) => {
+      if (
+        !this.dodgeHits.has(i) &&
+        this.x + 0.35 >= h.x &&
+        oldX - 0.35 <= h.x + h.length &&
+        Math.max(oldZ, this.lateral) + 0.35 >= h.z - h.width / 2 &&
+        Math.min(oldZ, this.lateral) - 0.35 <= h.z + h.width / 2
+      ) {
+        this.dodgeHits.add(i);
+        this.recover(
+          "ROOF IMPACT · SPEED LOST",
+          this.mode === "hardcore" ? 11 : 8,
+        );
+        this.speed = Math.min(this.speed, this.mode === "hardcore" ? 7 : 9);
+        this.dodgePenaltyUntil = Math.max(
+          this.dodgePenaltyUntil,
+          this.time + (this.mode === "hardcore" ? 1.5 : 1.2),
+        );
+        this.setMove("stumble", 0.36);
+      }
+    });
+  }
   frame(): Frame {
     const next = this.grounded && this.move === "run" ? this.next() : undefined;
     const anticipate =
@@ -1872,40 +1970,43 @@ export class Run {
         : {}),
       side: this.traversal?.side ?? 1,
       lane:
-        this.traversal?.technique &&
-        ["tic-tac", "rebound"].includes(this.traversal.technique)
-          ? 0.55 -
-            1.05 *
-              Math.sin(
-                (Math.PI * this.traversal.elapsed) / this.traversal.duration,
-              )
-          : this.x >= this.sideLaneStart && this.x < this.sideLaneEnd
-            ? 0.55 +
-              (this.level.sideRamps.some((r) => r.x === this.sideLaneStart)
-                ? 2.35
-                : 1.5) *
-                Math.min(
-                  1,
-                  (this.x - this.sideLaneStart) / 0.7,
-                  (this.sideLaneEnd - this.x) /
-                    (this.level.sideRamps.some(
-                      (r) => r.x === this.sideLaneStart,
-                    )
-                      ? 8.4
-                      : 0.7),
+        this.level.dodge && this.x >= this.level.dodge.start
+          ? this.lateral
+          : this.traversal?.technique &&
+              ["tic-tac", "rebound"].includes(this.traversal.technique)
+            ? 0.55 -
+              1.05 *
+                Math.sin(
+                  (Math.PI * this.traversal.elapsed) / this.traversal.duration,
                 )
-            : this.move === "wall-run"
-              ? 0.55 -
-                0.9 *
-                  Math.sin(
-                    Math.PI *
-                      Math.min(
-                        1,
-                        (this.traversal?.elapsed ?? 0) /
-                          Math.max(0.01, this.traversal?.duration ?? 1),
-                      ),
+            : this.x >= this.sideLaneStart && this.x < this.sideLaneEnd
+              ? 0.55 +
+                (this.level.sideRamps.some((r) => r.x === this.sideLaneStart)
+                  ? 2.35
+                  : 1.5) *
+                  Math.min(
+                    1,
+                    (this.x - this.sideLaneStart) / 0.7,
+                    (this.sideLaneEnd - this.x) /
+                      (this.level.sideRamps.some(
+                        (r) => r.x === this.sideLaneStart,
+                      )
+                        ? 8.4
+                        : 0.7),
                   )
-              : 0.55,
+              : this.move === "wall-run"
+                ? 0.55 -
+                  0.9 *
+                    Math.sin(
+                      Math.PI *
+                        Math.min(
+                          1,
+                          (this.traversal?.elapsed ?? 0) /
+                            Math.max(0.01, this.traversal?.duration ?? 1),
+                        ),
+                    )
+                : 0.55,
+      steering: clamp(this.lateralSpeed / 15, -1, 1),
     };
   }
   private slope() {

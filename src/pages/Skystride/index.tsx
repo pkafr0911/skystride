@@ -1,5 +1,10 @@
 import CourseMenu from "./CourseMenu";
-import { levels, LEVEL_STORAGE, readLevel, LevelDefinition } from "./courses/levels";
+import {
+  levels,
+  LEVEL_STORAGE,
+  readLevel,
+  LevelDefinition,
+} from "./courses/levels";
 import { CameraView } from "./game/camera";
 import CharacterPicker from "./CharacterPicker";
 import {
@@ -69,6 +74,12 @@ export default function Skystride() {
   const stage = useRef<HTMLDivElement>(null);
   const pointer = useRef<number | null>(null);
   const saved = useRef(false);
+  const dragX = useRef(0);
+  const dragDirection = useRef<-1 | 0 | 1>(0);
+  const stopSteering = () => {
+    dragDirection.current = 0;
+    game.steer(0);
+  };
   useEffect(() => {
     try {
       const loaded: Record<string, RecordRun> = {};
@@ -94,6 +105,7 @@ export default function Skystride() {
     };
     const blur = () => {
       gesture.active = false;
+      dragDirection.current = 0;
       if (!game.paused) game.pause();
     };
     const rotate = () => {
@@ -296,10 +308,10 @@ export default function Skystride() {
       <main className={styles.page}>
         <div
           ref={stage}
-          className={`${styles.stage} ${styles.expanded} ${level.atmosphere === "harbor" ? styles.harborStage : level.atmosphere === "saigon" ? styles.saigonStage : ""}`}
+          className={`${styles.stage} ${styles.expanded} ${level.atmosphere === "harbor" ? styles.harborStage : level.atmosphere === "saigon" ? styles.saigonStage : level.atmosphere === "street" ? styles.streetStage : ""}`}
           tabIndex={0}
           role="region"
-          aria-label="Skystride parkour course. Up or Space to jump, Down to slide, R to restart, Escape to pause. On touch, swipe up or down."
+          aria-label="Skystride course. Up or Space to jump, Down to slide, R to restart, Escape to pause. On touch, swipe up or down. During Street Level, tap Left or Right, A or D, or swipe horizontally to switch lanes."
           onKeyDown={(e) => {
             if (
               (e.target as HTMLElement).closest(
@@ -312,6 +324,8 @@ export default function Skystride() {
                 "ArrowUp",
                 "ArrowDown",
                 "ArrowRight",
+                "ArrowLeft",
+                "a",
                 " ",
                 "w",
                 "s",
@@ -321,14 +335,27 @@ export default function Skystride() {
               ].includes(e.key)
             )
               e.preventDefault();
+            if (
+              game.dodging &&
+              ["ArrowLeft", "a", "ArrowRight", "d"].includes(e.key)
+            ) {
+              if (!e.repeat)
+                game.steer(["ArrowLeft", "a"].includes(e.key) ? -1 : 1);
+              return;
+            }
             if (e.repeat) return;
-            if (e.key === "r") start();
-            else if (e.key === "Escape") game.pause();
-            else if (["ArrowUp", " ", "w"].includes(e.key)) game.action("up");
+            if (e.key === "r") {
+              stopSteering();
+              start();
+            } else if (e.key === "Escape") {
+              stopSteering();
+              game.pause();
+            } else if (["ArrowUp", " ", "w"].includes(e.key)) game.action("up");
             else if (["ArrowDown", "s"].includes(e.key)) game.action("down");
             else if (["ArrowRight", "d"].includes(e.key))
               game.action("forward");
           }}
+          onBlur={stopSteering}
           onPointerDown={(e) => {
             if (
               (e.target as HTMLElement).closest("button, [data-ui]") ||
@@ -336,26 +363,40 @@ export default function Skystride() {
             )
               return;
             pointer.current = e.pointerId;
+            dragX.current = e.clientX;
+            dragDirection.current = 0;
             gesture.start(e.clientX, e.clientY);
             e.currentTarget.setPointerCapture(e.pointerId);
             focus();
           }}
           onPointerMove={(e) => {
             if (pointer.current !== e.pointerId) return;
+            if (game.dodging) {
+              const delta = e.clientX - dragX.current;
+              const direction = Math.abs(delta) < 24 ? 0 : delta < 0 ? -1 : 1;
+              if (direction !== 0 && dragDirection.current === 0) {
+                game.steer(direction);
+                dragDirection.current = direction;
+              }
+              return;
+            }
             const action = gesture.move(e.clientX, e.clientY);
             if (action) game.action(action);
           }}
           onPointerUp={(e) => {
             if (pointer.current === e.pointerId) {
+              stopSteering();
               pointer.current = null;
               gesture.active = false;
             }
           }}
           onPointerCancel={() => {
+            stopSteering();
             pointer.current = null;
             gesture.active = false;
           }}
           onLostPointerCapture={() => {
+            stopSteering();
             pointer.current = null;
             gesture.active = false;
           }}
@@ -375,6 +416,16 @@ export default function Skystride() {
             />
           </Suspense>
           <div className={styles.grain} />
+          {game.dodging && game.phase === "running" && !game.paused && (
+            <div className={styles.dodgeHint} role="status">
+              <strong>STREET RUN</strong>
+              <span>
+                {game.x > (game.level.dodge?.end ?? 0) - 40
+                  ? "Clear stretch · returning to your line"
+                  : "3 LANES · tap ← → / A D · swipe to switch"}
+              </span>
+            </div>
+          )}
           {game.phase === "running" &&
             !game.paused &&
             game.feedback.kind === "chain" &&
@@ -427,11 +478,13 @@ export default function Skystride() {
           {game.phase === "running" && !game.paused && (
             <>
               <div className={styles.route}>
-                {game.upper && skybridgeAt(game.x)
-                  ? "↗ HIGH ROOFS · FAST LINE"
-                  : game.upper
-                    ? "↗ HARD LINE"
-                    : "→ NORMAL LINE"}
+                {game.dodging
+                  ? "↔ STREET DASH"
+                  : game.upper && skybridgeAt(game.x)
+                    ? "↗ HIGH ROOFS · FAST LINE"
+                    : game.upper
+                      ? "↗ HARD LINE"
+                      : "→ NORMAL LINE"}
                 <span>
                   {level.name.toUpperCase()} · SECTOR{" "}
                   {Math.min(
@@ -453,9 +506,11 @@ export default function Skystride() {
                 <span className={styles.flow}>
                   {game.speed.toFixed(1)} M/S · {game.flow} FLOW
                   {game.flow >= 5 ? ` · PERFECT CHAIN ×${game.flow}` : ""}
-                  {game.speed >= LONG_JUMP_SPEED
-                    ? " · LONG JUMP READY"
-                    : " · BUILD SPEED"}
+                  {game.dodging
+                    ? ` · LANE ${game.dodgeLane + 1} / 3`
+                    : game.speed >= LONG_JUMP_SPEED
+                      ? " · LONG JUMP READY"
+                      : " · BUILD SPEED"}
                   {level.id === "sunset-relay" &&
                   game.x >= TECHNICAL.start &&
                   game.x <= TECHNICAL.end
@@ -604,7 +659,7 @@ export default function Skystride() {
                         "Run paused."
                       ) : (
                         <>
-                          3 KM OF ROOFTOPS.
+                          {level.finish / 1000} KM OF ROOFTOPS.
                           <br />
                           Against the clock.
                         </>
@@ -705,8 +760,9 @@ export default function Skystride() {
                     </div>
                     {storageNotice && <p role="status">{storageNotice}</p>}
                     <small className={styles.panelNote}>
-                      UP / SPACE · JUMP & VAULT &nbsp; DOWN · SLIDE & ROLL
-                      &nbsp; → · LONG JUMP AT 11.5 M/S &nbsp; R · RETRY
+                      {game.dodging
+                        ? "3 LANES · TAP ← → / A D · SWIPE TO SWITCH · R TO RETRY"
+                        : "UP / SPACE · JUMP & VAULT · DOWN · SLIDE & ROLL · → LONG JUMP AT 11.5 M/S · R RETRY"}
                     </small>
                   </div>
                   <CharacterPicker

@@ -1,6 +1,6 @@
 # Skystride
 
-A standalone, fullscreen rooftop parkour time-trial game. Choose between three 3 km levels, each with three sectors, elevated route choices, contextual traversal, swipe controls, and its own local personal-best ghost.
+A standalone, fullscreen urban time-trial game. Choose between four courses (700 m–3 km), from ground-level street dodging to rooftop parkour, with contextual traversal, swipe controls, and local personal-best ghosts.
 
 ## Development
 
@@ -92,15 +92,16 @@ Other movement props: roof expansion joints (jumps), loading shutters (dives), a
 
 ## Levels and course selection
 
-The course menu now presents three selectable maps with sector previews, Standard/Hardcore difficulty, full-course time trials, and practice from any sector. Runner, camera, sound, swipe sensitivity, and fullscreen controls are grouped under **Runner & settings**. The selected level is remembered on this device. New players start on Harbor Run, which shows contextual action and timing guidance on the right. Sunset Relay and subsequent non-tutorial levels hide that guidance panel.
+The course menu now presents four selectable maps with sector previews, Standard/Hardcore difficulty, full-course time trials, and practice from any sector. Runner, camera, sound, swipe sensitivity, and fullscreen controls are grouped under **Runner & settings**. The selected level is remembered on this device. New players start on Harbor Run, which shows contextual action and timing guidance on the right. Sunset Relay and subsequent non-tutorial levels hide that guidance panel.
 
 - **Level 1 — Harbor Run (tutorial):** Warehouse Row, Crane District, and Port Skyline. Features freight equipment, six optional elevated routes, two crane-bar crossings, and two five-metre rooftop drops with roll-out corridors. Cool morning light, water, freight stacks, and harbor cranes distinguish the setting.
-- **Level 2 — Sunset Relay:** the original three-sector course, with its existing layout.
+- **Level 2 — Sunset Relay:** the original three parkour sectors across 3 km.
 - **Level 3 — Saigon Rooftops:** Alley Roofs, Market Quarter, and Riverfront. Vietnamese tube houses, balconies, striped awnings, rooftop gardens, water tanks and river scenery. Eight new object designs retain existing vault, slide, wall-run, dive, swing, precision and ramp contacts. No tutorial guidance.
+- **Level 4 — Street Level:** one 700 m Downtown Dash sector on a continuous ground-level road. Dodge parked cars, road barriers, bins, planters, hydrants, and scaffolds across three lanes. Lane changes are animated; collisions cause a stumble and a temporary speed penalty.
 
 Each `Run` owns a `LevelDefinition` from `src/pages/Skystride/courses/levels.ts`; simulation, obstacle meshes, scene geometry, practice starts, split markers, and finish detection read that same definition. Course geometry is grouped in `src/pages/Skystride/courses/`. Movement Lab and existing offline studies continue to default to Sunset Relay.
 
-Records are isolated by course version and difficulty. Current swing physics use `skystride.sunset-relay-v42.<mode>.best` and `skystride.harbor-run-v2.<mode>.best`. Earlier records remain stored under their old versions and are not compared with the faster crane releases. Practice and paused runs remain ineligible. Ghost validation rejects another map's course version.
+Records are isolated by course version and difficulty. Current records use `skystride.sunset-relay-v47.<mode>.best`, `skystride.harbor-run-v2.<mode>.best`, `skystride.saigon-rooftops-v4.<mode>.best`, and `skystride.street-level-v1.<mode>.best`. Practice and paused runs remain ineligible. Ghost validation rejects another map's course version.
 
 Crane swing releases now use the same 30 m/s forward launch and upward impulse as other bar swings, including early, late, and automatic releases. Perfect timing still awards bonus flow; Down remains the deliberate drop action.
 
@@ -108,3 +109,7 @@ Crane swing releases now use the same 30 m/s forward launch and upward impulse a
 Saigon uses an independently authored `saigon-course.ts`: 24 main ground-level contact phrases, 21 short connecting phrases, six elevated routes, and three courtyard descents. Combo orders, obstacle positions, crossings and route entrances are specific to this map. The harder layout uses eight-metre action switches, longer six- and seven-contact chains, and vault-to-swing transitions. Shared movement physics and action windows remain unchanged (0.30–0.40 seconds below, 0.20–0.25 seconds above). Full-course simulations cover both routes in both modes. Its revised layout uses `skystride.saigon-rooftops-v4.<mode>.best`, keeping old-layout ghosts separate.
 
 See the [implemented Vietnam objects](docs/saigon-implemented-objects.png), rendered from the actual meshes. Regenerate with `node scripts/obstacle-study.cjs --vietnam`, then `node scripts/render-obstacle-study.cjs docs/saigon-implemented-objects.png --vietnam` with `sharp` on the Node module path. The [original concept board](docs/vietnam-map-concept.png) remains a visual reference; final models use the existing game's simpler procedural style.
+
+## Street Level
+
+Street Level is a standalone 700 m course, separate from Sunset Relay, with a continuous road, sidewalks, lane markings, storefronts, street lamps, and ground-level city scenery. Its 36 obstacle gates use six street object types and block two of three lanes each. Forward movement stays automatic; jump, slide, and long-jump inputs are suppressed. Tap Left/Right or A/D once per lane change, or swipe horizontally on touch; holding a key does not repeat. Lane changes take 0.2 seconds and remain vulnerable to collisions while crossing. Hitting an object triggers a stumble and slows the runner to 9 m/s for 1.2 seconds (7 m/s for 1.5 seconds in Hardcore). Lane changes animate the runner's side lean and arm counterbalance. Practice is available from the course menu, and the course has its own versioned records and deterministic lateral ghost samples.
