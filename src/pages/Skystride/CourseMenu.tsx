@@ -53,10 +53,19 @@ function Skyline({
       {street && (
         <g fill="currentColor" opacity=".58">
           <path d="M197 0h126v165H197z" fill="#26353b" />
-          <path d="M255 0h9v16h-9zm0 28h9v16h-9zm0 28h9v16h-9zm0 28h9v16h-9zm0 28h9v16h-9z" fill="#f3d37b" />
+          <path
+            d="M255 0h9v16h-9zm0 28h9v16h-9zm0 28h9v16h-9zm0 28h9v16h-9zm0 28h9v16h-9z"
+            fill="#f3d37b"
+          />
           <path d="M0 112h184V56h-40V31h-36v53H74V42H30v70zm336 0h184V76h-38V24h-42v45h-35V35h-41v77z" />
-          <path d="M24 91h22v18H24zm57 2h20v17H81zm73-27h21v22h-21zm188 6h21v20h-21zm58-24h25v22h-25zm68 22h23v18h-23z" fill="#d4b77a" />
-          <path d="M213 8h7v10h-7zm91 35h7v10h-7zm-91 45h7v10h-7zm91 37h7v10h-7z" fill="#f5e7bb" />
+          <path
+            d="M24 91h22v18H24zm57 2h20v17H81zm73-27h21v22h-21zm188 6h21v20h-21zm58-24h25v22h-25zm68 22h23v18h-23z"
+            fill="#d4b77a"
+          />
+          <path
+            d="M213 8h7v10h-7zm91 35h7v10h-7zm-91 45h7v10h-7zm91 37h7v10h-7z"
+            fill="#f5e7bb"
+          />
         </g>
       )}
       <path
@@ -236,7 +245,9 @@ export default function CourseMenu({
             <span>↗</span>
           </button>
           <p className={styles.runHint}>
-            {level.dodge && practice === level.sectors.length - 1 ? (
+            {level.dodge &&
+            (level.dodge.start === 0 ||
+              practice === level.sectors.length - 1) ? (
               "3 LANES · tap ← → / A D · swipe to switch"
             ) : (
               <>

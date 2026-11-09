@@ -375,6 +375,9 @@ export class Run {
   dodgeLane = 1;
   private dodgeHits = new Set<number>();
   private dodgePenaltyUntil = 0;
+  get dodgeCrashRemaining() {
+    return Math.max(0, this.dodgePenaltyUntil - this.time);
+  }
   get dodging() {
     const zone = this.level.dodge;
     return Boolean(zone && this.x >= zone.start && this.x < zone.end);
@@ -1586,7 +1589,11 @@ export class Run {
         action === "steer-right" ||
         action === "steer-stop"
       ) {
-        if (this.dodging && action !== "steer-stop")
+        if (
+          this.dodging &&
+          !this.dodgeCrashRemaining &&
+          action !== "steer-stop"
+        )
           this.dodgeLane = clamp(
             this.dodgeLane + (action === "steer-left" ? -1 : 1),
             0,
@@ -1883,14 +1890,18 @@ export class Run {
     this.y = 0;
     this.vy = 0;
     this.grounded = true;
-    const penalized = this.time < this.dodgePenaltyUntil;
-    this.move = penalized ? "stumble" : "run";
-    const topSpeed = penalized
-      ? this.mode === "hardcore"
-        ? 7
-        : 9
-      : 22;
-    this.speed = Math.min(topSpeed, this.speed + 4.5 * STEP);
+    if (this.dodgeCrashRemaining > 0) {
+      this.move = "crash";
+      this.speed = 0;
+      this.lateralSpeed = 0;
+      return;
+    }
+    this.move = "run";
+    const topSpeed = zone.speedStages.reduce(
+      (speed, stage) => (this.x >= stage.start ? stage.speed : speed),
+      22,
+    );
+    this.speed = Math.min(topSpeed, Math.max(5.5, this.speed) + 4.5 * STEP);
     const oldX = this.x;
     const oldZ = this.lateral;
     this.x += this.speed * STEP;
@@ -1902,6 +1913,7 @@ export class Run {
     this.lateral += shift;
     this.lateralSpeed = shift / STEP;
     zone.hazards.forEach((h, i) => {
+      if (this.dodgeCrashRemaining > 0) return;
       if (
         !this.dodgeHits.has(i) &&
         this.x + 0.35 >= h.x &&
@@ -1911,15 +1923,15 @@ export class Run {
       ) {
         this.dodgeHits.add(i);
         this.recover(
-          "ROOF IMPACT · SPEED LOST",
+          "CRASH · STOPPED · TIME LOST",
           this.mode === "hardcore" ? 11 : 8,
         );
-        this.speed = Math.min(this.speed, this.mode === "hardcore" ? 7 : 9);
-        this.dodgePenaltyUntil = Math.max(
-          this.dodgePenaltyUntil,
-          this.time + (this.mode === "hardcore" ? 1.5 : 1.2),
-        );
-        this.setMove("stumble", 0.36);
+        const recovery = this.mode === "hardcore" ? 1.8 : 1.2;
+        this.speed = 0;
+        this.lateralSpeed = 0;
+        this.x = Math.min(this.x, h.x - 0.36);
+        this.dodgePenaltyUntil = this.time + recovery;
+        this.setMove("crash", recovery);
       }
     });
   }

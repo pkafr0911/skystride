@@ -416,6 +416,16 @@ export default function Skystride() {
             />
           </Suspense>
           <div className={styles.grain} />
+          {game.dodging && game.dodgeCrashRemaining > 0 && !game.paused && (
+            <div className={styles.dodgeCrash} role="status">
+              <strong>CRASH · TIME LOST</strong>
+              <span>Getting up · {game.dodgeCrashRemaining.toFixed(1)}s</span>
+              <small>
+                {game.recoveries} collision{game.recoveries === 1 ? "" : "s"} ·
+                timer keeps running
+              </small>
+            </div>
+          )}
           {game.dodging && game.phase === "running" && !game.paused && (
             <div className={styles.dodgeHint} role="status">
               <strong>STREET RUN</strong>

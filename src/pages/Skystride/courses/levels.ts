@@ -1,3 +1,4 @@
+import { STREET_PROPS, type StreetProp } from "../obstacles/street-props";
 import { saigonGeometry } from "./saigon-course";
 import * as sunset from "./sunset-course";
 import { harborGeometry } from "./harbor-course";
@@ -12,59 +13,73 @@ export type DodgeZone = {
   end: number;
   halfWidth: number;
   lanes: readonly [number, number, number];
+  speedStages: { start: number; speed: number }[];
   hazards: {
     x: number;
     length: number;
     z: number;
     width: number;
-    kind:
-      | "hvac"
-      | "water-tank"
-      | "vent"
-      | "solar"
-      | "satellite"
-      | "duct"
-      | "parked-car"
-      | "road-barrier"
-      | "trash-bins"
-      | "planter"
-      | "hydrant"
-      | "scaffold";
+    kind: StreetProp;
   }[];
 };
 const dodgeLanes = [-2.45, 0.55, 3.55] as const;
-const streetFinish = 700;
+const streetFinish = 2100;
+const streetStages = [
+  {
+    start: 0,
+    end: 700,
+    speed: 22,
+    gap: 16,
+    pattern: [1, 2, 0, 2, 1, 0, 2, 0, 1, 2, 1, 0],
+  },
+  {
+    start: 700,
+    end: 1400,
+    speed: 24,
+    gap: 14,
+    pattern: [0, 2, 0, 1, 2, 0, 2, 1, 0, 2, 1, 2],
+  },
+  {
+    start: 1400,
+    end: 2100,
+    speed: 26,
+    gap: 12,
+    pattern: [2, 0, 2, 1, 0, 2, 0, 1, 2, 0, 1, 0],
+  },
+];
+let streetGateIndex = 0;
 export const streetDodge: DodgeZone = {
   start: 0,
   end: streetFinish,
   halfWidth: 4.5,
   lanes: dodgeLanes,
-  // Each gate blocks two lanes. Outer-lane reversals demand two quick inputs.
-  hazards: Array.from({ length: 36 }, (_, row) => row).flatMap((row) =>
-    dodgeLanes.flatMap((z, lane) => {
-      const safe = [1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0][row % 12];
-      return lane === safe
-        ? []
-        : [
-            {
-              x: 70 + row * 16,
-              length: 2.4,
-              z,
-              width: 2.7,
-              kind: (
-                [
-                  "parked-car",
-                  "road-barrier",
-                  "trash-bins",
-                  "planter",
-                  "hydrant",
-                  "scaffold",
-                ] as const
-              )[row % 6],
-            },
-          ];
-    }),
-  ),
+  speedStages: streetStages.map(({ start, speed }) => ({ start, speed })),
+  hazards: streetStages.flatMap((stage) => {
+    const hazards: DodgeZone["hazards"] = [];
+    let x = stage.start + (stage.start === 0 ? 70 : 40);
+    for (let row = 0; x < stage.end - 45; row++) {
+      const safe = stage.pattern[row % stage.pattern.length];
+      for (const [lane, z] of dodgeLanes.entries()) {
+        if (lane !== safe)
+          hazards.push({
+            x,
+            length: 2.4,
+            z,
+            width: 2.7,
+            kind: STREET_PROPS[
+              (streetGateIndex * 2 + (lane > safe ? lane - 1 : lane)) %
+                STREET_PROPS.length
+            ],
+          });
+      }
+      streetGateIndex++;
+      const nextSafe = stage.pattern[(row + 1) % stage.pattern.length];
+      // Two-lane reversals retain time for two inputs and the full lateral crossing.
+      x +=
+        Math.abs(nextSafe - safe) === 2 ? Math.max(16, stage.gap) : stage.gap;
+    }
+    return hazards;
+  }),
 };
 export type SectorDefinition = {
   name: string;
@@ -207,13 +222,13 @@ const streetSurfaces = [
 export const streetLevel: LevelDefinition = {
   ...sunset,
   id: "street-level",
-  version: "street-level-v1",
+  version: "street-level-v3",
   name: "Street Level",
   number: "04",
   tutorial: false,
   tagline: "Down at street level. Keep moving.",
   description:
-    "A fast urban lane run through city streets, storefronts, traffic barriers, parked cars, and everyday street fixtures.",
+    "A 2.1 km street endurance run across three escalating districts. Tighter gates, rapid lane reversals, and speeds up to 26 m/s.",
   finish: streetFinish,
   dodge: streetDodge,
   obstacles: [],
@@ -232,8 +247,20 @@ export const streetLevel: LevelDefinition = {
     {
       name: "Downtown Dash",
       start: 0,
+      end: 700,
+      description: "22 m/s · learn the reversals",
+    },
+    {
+      name: "Market Rush",
+      start: 700,
+      end: 1400,
+      description: "24 m/s · tighter traffic gates",
+    },
+    {
+      name: "Expressway Gauntlet",
+      start: 1400,
       end: streetFinish,
-      description: "Switch lanes through city traffic",
+      description: "26 m/s · rapid switches and double reversals",
     },
   ],
 };

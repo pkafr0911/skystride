@@ -1,3 +1,5 @@
+import * as THREE from "three";
+import { STREET_PROPS, streetProp } from "./obstacles/street-props";
 import { dodgeCameraBlend } from "./game/camera";
 import {
   harborRun,
@@ -2482,11 +2484,19 @@ test("dodge collision uses both axes, counts each obstacle once and penalizes sp
     assert.equal(run.recoveries, hit ? 1 : 0);
     if (hit) {
       assert.ok(run.speed <= 9);
-      assert.equal(run.move, "stumble");
+      assert.equal(run.move, "crash");
+      const crashX = run.x;
+      const crashTime = run.time;
       advance(run, 0.75);
-      assert.ok(run.speed <= 9, "the slowdown remains visible after impact");
+      assert.equal(run.speed, 0);
+      assert.equal(run.x, crashX, "a crash stops forward travel");
+      assert.ok(
+        run.time >= crashTime + 0.75,
+        "recovery costs actual timed seconds",
+      );
       advance(run, 0.75);
-      assert.ok(run.speed > 9, "speed recovers after the penalty period");
+      assert.ok(run.x > crashX, "running resumes after getting up");
+      assert.equal(run.recoveries, 1);
     }
   }
 });
@@ -2529,12 +2539,13 @@ test("dodge steering input replays deterministically and ghosts preserve lateral
 });
 
 test("dodge camera has clear approach and exit buffers", () => {
-  assert.equal(dodgeCameraBlend(0, 0, 700), 0);
-  assert.equal(dodgeCameraBlend(55, 0, 700), 1);
-  assert.equal(dodgeCameraBlend(660, 0, 700), 1);
-  assert.equal(dodgeCameraBlend(700, 0, 700), 0);
-  assert.ok(dodgeCameraBlend(25, 0, 700) > 0);
-  assert.ok(dodgeCameraBlend(25, 0, 700) < 1);
+  const end = streetLevel.finish;
+  assert.equal(dodgeCameraBlend(0, 0, end), 0);
+  assert.equal(dodgeCameraBlend(55, 0, end), 1);
+  assert.equal(dodgeCameraBlend(end - 40, 0, end), 1);
+  assert.equal(dodgeCameraBlend(end, 0, end), 0);
+  assert.ok(dodgeCameraBlend(25, 0, end) > 0);
+  assert.ok(dodgeCameraBlend(25, 0, end) < 1);
 });
 
 test("three-lane dodge uses one adjacent lane per input and clamps at both edges", () => {
@@ -2574,7 +2585,7 @@ test("dodge steering animates the runner's upper body and counterbalancing arms"
 test("all difficult dodge gates have a clean reachable route at maximum speed", () => {
   const zone = streetLevel.dodge!;
   assert.equal(zone.start, 0);
-  assert.equal(zone.end - zone.start, 700);
+  assert.equal(zone.end - zone.start, 2100);
   assert.ok(
     streetLevel.surfaces.some(
       (surface) =>
@@ -2584,17 +2595,10 @@ test("all difficult dodge gates have a clean reachable route at maximum speed", 
     ),
     "Street Level stays on a continuous ground-level surface",
   );
-  assert.equal(zone.hazards.length, 72);
+  assert.ok(zone.hazards.length >= 240);
   assert.deepEqual(
     [...new Set(zone.hazards.map((hazard) => hazard.kind))].sort(),
-    [
-      "hydrant",
-      "parked-car",
-      "planter",
-      "road-barrier",
-      "scaffold",
-      "trash-bins",
-    ].sort(),
+    [...STREET_PROPS].sort(),
   );
   for (const x of new Set(zone.hazards.map((h) => h.x))) {
     const gate = zone.hazards.filter((h) => h.x === x);
@@ -2606,13 +2610,13 @@ test("all difficult dodge gates have a clean reachable route at maximum speed", 
     const run = new Run(streetLevel);
     run.start(0, true, mode);
     run.speed = 22;
-    for (let tick = 0; tick < 4500 && run.phase === "running"; tick++) {
+    for (let tick = 0; tick < 14000 && run.phase === "running"; tick++) {
       dodgePilot(run);
       run.step();
     }
     assert.equal(run.phase, "finished");
     assert.equal(run.recoveries, 0, `${mode}: ${run.message}`);
-    assert.equal(run.speed, 22);
+    assert.equal(run.speed, 26);
   }
 });
 
@@ -2626,4 +2630,132 @@ test("crossing an occupied lane still collides during a lane change", () => {
   run.steer(1);
   advance(run, 0.1);
   assert.equal(run.recoveries, 1);
+});
+
+test("street crashes freeze movement and input for the full difficulty-specific recovery", () => {
+  for (const mode of ["standard", "hardcore"] as const) {
+    const run = new Run(streetLevel);
+    run.start(0, true, mode);
+    run.x = 69.6;
+    run.lateral = streetLevel.dodge!.lanes[0];
+    run.dodgeLane = 0;
+    run.speed = 22;
+    run.step();
+    const duration = mode === "hardcore" ? 1.8 : 1.2;
+    assert.ok(Math.abs(run.dodgeCrashRemaining - duration) < 0.001);
+    const x = run.x,
+      lateral = run.lateral;
+    run.steer(1);
+    advance(run, duration - 0.05);
+    assert.equal(run.x, x);
+    assert.equal(run.lateral, lateral);
+    assert.equal(run.dodgeLane, 0);
+    assert.equal(run.speed, 0);
+    run.pause();
+    const remaining = run.dodgeCrashRemaining;
+    advance(run, 0.5);
+    assert.equal(run.dodgeCrashRemaining, remaining);
+    run.pause();
+    advance(run, 0.1);
+    assert.ok(run.x > x);
+    assert.equal(run.recoveries, 1);
+    run.start(0, true, mode);
+    assert.equal(run.dodgeCrashRemaining, 0);
+  }
+});
+
+test("18 additional street models have distinct geometry inside their collision markings", () => {
+  const signatures = new Set<string>();
+  for (const kind of STREET_PROPS.slice(6)) {
+    const group = new THREE.Group();
+    const geometries: THREE.BufferGeometry[] = [];
+    const material = new THREE.MeshBasicMaterial();
+    const shape =
+      (round: boolean) =>
+      (x: number, y: number, z: number, w: number, h: number, d: number) => {
+        const geometry = round
+          ? new THREE.CylinderGeometry(0.5, 0.5, 1, 12)
+          : new THREE.BoxGeometry(1, 1, 1);
+        geometries.push(geometry);
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x, y, z);
+        mesh.scale.set(w, h, d);
+        group.add(mesh);
+        return mesh;
+      };
+    streetProp(kind, shape(false), shape(true));
+    assert.ok(group.children.length >= 3, `${kind} must have modeled details`);
+    const bounds = new THREE.Box3().setFromObject(group);
+    assert.ok(bounds.min.x >= -1.21 && bounds.max.x <= 1.21, `${kind}: length`);
+    assert.ok(bounds.min.z >= -1.36 && bounds.max.z <= 1.36, `${kind}: width`);
+    signatures.add(
+      JSON.stringify(
+        group.children.map((part) => [
+          part.position.toArray(),
+          part.scale.toArray(),
+          part.rotation.toArray(),
+        ]),
+      ),
+    );
+    geometries.forEach((geometry) => geometry.dispose());
+    material.dispose();
+  }
+  assert.equal(signatures.size, 18);
+});
+
+test("street knockdowns replay without changing ghost timing", () => {
+  const first = new Run(streetLevel);
+  first.start(0, true);
+  for (let tick = 1; tick <= 900; tick++) {
+    if (tick === 1) first.steer(-1);
+    if (tick === 510) first.steer(1);
+    first.step();
+  }
+  assert.ok(
+    first.samples.some(
+      ({ frame }) => frame.move === "crash" && frame.speed === 0,
+    ),
+  );
+  const replay = new Run(streetLevel);
+  replay.start(0, true);
+  for (let tick = 1; tick <= 900; tick++) {
+    for (const input of first.inputs.filter((input) => input.tick === tick))
+      replay.action(input.action);
+    replay.step();
+  }
+  assert.deepEqual(replay.samples, first.samples);
+  assert.equal(replay.recoveries, first.recoveries);
+});
+
+test("extended street districts increase pace and density with safe practice starts", () => {
+  const zone = streetLevel.dodge!;
+  const counts = streetLevel.sectors.map(
+    (sector) =>
+      new Set(
+        zone.hazards
+          .filter((h) => h.x >= sector.start && h.x < sector.end)
+          .map((h) => h.x),
+      ).size,
+  );
+  assert.ok(counts[0] < counts[1] && counts[1] < counts[2]);
+  assert.deepEqual(
+    zone.speedStages.map((s) => s.speed),
+    [22, 24, 26],
+  );
+  for (const mode of ["standard", "hardcore"] as const) {
+    for (let sector = 0; sector < 3; sector++) {
+      const run = new Run(streetLevel);
+      run.start(sector, true, mode);
+      advance(run, 1);
+      assert.equal(run.recoveries, 0);
+      for (let tick = 0; tick < 18000 && run.phase === "running"; tick++) {
+        dodgePilot(run);
+        run.step();
+      }
+      assert.equal(run.phase, "finished");
+      assert.equal(run.recoveries, 0, `${mode} sector ${sector}`);
+      assert.ok(run.splits[2] > 0);
+      assert.equal(run.eligible, false);
+    }
+  }
 });

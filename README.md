@@ -1,6 +1,6 @@
 # Skystride
 
-A standalone, fullscreen urban time-trial game. Choose between four courses (700 m–3 km), from ground-level street dodging to rooftop parkour, with contextual traversal, swipe controls, and local personal-best ghosts.
+A standalone, fullscreen urban time-trial game. Choose between four courses (2.1–3 km), from ground-level street dodging to rooftop parkour, with contextual traversal, swipe controls, and local personal-best ghosts.
 
 ## Development
 
@@ -97,11 +97,11 @@ The course menu now presents four selectable maps with sector previews, Standard
 - **Level 1 — Harbor Run (tutorial):** Warehouse Row, Crane District, and Port Skyline. Features freight equipment, six optional elevated routes, two crane-bar crossings, and two five-metre rooftop drops with roll-out corridors. Cool morning light, water, freight stacks, and harbor cranes distinguish the setting.
 - **Level 2 — Sunset Relay:** the original three parkour sectors across 3 km.
 - **Level 3 — Saigon Rooftops:** Alley Roofs, Market Quarter, and Riverfront. Vietnamese tube houses, balconies, striped awnings, rooftop gardens, water tanks and river scenery. Eight new object designs retain existing vault, slide, wall-run, dive, swing, precision and ramp contacts. No tutorial guidance.
-- **Level 4 — Street Level:** one 700 m Downtown Dash sector on a continuous ground-level road. Dodge parked cars, road barriers, bins, planters, hydrants, and scaffolds across three lanes. Lane changes are animated; collisions cause a stumble and a temporary speed penalty.
+- **Level 4 — Street Level:** three 700 m sectors: Downtown Dash, Market Rush, and Expressway Gauntlet on a continuous ground-level road. Dodge parked cars, road barriers, bins, planters, hydrants, and scaffolds across three lanes. Lane changes are animated; collisions cause a full knockdown and timed recovery.
 
 Each `Run` owns a `LevelDefinition` from `src/pages/Skystride/courses/levels.ts`; simulation, obstacle meshes, scene geometry, practice starts, split markers, and finish detection read that same definition. Course geometry is grouped in `src/pages/Skystride/courses/`. Movement Lab and existing offline studies continue to default to Sunset Relay.
 
-Records are isolated by course version and difficulty. Current records use `skystride.sunset-relay-v47.<mode>.best`, `skystride.harbor-run-v2.<mode>.best`, `skystride.saigon-rooftops-v4.<mode>.best`, and `skystride.street-level-v1.<mode>.best`. Practice and paused runs remain ineligible. Ghost validation rejects another map's course version.
+Records are isolated by course version and difficulty. Current records use `skystride.sunset-relay-v47.<mode>.best`, `skystride.harbor-run-v2.<mode>.best`, `skystride.saigon-rooftops-v4.<mode>.best`, and `skystride.street-level-v3.<mode>.best`. Practice and paused runs remain ineligible. Ghost validation rejects another map's course version.
 
 Crane swing releases now use the same 30 m/s forward launch and upward impulse as other bar swings, including early, late, and automatic releases. Perfect timing still awards bonus flow; Down remains the deliberate drop action.
 
@@ -112,4 +112,8 @@ See the [implemented Vietnam objects](docs/saigon-implemented-objects.png), rend
 
 ## Street Level
 
-Street Level is a standalone 700 m course, separate from Sunset Relay, with a continuous road, sidewalks, lane markings, storefronts, street lamps, and ground-level city scenery. Its 36 obstacle gates use six street object types and block two of three lanes each. Forward movement stays automatic; jump, slide, and long-jump inputs are suppressed. Tap Left/Right or A/D once per lane change, or swipe horizontally on touch; holding a key does not repeat. Lane changes take 0.2 seconds and remain vulnerable to collisions while crossing. Hitting an object triggers a stumble and slows the runner to 9 m/s for 1.2 seconds (7 m/s for 1.5 seconds in Hardcore). Lane changes animate the runner's side lean and arm counterbalance. Practice is available from the course menu, and the course has its own versioned records and deterministic lateral ghost samples.
+Street Level is a standalone 2.1 km course, separate from Sunset Relay, with a continuous road, sidewalks, lane markings, storefronts, street lamps, and ground-level city scenery. Its progressively denser obstacle gates use 24 street object types and block two of three lanes each. Forward movement stays automatic; jump, slide, and long-jump inputs are suppressed. Tap Left/Right or A/D once per lane change, or swipe horizontally on touch; holding a key does not repeat. Lane changes take 0.2 seconds and remain vulnerable to collisions while crossing. Hitting an object knocks the runner down and completely stops movement and lane changes for 1.2 seconds (1.8 seconds in Hardcore). The run timer continues, so every collision costs real time, followed by acceleration from low speed. A crash banner shows the recovery countdown and collision count. Lane changes animate the runner's side lean and arm counterbalance. Practice is available from the course menu, and the course has its own versioned records and deterministic lateral ghost samples.
+
+Street props now include cars, barriers, bins, planters, hydrants, scaffolds, benches, bicycle racks, scooters, motorcycles, delivery carts, food carts, dumpsters, cones, roadworks signs, cable spools, barrels, pallets, crates, phone booths, mailboxes, utility cabinets, bus shelters, and fountains. Each gate mixes shapes; marked footprints show the collision area even for smaller fixtures.
+
+Street Level v3 triples the course length to 2.1 km. District speed caps rise from 22 to 24 to 26 m/s, while adjacent-lane gate spacing tightens from 16 to 14 to 12 m. Full-width reversals retain at least 16 m spacing so both lane changes remain possible. Every district has a clear practice entry, and the final 40 m retain the camera exit and recentering buffer. Existing knockdown penalties and all 24 prop designs remain active.

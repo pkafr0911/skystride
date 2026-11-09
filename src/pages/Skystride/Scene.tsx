@@ -1,3 +1,4 @@
+import { streetProp } from "./obstacles/street-props";
 import { TraversalAudio } from "./game/audio";
 import { CharacterId } from "./characters/characters";
 import { SWING_GAP_EXTRA, isSwing } from "./game/combos";
@@ -100,13 +101,7 @@ export default function Scene({
     camera.zoom = speedZoom(game.speed, motionPreference.matches);
     scene.add(
       new THREE.HemisphereLight(
-        harbor
-          ? 0xd9f7f5
-          : saigon
-            ? 0xffe6b5
-            : street
-              ? 0xe7eeeb
-              : 0xffd3b2,
+        harbor ? 0xd9f7f5 : saigon ? 0xffe6b5 : street ? 0xe7eeeb : 0xffd3b2,
         street ? 0x384343 : 0x25354e,
         1.25,
       ),
@@ -367,17 +362,21 @@ export default function Scene({
           edge,
         );
     }
-    const renderSurfaces = street ? [] : surfaces.flatMap((slab) => {
-      if (!slab.upper) return [slab];
-      const boundaries = [
-        slab.start,
-        slab.end,
-        ...narrowRanges.flat().filter((x) => x > slab.start && x < slab.end),
-      ].sort((a, b) => a - b);
-      return boundaries
-        .slice(0, -1)
-        .map((start, i) => ({ ...slab, start, end: boundaries[i + 1] }));
-    });
+    const renderSurfaces = street
+      ? []
+      : surfaces.flatMap((slab) => {
+          if (!slab.upper) return [slab];
+          const boundaries = [
+            slab.start,
+            slab.end,
+            ...narrowRanges
+              .flat()
+              .filter((x) => x > slab.start && x < slab.end),
+          ].sort((a, b) => a - b);
+          return boundaries
+            .slice(0, -1)
+            .map((start, i) => ({ ...slab, start, end: boundaries[i + 1] }));
+        });
     // Physical roof heights and connecting ramps come from the collision surfaces.
     for (const slab of renderSurfaces) {
       if (game.level.dodge && slab.start >= game.level.dodge.start) continue;
@@ -853,16 +852,7 @@ export default function Scene({
             );
           }
           for (const z of [-0.95, 2.05])
-            box(
-              scene,
-              x + 3.1,
-              0.008,
-              z,
-              4.1,
-              0.016,
-              0.09,
-              streetMarking,
-            );
+            box(scene, x + 3.1, 0.008, z, 4.1, 0.016, 0.09, streetMarking);
         }
       } else {
         // Separate slabs keep chunk culling valid along the entire sector.
@@ -874,13 +864,55 @@ export default function Scene({
             box(scene, x + 5, 0.015, z, 6, 0.03, 0.08, edge);
         }
       }
+      const propMaterials = new Map<number, THREE.Material>();
+      const propMaterial = (color: number) => {
+        if (!propMaterials.has(color))
+          propMaterials.set(color, material(color));
+        return propMaterials.get(color)!;
+      };
       for (const h of hazards) {
         const x = h.x + h.length / 2;
         const z = h.z;
         box(scene, x, 0.12, z, h.length + 0.18, 0.24, h.width + 0.2, black);
+        // Full footprint marking makes small fixtures' collision area readable.
+        for (const side of [-1, 1])
+          box(
+            scene,
+            x,
+            0.25,
+            z + (side * h.width) / 2,
+            h.length,
+            0.03,
+            0.06,
+            edge,
+          );
+        const propGroup = new THREE.Group();
+        propGroup.position.set(x, 0.24, z);
+        chunkFor(x).add(propGroup);
+        streetProp(
+          h.kind,
+          (px, py, pz, w, height, d, color) =>
+            box(propGroup, px, py, pz, w, height, d, propMaterial(color)),
+          (px, py, pz, w, height, d, color) => {
+            const mesh = new THREE.Mesh(cylinderGeometry, propMaterial(color));
+            mesh.position.set(px, py, pz);
+            mesh.scale.set(w / 2, height, d / 2);
+            propGroup.add(mesh);
+            return mesh;
+          },
+        );
         if (h.kind === "parked-car") {
           box(scene, x, 0.62, z, h.length, 0.88, h.width - 0.2, streetRed);
-          box(scene, x + 0.08, 1.14, z, h.length * 0.48, 0.28, h.width * 0.6, streetGlass);
+          box(
+            scene,
+            x + 0.08,
+            1.14,
+            z,
+            h.length * 0.48,
+            0.28,
+            h.width * 0.6,
+            streetGlass,
+          );
           box(scene, x + 0.82, 0.54, z, 0.42, 0.12, h.width + 0.04, edge);
           box(scene, x - 0.82, 0.54, z, 0.42, 0.12, h.width + 0.04, edge);
           for (const dx of [-0.72, 0.72])
@@ -920,17 +952,53 @@ export default function Scene({
             const binColor = dx < 0 ? streetGreen : streetBrick;
             box(scene, x + dx, 0.56, z, 0.82, 1, 0.92, binColor);
             box(scene, x + dx, 1.08, z, 0.92, 0.12, 1.02, black);
-            box(scene, x + dx, 0.52, z + 0.47, 0.58, 0.52, 0.04, streetSidewalk);
+            box(
+              scene,
+              x + dx,
+              0.52,
+              z + 0.47,
+              0.58,
+              0.52,
+              0.04,
+              streetSidewalk,
+            );
             for (const side of [-1, 1])
-              box(scene, x + dx + side * 0.25, 0.12, z + 0.32, 0.16, 0.2, 0.13, black);
+              box(
+                scene,
+                x + dx + side * 0.25,
+                0.12,
+                z + 0.32,
+                0.16,
+                0.2,
+                0.13,
+                black,
+              );
           }
         } else if (h.kind === "planter") {
           box(scene, x, 0.34, z, h.length, 0.62, h.width, streetBrick);
           box(scene, x, 0.68, z, h.length - 0.18, 0.12, h.width - 0.18, black);
           for (const dx of [-0.72, 0, 0.72]) {
             box(scene, x + dx, 0.98, z - 0.25, 0.18, 0.7, 0.18, streetGreen);
-            box(scene, x + dx - 0.18, 0.82, z + 0.18, 0.48, 0.14, 0.38, streetGreen);
-            box(scene, x + dx + 0.16, 1.16, z + 0.12, 0.4, 0.16, 0.4, streetGreen);
+            box(
+              scene,
+              x + dx - 0.18,
+              0.82,
+              z + 0.18,
+              0.48,
+              0.14,
+              0.38,
+              streetGreen,
+            );
+            box(
+              scene,
+              x + dx + 0.16,
+              1.16,
+              z + 0.12,
+              0.4,
+              0.16,
+              0.4,
+              streetGreen,
+            );
           }
         } else if (h.kind === "hydrant") {
           const hydrant = new THREE.Mesh(cylinderGeometry, streetRed);
@@ -951,14 +1019,41 @@ export default function Scene({
           }
           box(scene, x, 0.12, z, 0.9, 0.22, 0.9, streetBrick);
         } else if (h.kind === "scaffold") {
-          box(scene, x, 0.38, z, h.length + 0.1, 0.24, h.width + 0.1, streetRed);
+          box(
+            scene,
+            x,
+            0.38,
+            z,
+            h.length + 0.1,
+            0.24,
+            h.width + 0.1,
+            streetRed,
+          );
           for (const dx of [-1, 1])
             for (const side of [-1, 1])
               box(scene, x + dx, 0.78, z + side, 0.09, 1.1, 0.09, alloy);
           for (const y of [0.48, 1.04])
-            box(scene, x, y, z, h.length + 0.1, 0.08, h.width + 0.1, streetMarking);
+            box(
+              scene,
+              x,
+              y,
+              z,
+              h.length + 0.1,
+              0.08,
+              h.width + 0.1,
+              streetMarking,
+            );
           for (const dx of [-0.62, 0.62]) {
-            const brace = box(scene, x + dx, 0.72, z, 0.08, 0.9, h.width, black);
+            const brace = box(
+              scene,
+              x + dx,
+              0.72,
+              z,
+              0.08,
+              0.9,
+              h.width,
+              black,
+            );
             brace.rotation.y = dx < 0 ? 0.6 : -0.6;
           }
         }
@@ -967,7 +1062,9 @@ export default function Scene({
     if (street) {
       for (let x = -10, block = 0; x < FINISH; x += 22, block++) {
         const height = 8 + (block % 4) * 1.8;
-        const face = [streetBrick, buildingFaces[1], buildingFaces[2]][block % 3];
+        const face = [streetBrick, buildingFaces[1], buildingFaces[2]][
+          block % 3
+        ];
         for (const sign of [-1, 1]) {
           const centerZ = 0.55 + sign * 11;
           box(scene, x + 11, height / 2, centerZ, 20.5, height, 7.5, face);
@@ -1042,16 +1139,7 @@ export default function Scene({
             0.12,
             streetMarking,
           );
-          box(
-            scene,
-            x + 0.8,
-            4.82,
-            0.55 + sign * 6.7,
-            0.34,
-            0.24,
-            0.34,
-            edge,
-          );
+          box(scene, x + 0.8, 4.82, 0.55 + sign * 6.7, 0.34, 0.24, 0.34, edge);
           box(
             scene,
             x - 0.2,
