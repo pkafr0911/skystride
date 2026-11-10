@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { STREET_PROPS, streetProp } from "./obstacles/street-props";
 import { dodgeCameraBlend } from "./game/camera";
 import {
+  kilnCoast,
   harborRun,
   saigonRooftops,
   sunsetRelay,
@@ -11,7 +12,7 @@ import {
   type LevelDefinition,
 } from "./courses/levels";
 import { ground } from "./game/model";
-import { poseFor } from "./game/motion";
+import { poseFor, validPose } from "./game/motion";
 import { simulateChain } from "./game/lab-model";
 import {
   SWING_GAP_EXTRA,
@@ -110,6 +111,8 @@ function complete(
       g.frame().progress > 0.55
     )
       g.action("forward");
+    if (g.traversal?.technique === "wall-kick" && g.frame().progress >= 0.4)
+      g.action("up");
     const o = g.next();
     if (o && !pressed.has(o.x) && !g.traversal) {
       const d = o.x - g.x;
@@ -2319,6 +2322,7 @@ test("level geometry and records remain isolated across simultaneous runs", () =
       { number: "02", tutorial: false },
       { number: "03", tutorial: false },
       { number: "04", tutorial: false },
+      { number: "05", tutorial: false },
     ],
   );
   assert.equal(readLevel("harbor-run"), harborRun);
@@ -2757,5 +2761,148 @@ test("extended street districts increase pace and density with safe practice sta
       assert.ok(run.splits[2] > 0);
       assert.equal(run.eligible, false);
     }
+  }
+});
+
+for (const mode of ["standard", "hardcore"] as const) {
+  for (const upper of [false, true]) {
+    test(`Kiln Coast completes ${upper ? "upper" : "lower"} route in ${mode}`, () => {
+      const run = complete(upper, false, 1.9, mode, undefined, kilnCoast);
+      assert.equal(
+        run.phase,
+        "finished",
+        `x=${run.x}, y=${run.y}, next=${JSON.stringify(run.next())}`,
+      );
+      assert.equal(run.splits.length, 3);
+      assert.equal(run.recoveries, 0);
+      assert.ok(run.samples.some((s) => s.frame.technique === "wall-kick"));
+      assert.ok(run.samples.some((s) => s.frame.technique === "rope-swing"));
+      assert.ok(readRecord(JSON.stringify(run.record()), mode, kilnCoast));
+      assert.equal(
+        readRecord(JSON.stringify(run.record()), mode, sunsetRelay),
+        null,
+      );
+    });
+  }
+}
+
+test("wall kick requires a second timed Up and produces a real airborne launch", () => {
+  const obstacle = kilnCoast.obstacles.find(
+    (o) => o.technique === "wall-kick",
+  )!;
+  for (const mode of ["standard", "hardcore"] as const) {
+    const run = new Run(kilnCoast);
+    run.start(0, true, mode);
+    run.x = obstacle.x - 1.9;
+    run.speed = 12;
+    run.action("up");
+    run.step();
+    assert.equal(run.traversal?.technique, "wall-kick");
+    advance(run, 0.25);
+    run.action("forward");
+    run.step();
+    assert.equal(run.traversal?.technique, "wall-kick");
+    run.action("up");
+    run.step();
+    assert.equal(run.traversal, null);
+    assert.ok(run.vy > 12 && !run.grounded);
+    advance(run, 0.8);
+    assert.ok(run.x > obstacle.x + obstacle.width);
+    assert.notEqual(run.phase, "failed");
+    const missed = new Run(kilnCoast);
+    missed.start(0, true, mode);
+    missed.x = obstacle.x - 1.9;
+    missed.action("up");
+    advance(missed, 0.7);
+    assert.equal(missed.traversal, null);
+    assert.ok(missed.vy < 0 && !missed.grounded);
+  }
+});
+
+test("rope release phase changes launch, while Down and timeout detach without launching", () => {
+  const o = kilnCoast.obstacles.find((o) => o.technique === "rope-swing")!;
+  function caught() {
+    const run = new Run(kilnCoast);
+    run.start(0, true);
+    run.x = o.x - 1.9;
+    run.speed = 12;
+    run.action("up");
+    for (let i = 0; i < 100 && !run.traversal; i++) run.step();
+    assert.equal(run.traversal?.technique, "rope-swing");
+    return run;
+  }
+  const early = caught(),
+    late = caught();
+  advance(early, 0.36);
+  early.action("forward");
+  early.step();
+  advance(late, 0.62);
+  late.action("forward");
+  late.step();
+  assert.equal(early.traversal, null);
+  assert.equal(late.traversal, null);
+  assert.ok(late.vy > early.vy + 2);
+  const drop = caught();
+  advance(drop, 0.3);
+  drop.action("down");
+  drop.step();
+  assert.equal(drop.traversal, null);
+  assert.ok(drop.vy < 0);
+  const timeout = caught();
+  advance(timeout, 0.95);
+  assert.equal(timeout.traversal, null);
+  assert.ok(timeout.vy < 0);
+});
+
+test("Kiln Coast has ten original object families and independently authored layouts", () => {
+  assert.equal(
+    new Set(kilnCoast.obstacles.map((o) => o.kiln).filter(Boolean)).size,
+    10,
+  );
+  assert.ok(kilnCoast.obstacles.every((o) => !o.vietnam && !o.design));
+  assert.equal(kilnCoast.skybridges.length, 6);
+  for (const o of kilnCoast.obstacles)
+    assert.ok(o.x >= 0 && o.x + o.width <= kilnCoast.finish);
+  assert.notDeepEqual(
+    kilnCoast.obstacles.map((o) => [o.x, o.kind]),
+    saigonRooftops.obstacles.map((o) => [o.x, o.kind]),
+  );
+});
+
+test("Kiln wall and rope actions replay deterministically with valid contact poses", () => {
+  for (const technique of ["wall-kick", "rope-swing"] as const) {
+    const o = kilnCoast.obstacles.find((item) => item.technique === technique)!;
+    const setup = () => {
+      const run = new Run(kilnCoast);
+      run.start(0, true);
+      run.x = o.x - 1.9;
+      run.speed = 12;
+      return run;
+    };
+    const first = setup();
+    first.action("up");
+    for (let tick = 0; tick < 230; tick++) {
+      if (
+        first.traversal?.technique === "wall-kick" &&
+        first.frame().progress > 0.4
+      )
+        first.action("up");
+      if (
+        first.traversal?.technique === "rope-swing" &&
+        first.frame().progress > 0.55
+      )
+        first.action("forward");
+      first.step();
+      assert.ok(validPose(poseFor(first.frame())));
+    }
+    const replay = setup();
+    for (let tick = 1; tick <= first.ticks; tick++) {
+      for (const input of first.inputs.filter((input) => input.tick === tick))
+        replay.action(input.action);
+      replay.step();
+    }
+    assert.deepEqual(replay.samples, first.samples);
+    assert.equal(replay.x, first.x);
+    assert.equal(replay.recoveries, first.recoveries);
   }
 });

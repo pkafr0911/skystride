@@ -217,6 +217,23 @@ export default function Skystride() {
         : landmark === "skylights"
           ? "GLASS GALLERY · LAND ON AMBER BEAMS → JUMP AGAIN"
           : "";
+  const kilnCue =
+    level.id === "kiln-coast" &&
+    (motionFrame.technique === "wall-kick"
+      ? motionFrame.progress < 0.28
+        ? "WALL PLANT · WAIT FOR CONTACT"
+        : motionFrame.progress <= 0.85
+          ? "↑ KICK NOW · GAIN HEIGHT"
+          : "MISSED KICK · PREPARE TO ROLL"
+      : motionFrame.technique === "rope-swing"
+        ? motionFrame.progress < 0.35
+          ? "ROPE CAUGHT · HOLD"
+          : "→ RELEASE · ↓ DROP"
+        : next && distance < 28 && next.technique === "wall-kick"
+          ? "↑ PLANT ON WALL · ↑ AGAIN TO KICK"
+          : next && distance < 28 && next.technique === "rope-swing"
+            ? "↑ JUMP & CATCH ROPE · → RELEASE"
+            : "");
   const cue =
     game.traversal?.landmark === "crane" && isSwing(motionFrame.technique)
       ? motionFrame.progress < 0.5
@@ -308,10 +325,10 @@ export default function Skystride() {
       <main className={styles.page}>
         <div
           ref={stage}
-          className={`${styles.stage} ${styles.expanded} ${level.atmosphere === "harbor" ? styles.harborStage : level.atmosphere === "saigon" ? styles.saigonStage : level.atmosphere === "street" ? styles.streetStage : ""}`}
+          className={`${styles.stage} ${styles.expanded} ${level.atmosphere === "kiln" ? styles.kilnStage : level.atmosphere === "harbor" ? styles.harborStage : level.atmosphere === "saigon" ? styles.saigonStage : level.atmosphere === "street" ? styles.streetStage : ""}`}
           tabIndex={0}
           role="region"
-          aria-label="Skystride course. Up or Space to jump, Down to slide, R to restart, Escape to pause. On touch, swipe up or down. During Street Level, tap Left or Right, A or D, or swipe horizontally to switch lanes."
+          aria-label="Skystride course. Up or Space to jump, Down to slide, R to restart, Escape to pause. On touch, swipe up or down. In Kiln Coast, Up again during a wall plant kicks upward; Right releases a rope and Down drops. During Street Level, tap Left or Right, A or D, or swipe horizontally to switch lanes."
           onKeyDown={(e) => {
             if (
               (e.target as HTMLElement).closest(
@@ -528,6 +545,7 @@ export default function Skystride() {
                     : ""}
                 </span>
               </div>
+              {kilnCue && <div className={styles.cue}>{kilnCue}</div>}
               {level.tutorial &&
                 (game.move === "special" ||
                   onTop ||

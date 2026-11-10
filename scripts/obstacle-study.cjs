@@ -5,7 +5,9 @@ const fs = require("node:fs");
 const THREE = require("three");
 const { SWING_GAP_EXTRA } = require("../src/pages/Skystride/game/combos");
 const { obstacles } = require("../src/pages/Skystride/game/model");
-const { creativeObstacle } = require("../src/pages/Skystride/obstacles/obstacle-mesh");
+const {
+  creativeObstacle,
+} = require("../src/pages/Skystride/obstacles/obstacle-mesh");
 const box = new THREE.BoxGeometry(),
   cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
 const materials = [0x40506a, 0x101c2c, 0x718097, 0xf3ae65, 0x203958].map(
@@ -20,6 +22,25 @@ const kit = {
   amber: materials[3],
   panel: materials[4],
 };
+const kilnStudy = process.argv.includes("--kiln");
+const kilnCourse = kilnStudy
+  ? require("../src/pages/Skystride/courses/levels").kilnCoast
+  : null;
+if (kilnStudy) {
+  kit.kilnPalette = Object.fromEntries(
+    Object.entries({
+      brick: 0xa85d45,
+      chalk: 0xd8cbb3,
+      wood: 0x594231,
+      indigo: 0x375c79,
+    }).map(([key, color]) => {
+      const material = new THREE.MeshBasicMaterial({ color });
+      materials.push(material);
+      return [key, material];
+    }),
+  );
+  kit.ground = () => 0;
+}
 const vietnamStudy = process.argv.includes("--vietnam");
 const vietnamCourse = vietnamStudy
   ? require("../src/pages/Skystride/courses/levels").saigonRooftops
@@ -46,73 +67,78 @@ const panels = [];
 const signatureStudy = process.argv.includes("--signatures");
 const equipmentStudy = process.argv.includes("--equipment");
 const movementStudy = process.argv.includes("--movement-props");
-const entries = vietnamStudy
-  ? [
-      ["fruit-crate-bench", "FRUIT CRATE BENCH / VAULT"],
-      ["awning-crossbar", "AWNING CROSSBAR / SLIDE"],
-      ["water-tank-deck", "WATER TANK SERVICE DECK / CLIMB"],
-      ["cafe-sign", "CAFE SIGN / WALL RUN"],
-      ["market-shutter", "MARKET SHUTTER / DIVE"],
-      ["drying-rack", "DRYING RACK / GRAB AND SWING"],
-      ["terrazzo-planter", "TERRAZZO PLANTER / PRECISION"],
-      ["plank-ramp", "MAINTENANCE PLANK RAMP / JUMP"],
-    ]
-  : movementStudy
-    ? [...new Set(obstacles.map((o) => o.appearance).filter(Boolean))].map(
-        (name) => [name, name.replaceAll("-", " ").toUpperCase()],
-      )
-    : equipmentStudy
-      ? [
-          ["ac-condenser", "AC CONDENSER"],
-          ["cable-reels", "CABLE REELS"],
-          ["utility-cabinet", "UTILITY CABINET"],
-          ["maintenance-cart", "MAINTENANCE CART"],
-          ["roof-hatch", "ROOF ACCESS HATCH"],
-          ["duct-elbow", "DUCT ELBOW"],
-          ["safety-barricade", "SAFETY BARRICADE"],
-          ["antenna-base", "ANTENNA BASE"],
-          ["freight-crate", "STRAPPED FREIGHT CRATE"],
-          ["hose-station", "HOSE-REEL STATION"],
-          ["cable-gantry", "OVERHEAD CABLE TRAY"],
-        ]
-      : signatureStudy
-        ? require("../src/pages/Skystride/game/combos").techniques.map((t) => [
-            t,
-            t.replaceAll("-", " ").toUpperCase(),
-          ])
-        : [
-            ["vent-bank", "SPLIT VENTILATION BANK"],
-            ["pipe", "PIPE CROSSING"],
-            ["solar", "SOLAR LAUNCH RAMP"],
-            ["window", "CONSTRUCTION WINDOW"],
-            ["tank", "WATER-TANK CRADLE"],
-            ["wall-billboard", "WALL-RUN BILLBOARD"],
-            ["bridge", "BROKEN MAINTENANCE BRIDGE"],
-            ["greenhouse", "GREENHOUSE SERVICE LINE"],
-            ["scaffold", "HANGING SCAFFOLD"],
-            ["balcony", "STAGGERED BALCONIES"],
-          ];
-for (const [feature, title] of entries) {
-  const pieces = vietnamStudy
-    ? vietnamCourse.obstacles
-        .filter(
-          (o) =>
-            o.vietnam === feature &&
-            (feature !== "plank-ramp" ||
-              (o.height > 0 && o.feature !== "side-ramp")) &&
-            (feature !== "drying-rack" || o.technique === "lache") &&
-            (feature !== "terrazzo-planter" || o.technique === "precision"),
-        )
-        .slice(0, 1)
+const entries = kilnStudy
+  ? [...new Set(kilnCourse.obstacles.map((o) => o.kiln).filter(Boolean))].map(
+      (name) => [name, name.replaceAll("-", " ").toUpperCase()],
+    )
+  : vietnamStudy
+    ? [
+        ["fruit-crate-bench", "FRUIT CRATE BENCH / VAULT"],
+        ["awning-crossbar", "AWNING CROSSBAR / SLIDE"],
+        ["water-tank-deck", "WATER TANK SERVICE DECK / CLIMB"],
+        ["cafe-sign", "CAFE SIGN / WALL RUN"],
+        ["market-shutter", "MARKET SHUTTER / DIVE"],
+        ["drying-rack", "DRYING RACK / GRAB AND SWING"],
+        ["terrazzo-planter", "TERRAZZO PLANTER / PRECISION"],
+        ["plank-ramp", "MAINTENANCE PLANK RAMP / JUMP"],
+      ]
     : movementStudy
-      ? obstacles.filter((o) => o.appearance === feature).slice(0, 1)
+      ? [...new Set(obstacles.map((o) => o.appearance).filter(Boolean))].map(
+          (name) => [name, name.replaceAll("-", " ").toUpperCase()],
+        )
       : equipmentStudy
-        ? obstacles.filter((o) => o.design === feature).slice(0, 1)
+        ? [
+            ["ac-condenser", "AC CONDENSER"],
+            ["cable-reels", "CABLE REELS"],
+            ["utility-cabinet", "UTILITY CABINET"],
+            ["maintenance-cart", "MAINTENANCE CART"],
+            ["roof-hatch", "ROOF ACCESS HATCH"],
+            ["duct-elbow", "DUCT ELBOW"],
+            ["safety-barricade", "SAFETY BARRICADE"],
+            ["antenna-base", "ANTENNA BASE"],
+            ["freight-crate", "STRAPPED FREIGHT CRATE"],
+            ["hose-station", "HOSE-REEL STATION"],
+            ["cable-gantry", "OVERHEAD CABLE TRAY"],
+          ]
         : signatureStudy
-          ? obstacles
-              .filter((o) => o.technique === feature && o.route === "lower")
-              .slice(0, 1)
-          : obstacles.filter((o) => o.feature === feature && o.x < 480);
+          ? require("../src/pages/Skystride/game/combos").techniques.map(
+              (t) => [t, t.replaceAll("-", " ").toUpperCase()],
+            )
+          : [
+              ["vent-bank", "SPLIT VENTILATION BANK"],
+              ["pipe", "PIPE CROSSING"],
+              ["solar", "SOLAR LAUNCH RAMP"],
+              ["window", "CONSTRUCTION WINDOW"],
+              ["tank", "WATER-TANK CRADLE"],
+              ["wall-billboard", "WALL-RUN BILLBOARD"],
+              ["bridge", "BROKEN MAINTENANCE BRIDGE"],
+              ["greenhouse", "GREENHOUSE SERVICE LINE"],
+              ["scaffold", "HANGING SCAFFOLD"],
+              ["balcony", "STAGGERED BALCONIES"],
+            ];
+for (const [feature, title] of entries) {
+  const pieces = kilnStudy
+    ? kilnCourse.obstacles.filter((o) => o.kiln === feature).slice(0, 1)
+    : vietnamStudy
+      ? vietnamCourse.obstacles
+          .filter(
+            (o) =>
+              o.vietnam === feature &&
+              (feature !== "plank-ramp" ||
+                (o.height > 0 && o.feature !== "side-ramp")) &&
+              (feature !== "drying-rack" || o.technique === "lache") &&
+              (feature !== "terrazzo-planter" || o.technique === "precision"),
+          )
+          .slice(0, 1)
+      : movementStudy
+        ? obstacles.filter((o) => o.appearance === feature).slice(0, 1)
+        : equipmentStudy
+          ? obstacles.filter((o) => o.design === feature).slice(0, 1)
+          : signatureStudy
+            ? obstacles
+                .filter((o) => o.technique === feature && o.route === "lower")
+                .slice(0, 1)
+            : obstacles.filter((o) => o.feature === feature && o.x < 480);
   if (pieces.length === 0) {
     console.warn(
       `Skipping obstacle study entry "${feature}": no matching obstacles.`,
@@ -132,6 +158,27 @@ for (const [feature, title] of entries) {
         kit,
       ),
     );
+  if (kilnStudy && feature === "tile-hoist") {
+    const {
+      ropeAnchor,
+      ropeContact,
+    } = require("../src/pages/Skystride/game/kiln-movement");
+    const { swingGripOffset } = require("../src/pages/Skystride/game/combos");
+    const anchor = ropeAnchor(
+      pieces[0].x - (start + end) / 2 + swingGripOffset(pieces[0].width),
+      pieces[0].height,
+    );
+    const grip = ropeContact(anchor, 0);
+    const rope = new THREE.Mesh(cylinder, kit.kilnPalette.wood);
+    rope.position.set((anchor.x + grip.x) / 2, (anchor.y + grip.y) / 2, 0.55);
+    rope.scale.set(
+      0.045,
+      Math.hypot(grip.x - anchor.x, grip.y - anchor.y),
+      0.045,
+    );
+    rope.rotation.z = -Math.atan2(grip.x - anchor.x, grip.y - anchor.y);
+    scene.add(rope);
+  }
   const roof = new THREE.Mesh(box, materials[1]);
   roof.position.set(0, -0.15, 0);
   roof.scale.set(end - start + 2, 0.3, 4);
@@ -142,6 +189,7 @@ for (const [feature, title] of entries) {
       "monkey",
       "maintenance-gantry",
       "drying-rack",
+      "tile-hoist",
     ].includes(feature)
   ) {
     for (const [a, b] of [
@@ -154,6 +202,9 @@ for (const [feature, title] of entries) {
       scene.add(bank);
     }
   } else if (
+    feature !== "inspection-trench" &&
+    feature !== "retaining-steps" &&
+    feature !== "kiln-buttress" &&
     feature !== "bridge" &&
     feature !== "scaffold" &&
     feature !== "roof-hatch" &&

@@ -1,3 +1,4 @@
+import { kilnObstacle } from "./kiln-obstacle-mesh";
 import { vietnamObstacle } from "./vietnam-obstacle-mesh";
 import { SWING_GAP_EXTRA, swingGripOffset } from "../game/combos";
 import * as THREE from "three";
@@ -6,6 +7,12 @@ import { movementObstacle } from "./movement-obstacle-mesh";
 import { ground, Obstacle } from "../game/model";
 
 export type ObstacleKit = {
+  kilnPalette?: {
+    brick: THREE.Material;
+    chalk: THREE.Material;
+    wood: THREE.Material;
+    indigo: THREE.Material;
+  };
   vietnamPalette?: {
     wood: THREE.Material;
     cream: THREE.Material;
@@ -27,6 +34,7 @@ export type ObstacleKit = {
 
 /** Shared by the course and offline studies; every mesh uses caller-owned resources. */
 export function creativeObstacle(o: Obstacle, kit: ObstacleKit): THREE.Group {
+  if (o.kiln) return kilnObstacle(o, kit);
   if (o.vietnam) return vietnamObstacle(o, kit);
   if (o.appearance) return movementObstacle(o, kit);
   if (o.design) return equipmentObstacle(o, kit);

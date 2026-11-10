@@ -1,3 +1,9 @@
+import {
+  ropeAnchor,
+  ropeContact,
+  ropeRelease,
+  ROPE_DURATION,
+} from "./kiln-movement";
 import { sunsetRelay, type LevelDefinition } from "../courses/levels";
 import { timingRange, surfaceHeight } from "../courses/sunset-course";
 export * from "../courses/sunset-course";
@@ -15,6 +21,7 @@ import {
   SWING_RELEASE_SPEED,
   isSwing,
   techniques,
+  kilnTechniques,
   Technique,
 } from "./combos";
 export const STEP = 1 / 120;
@@ -108,7 +115,19 @@ export type VietnamProp =
   | "drying-rack"
   | "terrazzo-planter"
   | "plank-ramp";
+export type KilnProp =
+  | "press-table"
+  | "drying-beam"
+  | "kiln-portal"
+  | "kiln-buttress"
+  | "glaze-steps"
+  | "tile-hoist"
+  | "ceramic-pedestal"
+  | "loading-wedge"
+  | "inspection-trench"
+  | "retaining-steps";
 export type Obstacle = {
+  kiln?: KilnProp;
   /** Vietnam-themed geometry; retains the authored movement/contact dimensions. */
   vietnam?: VietnamProp;
   /** Alternate physical prop with the same traversal/contact geometry. */
@@ -309,7 +328,8 @@ export function readRecord(
             f.slope,
             f.lane,
           ].every((value) => value === undefined || Number.isFinite(value)) &&
-          (f.technique === undefined || techniques.includes(f.technique)) &&
+          (f.technique === undefined ||
+            [...techniques, ...kilnTechniques].includes(f.technique)) &&
           (f.side === undefined || f.side === 1 || f.side === -1) &&
           (f.transitionPose === undefined || validPose(f.transitionPose)) &&
           (f.transitionDuration === undefined ||
@@ -359,6 +379,7 @@ export type Traversal = {
   side?: 1 | -1;
   released?: boolean;
   landmark?: Landmark;
+  ropeAnchor?: Contact;
   catchX?: number;
   catchY?: number;
 };
@@ -506,7 +527,7 @@ export class Run {
     );
     this.message = practice
       ? "PRACTICE · FIND YOUR RHYTHM"
-      : "SUNSET RELAY / GO";
+      : `${this.level.name.toUpperCase()} / GO`;
     this.messageUntil = 1.6;
     this.previous = this.frame();
     this.samples.push({ time: 0, frame: this.frame() });
@@ -746,6 +767,14 @@ export class Run {
       isSwing(o.technique) ? 0.75 : 0.48,
       (t.end - t.start) / Math.max(3, this.speed),
     );
+    if (o.technique === "wall-kick") {
+      t.duration = 0.65;
+      t.end = o.x + 0.65;
+      t.y1 = this.y + 1;
+      t.contact = { x: o.x + 0.9, y: this.y + 1.3 };
+      this.say("WALL PLANT · TAP UP AGAIN TO KICK");
+      return;
+    }
     // A quick wall plant and drive keep tic-tacs from hanging on contact.
     if (o.technique === "tic-tac") t.duration *= 0.75;
     t.contact = { x: o.x + o.width / 2, y: this.y + (o.height ?? 1.1) };
@@ -782,6 +811,21 @@ export class Run {
     if (this.recovering && this.moveTime < this.actionDuration) return false;
     const t = this.traversal;
     if (t) {
+      if (t.technique === "wall-kick") {
+        const phase = t.elapsed / t.duration;
+        if (action !== "up" || phase < 0.28 || phase > 0.85) return false;
+        this.launchX = this.x;
+        this.launchY = this.y;
+        this.dropFrom = this.y;
+        this.traversal = null;
+        this.grounded = false;
+        this.lastGround = -1;
+        this.speed = Math.max(14, this.speed);
+        this.vy = 13;
+        this.setMove("jump");
+        this.say("WALL KICK · DRIVE UP AND ACROSS");
+        return true;
+      }
       if (
         t.move === "special" &&
         isSwing(t.technique) &&
@@ -808,6 +852,11 @@ export class Run {
               Math.max(3, this.speed),
           );
           this.vy = (0.3 - this.y + 33 * 0.5 * flight * flight) / flight;
+        }
+        if (t.technique === "rope-swing") {
+          const launch = ropeRelease(releasePhase);
+          this.speed = launch.speed;
+          this.vy = launch.vy;
         }
         if (perfect) this.reward("PERFECT RELEASE · FAST EXIT");
         this.traversal = null;
@@ -981,10 +1030,14 @@ export class Run {
       signature.x - this.x >= -0.25 &&
       signature.x - this.x <= 2.5
     ) {
+      if (signature.technique === "wall-kick" && action !== "up") return false;
       if (isSwing(signature.technique)) {
         if (action === "down") return false;
         this.jump("up");
-        this.vy = signature.route === "upper" ? 8.8 : 5.5;
+        this.vy =
+          signature.technique === "rope-swing" || signature.route === "upper"
+            ? 8.8
+            : 5.5;
         this.say("JUMP → REACH FOR BAR → RIGHT TO RELEASE");
       } else this.signature(signature, true);
       return true;
@@ -1294,10 +1347,17 @@ export class Run {
           x: bar.x + swingGripOffset(bar.width),
           y: base + bar.height!,
         };
-        t.duration = SWING_DURATION;
+        t.duration =
+          bar.technique === "rope-swing" ? ROPE_DURATION : SWING_DURATION;
+        if (bar.technique === "rope-swing")
+          t.ropeAnchor = ropeAnchor(t.contact.x, t.contact.y);
         t.catchX = this.x;
         t.catchY = this.y;
-        this.say("BAR CAUGHT · RIGHT TO RELEASE");
+        this.say(
+          bar.technique === "rope-swing"
+            ? "ROPE CAUGHT · RIGHT TO RELEASE / DOWN TO DROP"
+            : "BAR CAUGHT · RIGHT TO RELEASE",
+        );
         return;
       }
     }
@@ -1476,6 +1536,7 @@ export class Run {
         overlaps &&
         o.kind === "signature" &&
         !isSwing(o.technique) &&
+        o.technique !== "wall-kick" &&
         this.grounded
       ) {
         this.signature(o, this.time - this.jumpIntent < 0.18);
@@ -1811,9 +1872,34 @@ export class Run {
         this.x = (t.catchX ?? sx) + (sx - (t.catchX ?? sx)) * blend;
         this.y = (t.catchY ?? sy) + (sy - (t.catchY ?? sy)) * blend;
       }
+      if (t.technique === "rope-swing" && t.ropeAnchor) {
+        t.contact = ropeContact(t.ropeAnchor, p);
+        const blend = clamp(p / 0.12, 0, 1);
+        this.x =
+          (t.catchX ?? t.contact.x) +
+          (t.contact.x - (t.catchX ?? t.contact.x)) * blend;
+        this.y =
+          (t.catchY ?? t.contact.y - 1.8) +
+          (t.contact.y - 1.8 - (t.catchY ?? t.contact.y - 1.8)) * blend;
+      }
+      if (t.technique === "wall-kick") {
+        const plant = clamp(p / 0.28, 0, 1);
+        this.x = t.start + (t.end - t.start) * plant;
+        this.y = t.y0 + plant;
+      }
       this.vy = (this.y - previousY) / STEP;
       if (p === 1) {
-        if (t.move === "special" && isSwing(t.technique)) {
+        if (t.technique === "wall-kick" || t.technique === "rope-swing") {
+          this.launchX = this.x;
+          this.launchY = this.y;
+          this.dropFrom = this.y;
+          this.traversal = null;
+          this.grounded = false;
+          this.lastGround = -1;
+          this.vy = -1;
+          this.setMove("fall");
+          this.say("MISSED RELEASE · PREPARE TO ROLL");
+        } else if (t.move === "special" && isSwing(t.technique)) {
           this.tryAction("forward");
         } else if (t.move === "catch" && t.contact) {
           this.traversal = {
@@ -1984,40 +2070,48 @@ export class Run {
       lane:
         this.level.dodge && this.x >= this.level.dodge.start
           ? this.lateral
-          : this.traversal?.technique &&
-              ["tic-tac", "rebound"].includes(this.traversal.technique)
+          : this.traversal?.technique === "wall-kick"
             ? 0.55 -
-              1.05 *
-                Math.sin(
-                  (Math.PI * this.traversal.elapsed) / this.traversal.duration,
+              0.75 *
+                Math.min(
+                  1,
+                  this.traversal.elapsed / this.traversal.duration / 0.28,
                 )
-            : this.x >= this.sideLaneStart && this.x < this.sideLaneEnd
-              ? 0.55 +
-                (this.level.sideRamps.some((r) => r.x === this.sideLaneStart)
-                  ? 2.35
-                  : 1.5) *
-                  Math.min(
-                    1,
-                    (this.x - this.sideLaneStart) / 0.7,
-                    (this.sideLaneEnd - this.x) /
-                      (this.level.sideRamps.some(
-                        (r) => r.x === this.sideLaneStart,
-                      )
-                        ? 8.4
-                        : 0.7),
+            : this.traversal?.technique &&
+                ["tic-tac", "rebound"].includes(this.traversal.technique)
+              ? 0.55 -
+                1.05 *
+                  Math.sin(
+                    (Math.PI * this.traversal.elapsed) /
+                      this.traversal.duration,
                   )
-              : this.move === "wall-run"
-                ? 0.55 -
-                  0.9 *
-                    Math.sin(
-                      Math.PI *
-                        Math.min(
-                          1,
-                          (this.traversal?.elapsed ?? 0) /
-                            Math.max(0.01, this.traversal?.duration ?? 1),
-                        ),
+              : this.x >= this.sideLaneStart && this.x < this.sideLaneEnd
+                ? 0.55 +
+                  (this.level.sideRamps.some((r) => r.x === this.sideLaneStart)
+                    ? 2.35
+                    : 1.5) *
+                    Math.min(
+                      1,
+                      (this.x - this.sideLaneStart) / 0.7,
+                      (this.sideLaneEnd - this.x) /
+                        (this.level.sideRamps.some(
+                          (r) => r.x === this.sideLaneStart,
+                        )
+                          ? 8.4
+                          : 0.7),
                     )
-                : 0.55,
+                : this.move === "wall-run"
+                  ? 0.55 -
+                    0.9 *
+                      Math.sin(
+                        Math.PI *
+                          Math.min(
+                            1,
+                            (this.traversal?.elapsed ?? 0) /
+                              Math.max(0.01, this.traversal?.duration ?? 1),
+                          ),
+                      )
+                  : 0.55,
       steering: clamp(this.lateralSpeed / 15, -1, 1),
     };
   }

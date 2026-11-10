@@ -4,10 +4,12 @@ import { formatTime, GameMode, RecordRun, recordStorage } from "./game/model";
 import styles from "./styles.less";
 
 function Skyline({
+  kiln,
   harbor,
   saigon,
   street,
 }: {
+  kiln: boolean;
   harbor: boolean;
   saigon: boolean;
   street: boolean;
@@ -26,6 +28,16 @@ function Skyline({
         fill="currentColor"
         opacity=".16"
       />
+      {kiln && (
+        <g fill="currentColor" opacity=".8">
+          <path d="M40 132V76Q70 25 100 76V132ZM145 135V55Q183 1 221 55V135ZM169 38V8H191V38ZM275 130V82Q305 35 335 82V130Z" />
+          <path
+            d="M362 130Q385 36 430 75Q450 97 463 130H448Q424 62 397 91L378 130Z"
+            fill="#375c79"
+          />
+          <path d="M0 151H520M330 143H510" stroke="#8ab7c3" strokeWidth="3" />
+        </g>
+      )}
       {harbor && (
         <g stroke="currentColor" fill="none" strokeWidth="3" opacity=".65">
           <path d="M115 127V21L197 42H86M115 22L179 42M182 42V80M354 118V17L442 37H324M354 17L423 37M429 37V72" />
@@ -118,7 +130,7 @@ export default function CourseMenu({
         <div>
           <div className={styles.wordmark}>SKYSTRIDE ↗</div>
           <h1>Find your next line.</h1>
-          <p>Four city routes. Find your favorite line.</p>
+          <p>Five distinct routes. Find your favorite line.</p>
         </div>
         <span className={styles.menuStamp}>
           URBAN TIME TRIALS
@@ -138,7 +150,7 @@ export default function CourseMenu({
               type="button"
               aria-pressed={item.id === level.id}
               onClick={() => onLevel(item)}
-              className={`${styles.levelCard} ${item.atmosphere === "harbor" ? styles.harborCard : item.atmosphere === "saigon" ? styles.saigonCard : item.atmosphere === "street" ? styles.streetCard : styles.sunsetCard} ${item.id === level.id ? styles.levelSelected : ""}`}
+              className={`${styles.levelCard} ${item.atmosphere === "kiln" ? styles.kilnCard : item.atmosphere === "harbor" ? styles.harborCard : item.atmosphere === "saigon" ? styles.saigonCard : item.atmosphere === "street" ? styles.streetCard : styles.sunsetCard} ${item.id === level.id ? styles.levelSelected : ""}`}
             >
               <div className={styles.cardTop}>
                 <span>
@@ -150,6 +162,7 @@ export default function CourseMenu({
                 </span>
               </div>
               <Skyline
+                kiln={item.atmosphere === "kiln"}
                 harbor={item.atmosphere === "harbor"}
                 saigon={item.atmosphere === "saigon"}
                 street={item.atmosphere === "street"}
@@ -249,6 +262,8 @@ export default function CourseMenu({
             (level.dodge.start === 0 ||
               practice === level.sectors.length - 1) ? (
               "3 LANES · tap ← → / A D · swipe to switch"
+            ) : level.id === "kiln-coast" ? (
+              "↑ Wall plant · ↑ again to kick · → Rope release · ↓ Drop"
             ) : (
               <>
                 ↑ Jump & vault <span>↓ Slide & roll</span> → Long jump

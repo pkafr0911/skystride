@@ -92,7 +92,7 @@ Other movement props: roof expansion joints (jumps), loading shutters (dives), a
 
 ## Levels and course selection
 
-The course menu now presents four selectable maps with sector previews, Standard/Hardcore difficulty, full-course time trials, and practice from any sector. Runner, camera, sound, swipe sensitivity, and fullscreen controls are grouped under **Runner & settings**. The selected level is remembered on this device. New players start on Harbor Run, which shows contextual action and timing guidance on the right. Sunset Relay and subsequent non-tutorial levels hide that guidance panel.
+The course menu now presents five selectable maps with sector previews, Standard/Hardcore difficulty, full-course time trials, and practice from any sector. Runner, camera, sound, swipe sensitivity, and fullscreen controls are grouped under **Runner & settings**. The selected level is remembered on this device. New players start on Harbor Run, which shows contextual action and timing guidance on the right. Sunset Relay and subsequent non-tutorial levels hide that guidance panel.
 
 - **Level 1 — Harbor Run (tutorial):** Warehouse Row, Crane District, and Port Skyline. Features freight equipment, six optional elevated routes, two crane-bar crossings, and two five-metre rooftop drops with roll-out corridors. Cool morning light, water, freight stacks, and harbor cranes distinguish the setting.
 - **Level 2 — Sunset Relay:** the original three parkour sectors across 3 km.
@@ -117,3 +117,15 @@ Street Level is a standalone 2.1 km course, separate from Sunset Relay, with a c
 Street props now include cars, barriers, bins, planters, hydrants, scaffolds, benches, bicycle racks, scooters, motorcycles, delivery carts, food carts, dumpsters, cones, roadworks signs, cable spools, barrels, pallets, crates, phone booths, mailboxes, utility cabinets, bus shelters, and fountains. Each gate mixes shapes; marked footprints show the collision area even for smaller fixtures.
 
 Street Level v3 triples the course length to 2.1 km. District speed caps rise from 22 to 24 to 26 m/s, while adjacent-lane gate spacing tightens from 16 to 14 to 12 m. Full-width reversals retain at least 16 m spacing so both lane changes remain possible. Every district has a clear practice entry, and the final 40 m retain the camera exit and recentering buffer. Existing knockdown penalties and all 24 prop designs remain active.
+
+
+## Kiln Coast — Level 5
+
+A new 3 km Vietnamese coastal ceramics course: Clayworks, Kiln Terraces, and Ceramic Coast. It has independently authored contact phrases, six elevated routes, three lower courtyard descents, and ten original obstacle families. Select **Kiln Coast** in the course menu; practice can start at any sector. Records and ghosts use `skystride.kiln-coast-v1.<mode>.best`.
+
+- **Wall kick:** press Up (or swipe up) near a marked kiln buttress to plant, then press Up again during the displayed kick window. The second input launches the runner upward and across the gap. Missing the window drops the contact instead of automatically completing the crossing.
+- **Rope swing:** jump to catch the hanging rope, then press Right (or swipe right) to release after the initial catch. Release timing changes forward and upward velocity. Down deliberately drops; holding through the full swing also lets go without a launch.
+
+Contextual cues explain these two moves without enabling the full tutorial panel. Existing jump, vault, slide, dive, climb and roll rules remain shared with Sunset and Saigon. Automated full-course runs finish both routes in Standard and Hardcore without recovery penalties; balance is still subject to human playtesting.
+
+[Implemented obstacle mesh preview](docs/kiln-implemented-objects.png). Generate it with `node scripts/obstacle-study.cjs --kiln`, then `node scripts/render-obstacle-study.cjs docs/kiln-implemented-objects.png --kiln` with `sharp` available on the Node module path. The preview is rendered from procedural meshes, not concept art. Wall kicks and rope swings are currently taught and practiced in the level; the Sunset-based Movement Lab retains its existing move list.

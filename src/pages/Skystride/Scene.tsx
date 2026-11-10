@@ -1,3 +1,5 @@
+import { ropeAnchor, ropeContact } from "./game/kiln-movement";
+import { swingGripOffset } from "./game/combos";
 import { streetProp } from "./obstacles/street-props";
 import { TraversalAudio } from "./game/audio";
 import { CharacterId } from "./characters/characters";
@@ -51,6 +53,7 @@ export default function Scene({
       lowerRoofDrops,
       skybridges,
     } = game.level;
+    const kiln = game.level.atmosphere === "kiln";
     const harbor = game.level.atmosphere === "harbor";
     const saigon = game.level.atmosphere === "saigon";
     const street = game.level.atmosphere === "street";
@@ -90,7 +93,15 @@ export default function Scene({
     container.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(
-      harbor ? 0x9fc8cf : saigon ? 0xc5ac9a : street ? 0xa8b5b3 : 0xa59abb,
+      kiln
+        ? 0xd4ac98
+        : harbor
+          ? 0x9fc8cf
+          : saigon
+            ? 0xc5ac9a
+            : street
+              ? 0xa8b5b3
+              : 0xa59abb,
       60,
       170,
     );
@@ -143,8 +154,12 @@ export default function Scene({
       materials.push(m);
       return m;
     };
-    const roof = material(saigon ? 0x8b8171 : street ? 0x333d43 : 0x35465a),
-      side = material(saigon ? 0xb8a081 : street ? 0x343b3c : 0x182a43),
+    const roof = material(
+        kiln ? 0xb5a28a : saigon ? 0x8b8171 : street ? 0x333d43 : 0x35465a,
+      ),
+      side = material(
+        kiln ? 0x9e624e : saigon ? 0xb8a081 : street ? 0x343b3c : 0x182a43,
+      ),
       edge = material(harbor ? 0x9fe5d5 : street ? 0xf1c85b : 0xf3ae65);
     // Mid-tone matte steel preserves panel detail under the warm sunlight.
     const vaultFace = material(0x5e7084),
@@ -163,6 +178,12 @@ export default function Scene({
       finish.roughness = 1;
       finish.metalness = 0;
     }
+    const kilnPalette = {
+      brick: material(0xa85d45),
+      chalk: material(0xd8cbb3),
+      wood: material(0x594231),
+      indigo: material(0x375c79),
+    };
     const metal = material(0x40506a),
       black = material(0x101c2c),
       streetAsphalt = material(0x3f4a4b),
@@ -674,9 +695,10 @@ export default function Scene({
           : o.kind === "ramp"
             ? rampFace
             : vaultFace;
-      if (o.vietnam || o.feature || o.design || o.appearance) {
+      if (o.kiln || o.vietnam || o.feature || o.design || o.appearance) {
         chunkFor(o.x).add(
           creativeObstacle(o, {
+            kilnPalette,
             vietnamPalette,
             ground,
             box: boxGeometry,
@@ -1163,6 +1185,46 @@ export default function Scene({
       box(scene, x, 2.5, -2, 0.12, 5, 0.12, metal);
       box(scene, x + 1, 4.5, -2, 2, 0.65, 0.08, x === FINISH ? metal : roof);
     }
+    if (kiln) {
+      const sea = material(0x557f91);
+      box(scene, FINISH / 2, -14, -42, FINISH + 100, 0.2, 65, sea);
+      for (let x = 0; x < FINISH; x += 32) {
+        const sector = Math.floor(x / 1000);
+        const { brick, chalk, indigo, wood } = kilnPalette;
+        box(scene, x, -2, -8, 20, 7, 7, sector === 2 ? chalk : brick);
+        if (sector === 1 || (sector === 0 && x % 96 === 0)) {
+          const tower = new THREE.Mesh(cylinderGeometry, brick);
+          tower.position.set(x, 3, -10);
+          tower.scale.set(3.8, 10, 3.8);
+          chunkFor(x).add(tower);
+          const chimney = new THREE.Mesh(cylinderGeometry, wood);
+          chimney.position.set(x, 10, -10);
+          chimney.scale.set(0.9, 5, 0.9);
+          chunkFor(x).add(chimney);
+          for (let y = 0; y <= 7; y += 2)
+            box(scene, x, y, -5.9, 5, 0.12, 0.12, chalk);
+        } else if (sector === 2) {
+          for (let i = 0; i < 8; i++) {
+            const a = (i / 7) * Math.PI;
+            box(
+              scene,
+              x + Math.cos(a) * 3,
+              1 + Math.sin(a) * 5,
+              -7,
+              0.6,
+              1.3,
+              0.7,
+              indigo,
+            ).rotation.z = -a;
+          }
+        } else {
+          for (let offset = -6; offset <= 6; offset += 3) {
+            box(scene, x + offset, 2, -5, 0.2, 3, 0.2, wood);
+            box(scene, x + offset, 3.5, -7, 0.2, 0.2, 4, wood);
+          }
+        }
+      }
+    }
     if (saigon && vietnamPalette) {
       const { cream, jade, coral, leaf, steel } = vietnamPalette;
       const water = material(0x648c89);
@@ -1332,6 +1394,20 @@ export default function Scene({
       });
     };
     batch(scene);
+    const ropes = obstacles
+      .filter((o) => o.technique === "rope-swing")
+      .map((o) => {
+        const base = ground(o.x, o.route === "upper");
+        const anchor = ropeAnchor(
+          o.x + swingGripOffset(o.width),
+          base + (o.height ?? 3),
+        );
+        const rope = new THREE.Mesh(cylinderGeometry, kilnPalette.wood);
+        const grip = new THREE.Mesh(cylinderGeometry, obstacleAccent);
+        grip.scale.set(0.1, 0.28, 0.1);
+        scene.add(rope, grip);
+        return { o, anchor, rope, grip };
+      });
     // Preserve shadows through instancing, including curved obstacle geometry.
     const enableShadows = (root: THREE.Object3D) =>
       root.traverse((object) => {
@@ -1402,6 +1478,20 @@ export default function Scene({
       const current = game.frame();
       const visual: Frame = interpolateFrame(game.previous, current, alpha);
       const x = visual.x;
+      for (const { o, anchor, rope, grip } of ropes) {
+        const active =
+          current.technique === "rope-swing" &&
+          game.traversal?.obstacle?.start === o.x;
+        const end =
+          active && visual.contact ? visual.contact : ropeContact(anchor, 0);
+        const dx = end.x - anchor.x,
+          dy = end.y - anchor.y;
+        rope.position.set((anchor.x + end.x) / 2, (anchor.y + end.y) / 2, 0.55);
+        rope.scale.set(0.045, Math.hypot(dx, dy), 0.045);
+        rope.rotation.z = -Math.atan2(dx, dy);
+        grip.position.set(end.x, end.y, 0.55);
+        rope.visible = grip.visible = Math.abs(o.x - x) < 100;
+      }
       const next = game.next();
       audio.setEnabled(soundRef.current);
       if (game.time < feedbackTime) feedbackId = -1;

@@ -132,7 +132,7 @@ export default function MovementLab() {
                     ]
                   : [0, 0.18, 0.4, 0.7, 0.97].map((p) =>
                       atProgress(
-                        techniques.includes(move as Technique)
+                        (techniques as readonly string[]).includes(move)
                           ? "special"
                           : move === "wall-run" || move === "dive"
                             ? move

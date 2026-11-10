@@ -16,9 +16,12 @@ export const techniques = [
   "drop-through",
   "duck",
 ] as const;
-export type Technique = (typeof techniques)[number];
+export const kilnTechniques = ["wall-kick", "rope-swing"] as const;
+export type Technique =
+  | (typeof techniques)[number]
+  | (typeof kilnTechniques)[number];
 export const isSwing = (t?: Technique) =>
-  t === "underbar" || t === "lache" || t === "monkey";
+  t === "underbar" || t === "lache" || t === "monkey" || t === "rope-swing";
 export const SWING_GAP_EXTRA = 10.2;
 export const SWING_RELEASE_SPEED = 30;
 export const swingGripOffset = (width: number) => width - 0.2;

@@ -1199,7 +1199,13 @@ function specialPose(f: Frame): Pose {
       u < 0.5 ? "out" : "in",
     );
   }
-  if (t === "underbar" || t === "lache" || t === "monkey" || t === "shimmy") {
+  if (
+    t === "underbar" ||
+    t === "lache" ||
+    t === "monkey" ||
+    t === "shimmy" ||
+    t === "rope-swing"
+  ) {
     const swing = Math.sin((u - 0.2) * Math.PI * 2);
     p.hip = [-0.12 * swing, 0.84, 0];
     p.chest = [0.08 * swing, 1.4, 0];
@@ -1208,6 +1214,11 @@ function specialPose(f: Frame): Pose {
       [contact[0], contact[1], -0.22],
       [contact[0], contact[1], 0.22],
     ];
+    if (t === "rope-swing")
+      p.hands = [
+        [contact[0], contact[1], -0.035],
+        [contact[0], contact[1] - 0.18, 0.035],
+      ];
     if (t === "monkey" || t === "shimmy") {
       const hand = Math.floor(u * 6) % 2;
       p.hands[hand][0] += 0.32 * Math.sin(u * 6 * Math.PI);
@@ -1295,7 +1306,7 @@ function specialPose(f: Frame): Pose {
       u,
     );
   }
-  if (t === "tic-tac" || t === "rebound") {
+  if (t === "tic-tac" || t === "rebound" || t === "wall-kick") {
     p.feet[0] = [contact[0], contact[1], -0.35];
     p.knees[0] = [0.7, 0.85, -0.15];
     p.hands[0] = [0.4, 1.4, -0.4];

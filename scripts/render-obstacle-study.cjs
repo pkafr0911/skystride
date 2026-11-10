@@ -12,11 +12,13 @@ const width = 1800,
 const height = 142 + Math.ceil(panels.length / 2) * 374 + 36;
 const pixels = Buffer.alloc(width * height * 4);
 const depths = new Float64Array(width * height).fill(Infinity);
-const title = process.argv.includes("--vietnam")
-  ? "SKYSTRIDE / SAIGON ROOFTOPS"
-  : "SKYSTRIDE / ROOFTOP EQUIPMENT";
+const title = process.argv.includes("--kiln")
+  ? "SKYSTRIDE / KILN COAST"
+  : process.argv.includes("--vietnam")
+    ? "SKYSTRIDE / SAIGON ROOFTOPS"
+    : "SKYSTRIDE / ROOFTOP EQUIPMENT";
 const svg = [
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#0c1420"/><text x="36" y="58" fill="#f1eadf" font-family="sans-serif" font-size="34" font-weight="700">${title}</text><text x="36" y="98" fill="#9caec3" font-family="sans-serif" font-size="19">Current in-game geometry · Real-world rooftop equipment</text>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#0c1420"/><text x="36" y="58" fill="#f1eadf" font-family="sans-serif" font-size="34" font-weight="700">${title}</text><text x="36" y="98" fill="#9caec3" font-family="sans-serif" font-size="19">Current in-game geometry · Procedural obstacle kit</text>`,
 ];
 const edge = (a, b, x, y) =>
   (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);

@@ -1,3 +1,4 @@
+import { kilnGeometry } from "./kiln-course";
 import { STREET_PROPS, type StreetProp } from "../obstacles/street-props";
 import { saigonGeometry } from "./saigon-course";
 import * as sunset from "./sunset-course";
@@ -7,7 +8,8 @@ export type LevelId =
   | "sunset-relay"
   | "harbor-run"
   | "saigon-rooftops"
-  | "street-level";
+  | "street-level"
+  | "kiln-coast";
 export type DodgeZone = {
   start: number;
   end: number;
@@ -115,7 +117,7 @@ export type LevelDefinition = Geometry & {
   finish: number;
   dodge?: DodgeZone;
   sectors: SectorDefinition[];
-  atmosphere: "sunset" | "harbor" | "saigon" | "street";
+  atmosphere: "sunset" | "harbor" | "saigon" | "street" | "kiln";
 };
 export const sunsetRelay: LevelDefinition = {
   ...sunset,
@@ -264,11 +266,45 @@ export const streetLevel: LevelDefinition = {
     },
   ],
 };
+export const kilnCoast: LevelDefinition = {
+  ...kilnGeometry(),
+  id: "kiln-coast",
+  version: "kiln-coast-v1",
+  name: "Kiln Coast",
+  number: "05",
+  tutorial: false,
+  tagline: "Kick skyward. Swing toward the sea.",
+  description:
+    "A new coastal ceramics district with wall kicks, hanging rope swings and ten original obstacle designs. Tap Up again during a wall plant; press Right to release a rope, or Down to drop.",
+  finish: 3000,
+  atmosphere: "kiln",
+  sectors: [
+    {
+      name: "Clayworks",
+      start: 0,
+      end: 1000,
+      description: "Learn wall kicks and rope releases",
+    },
+    {
+      name: "Kiln Terraces",
+      start: 1000,
+      end: 2000,
+      description: "Link the elevated galleries",
+    },
+    {
+      name: "Ceramic Coast",
+      start: 2000,
+      end: 3000,
+      description: "Take the high line to the sea",
+    },
+  ],
+};
 export const levels: LevelDefinition[] = [
   harborRun,
   sunsetRelay,
   saigonRooftops,
   streetLevel,
+  kilnCoast,
 ];
 export const LEVEL_STORAGE = "skystride.selected-level";
 export function readLevel(value: string | null): LevelDefinition {
