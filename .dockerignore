@@ -1,0 +1,12 @@
+.git
+.gitignore
+.umi
+.umi-production
+.umi-test
+coverage
+dist
+node_modules
+*.log
+.env
+.env.*
+!.env.example

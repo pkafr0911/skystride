@@ -26,6 +26,24 @@ npm run build-pre
 
 CI runs these checks on main pushes and pull requests.
 
+## Docker
+
+Build and run the production image locally:
+
+```sh
+docker compose up --build
+```
+
+Open http://localhost:8080. The container serves the production build and falls back to the app entry point for client-side routes such as `/movement-lab`. To change the host port, set `PORT` (for example, `PORT=80 docker compose up --build`).
+
+For deployment, build and start the same Compose service on a Docker host:
+
+```sh
+docker compose up --build -d
+```
+
+The service restarts automatically unless explicitly stopped. Put a TLS-terminating reverse proxy in front of it when exposing it publicly.
+
 ## GitHub Pages deployment
 
 Repository: https://github.com/pkafr0911/skystride
