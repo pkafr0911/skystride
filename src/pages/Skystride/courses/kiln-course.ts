@@ -90,7 +90,7 @@ export function kilnGeometry() {
   // First wall and rope encounters have long, clear approaches and exits.
   phrase(36, "Clay Dispatch", "0:v 16:s 32:g 49:p");
   phrase(156, "First Firing", "0:j 29:v 41:s");
-  phrase(306, "Hoist Lesson", "0:r 46:k 60:p");
+  phrase(340, "Hoist Lesson", "0:r 34:k 46:p");
   phrase(436, "Workshop Windows", "0:w 16:d 30:s 43:g");
   phrase(556, "Glaze Lift", "0:t 20:p 34:v");
   phrase(716, "Drying Gallery", "0:s 14:k 66:p 80:w");
@@ -98,7 +98,7 @@ export function kilnGeometry() {
   phrase(936, "Courtyard Exit", "0:v 12:s 26:a 31:g");
   phrase(1038, "Cold Kiln", "0:w 15:k 30:c 51:p");
   phrase(1158, "Twin Buttresses", "0:j 27:s 39:d");
-  phrase(1308, "Hoist Transfer", "0:r 45:p 59:k");
+  phrase(1340, "Hoist Transfer", "0:r 34:p 46:k");
   phrase(1438, "Firebrick Thread", "0:s 12:d 25:w 41:p 55:v");
   phrase(1558, "Glaze Descent", "0:t 19:p 33:k");
   phrase(1718, "Kiln Circuit", "0:c 62:s 74:k 87:p 100:d");
@@ -106,12 +106,34 @@ export function kilnGeometry() {
   phrase(1938, "Last Gallery", "0:s 12:k 25:g");
   phrase(2038, "Coastal Ribs", "0:p 12:s 25:k 38:g 55:p");
   phrase(2158, "Sea Wall", "0:j 26:w 39:d");
-  phrase(2308, "Rope Horizon", "0:r 44:p 56:s 68:k");
+  phrase(2338, "Rope Horizon", "0:r 34:p 46:k");
   phrase(2438, "Sculpture Walk", "0:c 20:k 32:s 44:p 57:g");
   phrase(2558, "Stone Steps", "0:t 18:p 30:d");
   phrase(2718, "Last Firing", "0:j 65:k 77:s 89:p");
   phrase(2848, "Coastal Hoist", "0:r 45:d 58:s");
-  phrase(2940, "Home to the Sea", "0:k 12:s 26:p");
+  phrase(2940, "Home to the Sea", "0:k 10:s 20:p 30:d 40:s");
+  // Additional contact phrases build density by sector (10 m, 9 m, then 8 m
+  // switches), with protected space around branches, drops and rope landings.
+  phrase(106, "Clay Slalom", "0:v 10:s 20:d 30:p");
+  phrase(246, "Under the Crown", "0:s 10:k 20:p 30:d 40:s");
+  phrase(406, "Hoist Runout", "0:s 8:k 16:d");
+  phrase(506, "Glaze Queue", "0:v 10:s 20:p 30:k");
+  phrase(674, "Courtyard Weave", "0:k 10:s 20:d");
+  phrase(818, "Drying Sprint", "0:v 10:s");
+  phrase(912, "Brick Dispatch", "0:k 10:s");
+  phrase(1110, "Furnace Rhythm", "0:s 9:k 18:d 27:p");
+  phrase(1246, "Under the Kiln", "0:p 9:s 18:k 27:w 39:d");
+  phrase(1400, "Tile Exchange", "0:s 9:v 18:p 27:d");
+  phrase(1510, "Inspection Rush", "0:k 9:s 18:w 30:d");
+  phrase(1676, "Glaze Conveyor", "0:v 9:s 18:k");
+  phrase(1914, "Ember Exit", "0:k 9:s");
+  phrase(2110, "Coastal Thread", "0:s 8:k 16:w 28:d");
+  phrase(2246, "Archway Relay", "0:k 8:s 16:p 24:w 36:d");
+  phrase(2400, "Sea Spray", "0:s 8:d 16:p");
+  phrase(2520, "Sculpture Slalom", "0:k 8:s 16:d 24:p");
+  phrase(2674, "Quay Switchback", "0:s 8:k 16:p 24:d");
+  phrase(2822, "Final Approach", "0:v 8:s");
+  phrase(2920, "Coastline Dash", "0:k 8:p");
   const skybridges = [210, 640, 1210, 1640, 2210, 2640].map((start) => ({
     start: start + 6,
     rampStart: start + 8,
@@ -132,7 +154,14 @@ export function kilnGeometry() {
         "Sea Arch",
         "Coastal Crown",
       ][i],
-      i % 2 ? "0:r 44:p 57:d" : "0:j 38:s 51:k",
+      [
+        "0:j 30:s 40:k 50:p 60:d",
+        "0:r 34:k 44:s 54:p 64:d",
+        "0:j 30:p 40:s 50:d 60:k",
+        "0:r 32:s 42:k 52:w 64:p",
+        "0:j 30:k 40:s 50:p 60:w",
+        "0:r 32:p 42:s 52:d 62:k",
+      ][i],
       "upper",
     );
     obstacles.push({
@@ -140,7 +169,6 @@ export function kilnGeometry() {
       width: 5,
       kind: "drop",
       route: "upper",
-      kiln: "retaining-steps",
     });
   });
   const lowerRoofDrops = [610, 1610, 2610].map((x) => ({
@@ -237,7 +265,7 @@ export function kilnGeometry() {
       { start: b.descent, end: b.end, y: b.height, endY: 3.3, upper: true },
     );
   const obstacleTops = obstacles.flatMap((o, index) =>
-    ["vault", "slide", "ledge"].includes(o.kind)
+    ["vault", "slide", "ledge"].includes(o.kind) || o.technique === "precision"
       ? [
           {
             start: o.x,

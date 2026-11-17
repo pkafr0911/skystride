@@ -70,7 +70,7 @@ export function kilnObstacle(o: Obstacle, kit: ObstacleKit) {
     box(w / 2, o.openingTop! + 0.275, 0, w, 0.55, 2.4, chalk);
     for (const x of [0.12, w - 0.12]) box(x, 2, -1.5, 0.24, 4, 0.3, brick);
     for (let x = 0.2; x < w; x += 0.45)
-      box(x, 3.9, 1.69, 0.3, 0.18, 0.08, indigo);
+      box(x, 3.9, 1.23, 0.3, 0.18, 0.08, indigo);
     edge(w / 2, h, w);
     edge(w / 2, o.openingTop!, w);
   } else if (o.kiln === "kiln-buttress") {
@@ -168,13 +168,13 @@ export function kilnObstacle(o: Obstacle, kit: ObstacleKit) {
     // Surface elevation is owned by the course. Stone facing follows that surface.
     const landingY =
       (kit.ground?.(o.x + w + 0.01, false) ?? 0) - group.position.y;
-    box(w + 7, landingY - 0.5, -1.7, 14, 1, 0.7, chalk);
-    box(w + 7, landingY - 0.04, -1.7, 14, 0.08, 0.8, indigo);
+    box(w + 7, landingY - 0.55, -4.25, 14, 1, 0.3, chalk);
+    box(w + 7, landingY - 0.06, -4.25, 14, 0.06, 0.35, indigo);
     for (const x of [0, w, w + 6, w + 14]) {
       const localY =
         (kit.ground?.(o.x + x + 0.01, false) ?? 0) - group.position.y;
-      box(x, localY - 0.5, -1.7, 0.3, 1, 0.5, chalk);
-      box(x, localY, -1.7, 0.45, 0.06, 0.6, indigo);
+      box(x, localY - 0.55, -4.25, 0.3, 1, 0.3, chalk);
+      box(x, localY - 0.06, -4.25, 0.45, 0.06, 0.35, indigo);
     }
   }
   return group;

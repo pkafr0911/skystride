@@ -1445,11 +1445,20 @@ export class Run {
     }
     // Thin service decks can be crossed underneath, but not through their fascia.
     for (const deck of this.level.obstacles) {
-      if (deck.kind !== "ledge" || !this.applicable(deck)) continue;
+      if (
+        (deck.kind !== "ledge" && deck.kiln !== "ceramic-pedestal") ||
+        !this.applicable(deck)
+      )
+        continue;
       const bodyHeight =
         this.move === "slide" || this.move === "roll" ? 0.85 : 1.85;
-      const top =
-        this.level.ground(deck.x, deck.route === "upper") + deck.height!;
+      const base = this.level.ground(deck.x, deck.route === "upper");
+      const top = base + deck.height!;
+      // Kiln plinths are solid masonry, unlike thin service decks.
+      const underside =
+        deck.kiln === "ceramic-pedestal" || deck.kiln === "glaze-steps"
+          ? base
+          : top - 0.18;
       if (
         this.x + 0.22 < deck.x ||
         this.x - 0.22 > deck.x + deck.width ||
@@ -1458,13 +1467,13 @@ export class Run {
         continue;
       if (
         this.vy > 0 &&
-        oldY + bodyHeight <= top - 0.18 &&
-        this.y + bodyHeight >= top - 0.18
+        oldY + bodyHeight <= underside &&
+        this.y + bodyHeight >= underside
       ) {
-        this.y = top - 0.18 - bodyHeight;
+        this.y = underside - bodyHeight;
         this.vy = 0;
         this.setMove("fall");
-      } else if (oldX < deck.x && this.y + bodyHeight > top - 0.18) {
+      } else if (oldX < deck.x && this.y + bodyHeight > underside) {
         this.x = deck.x - 0.23;
         this.speed = Math.min(this.speed, 3);
       }

@@ -269,13 +269,13 @@ export const streetLevel: LevelDefinition = {
 export const kilnCoast: LevelDefinition = {
   ...kilnGeometry(),
   id: "kiln-coast",
-  version: "kiln-coast-v1",
+  version: "kiln-coast-v2",
   name: "Kiln Coast",
   number: "05",
   tutorial: false,
   tagline: "Kick skyward. Swing toward the sea.",
   description:
-    "A new coastal ceramics district with wall kicks, hanging rope swings and ten original obstacle designs. Tap Up again during a wall plant; press Right to release a rope, or Down to drop.",
+    "A demanding coastal ceramics course with 50 combos, wall kicks, rope swings and ten original obstacle designs. Tap Up again during a wall plant; press Right to release a rope, or Down to drop.",
   finish: 3000,
   atmosphere: "kiln",
   sectors: [

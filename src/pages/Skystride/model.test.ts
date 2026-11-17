@@ -1,3 +1,5 @@
+import { creativeObstacle } from "./obstacles/obstacle-mesh";
+import { elevatedMarkers, sliceSurface } from "./courses/surface-layout";
 import * as THREE from "three";
 import { STREET_PROPS, streetProp } from "./obstacles/street-props";
 import { dodgeCameraBlend } from "./game/camera";
@@ -68,10 +70,11 @@ function complete(
   mode: GameMode = "standard",
   branchStart?: number,
   level: LevelDefinition = sunsetRelay,
+  startSector = 0,
 ) {
   const g = new Run(level);
   const { ground, surfaces } = level;
-  g.start(0, false, mode);
+  g.start(startSector, startSector > 0, mode);
   if (branchStart !== undefined) {
     g.x = branchStart - 8;
     g.y = ground(g.x, false);
@@ -2905,4 +2908,178 @@ test("Kiln wall and rope actions replay deterministically with valid contact pos
     assert.equal(replay.x, first.x);
     assert.equal(replay.recoveries, first.recoveries);
   }
+});
+
+test("Kiln precision plinths support repeat landings in either lane and mode", () => {
+  for (const upper of [false, true])
+    for (const mode of ["standard", "hardcore"] as const) {
+      const o = kilnCoast.obstacles.find(
+        (o) => o.technique === "precision" && (o.route === "upper") === upper,
+      )!;
+      const run = new Run(kilnCoast);
+      run.start(0, true, mode);
+      run.x = o.x + 0.5;
+      run.upper = upper;
+      const top = kilnCoast.ground(o.x, upper) + o.height!;
+      run.y = top + 0.15;
+      run.vy = -2;
+      run.speed = 0;
+      run.grounded = false;
+      run.handled.add(kilnCoast.obstacles.indexOf(o));
+      advance(run, 0.1);
+      assert.ok(
+        run.grounded,
+        `${mode} ${upper}: should land on the visible plinth`,
+      );
+      assert.equal(run.y, top);
+      run.action("up");
+      run.step();
+      assert.ok(!run.grounded && run.vy > 0, "top supports a follow-up jump");
+    }
+});
+
+test("solid Kiln blocks cannot be crossed below their visible tops", () => {
+  for (const family of ["glaze-steps", "ceramic-pedestal"] as const) {
+    const o = kilnCoast.obstacles.find(
+      (o) => o.kiln === family && o.route === "lower",
+    )!;
+    const run = new Run(kilnCoast);
+    run.start(0, true);
+    run.x = o.x - 0.3;
+    run.y = 0.1;
+    run.speed = 12;
+    run.vy = -1;
+    run.grounded = false;
+    run.handled.add(kilnCoast.obstacles.indexOf(o));
+    run.step();
+    assert.ok(
+      run.x < o.x,
+      `${family}: visible solid face must stop the runner`,
+    );
+  }
+});
+
+test("elevated markers and sliced ramps follow the actual support geometry", () => {
+  for (const marker of elevatedMarkers(kilnCoast.surfaces)) {
+    const support = kilnCoast.surfaces.find(
+      (s) => s.upper && marker.x > s.start && marker.x < s.end,
+    );
+    assert.ok(support, "no marker may float over a cut gap");
+    assert.ok(
+      Math.abs(marker.y - surfaceHeight(support, marker.x) - 0.035) < 1e-8,
+    );
+  }
+  for (const original of kilnCoast.surfaces.filter(
+    (s) => s.endY !== undefined,
+  )) {
+    const start = original.start + (original.end - original.start) * 0.2;
+    const end = original.start + (original.end - original.start) * 0.8;
+    const slice = sliceSurface(original, start, end);
+    for (const x of [start, (start + end) / 2, end])
+      assert.ok(
+        Math.abs(surfaceHeight(slice, x) - surfaceHeight(original, x)) < 1e-8,
+      );
+  }
+});
+
+test("Kiln v2 increases combo density without occupying protected approaches", () => {
+  const combos = new Set(
+    kilnCoast.obstacles.map((o) => o.combo).filter(Boolean),
+  );
+  assert.equal(combos.size, 50);
+  assert.ok(kilnCoast.obstacles.filter((o) => o.combo).length >= 180);
+  for (const sector of kilnCoast.sectors)
+    assert.ok(
+      kilnCoast.obstacles.filter(
+        (o) => o.combo && o.x >= sector.start && o.x < sector.end,
+      ).length >= 60,
+    );
+  for (const bridge of kilnCoast.skybridges) {
+    assert.ok(
+      !kilnCoast.obstacles.some(
+        (o) =>
+          o.route === "lower" &&
+          o.kind !== "drop" &&
+          o.x < bridge.start + 6 &&
+          o.x + o.width > bridge.start - 9,
+      ),
+    );
+    assert.ok(
+      kilnCoast.obstacles.filter(
+        (o) =>
+          o.route === "upper" &&
+          o.combo &&
+          o.x >= bridge.crest &&
+          o.x < bridge.descent,
+      ).length >= 5,
+    );
+  }
+});
+
+test("Kiln obstacle meshes stay clear of overhead decks", () => {
+  const box = new THREE.BoxGeometry(),
+    cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
+  const material = new THREE.MeshBasicMaterial();
+  const kit = {
+    box,
+    cylinder,
+    face: material,
+    dark: material,
+    trim: material,
+    amber: material,
+    panel: material,
+    ground: kilnCoast.ground,
+  };
+  try {
+    for (const o of kilnCoast.obstacles.filter(
+      (o) => o.kiln && o.route !== "upper",
+    )) {
+      const group = creativeObstacle(o, kit);
+      group.updateMatrixWorld(true);
+      group.traverse((mesh) => {
+        if (!(mesh instanceof THREE.Mesh)) return;
+        const bounds = new THREE.Box3().setFromObject(mesh);
+        if (bounds.max.z < -5.4 || bounds.min.z > 2.2) return;
+        for (const slab of kilnCoast.surfaces.filter(
+          (s) => s.upper && s.end > bounds.min.x && s.start < bounds.max.x,
+        )) {
+          const start = Math.max(bounds.min.x, slab.start),
+            end = Math.min(bounds.max.x, slab.end);
+          const ceiling =
+            Math.min(surfaceHeight(slab, start), surfaceHeight(slab, end)) -
+            0.9;
+          assert.ok(
+            bounds.max.y <= ceiling + 0.025,
+            `${o.kiln} at ${o.x} intersects upper deck at ${slab.start}`,
+          );
+        }
+      });
+    }
+  } finally {
+    box.dispose();
+    cylinder.dispose();
+    material.dispose();
+  }
+});
+
+test("denser Kiln sectors remain completable from practice starts in both modes", () => {
+  for (const sector of [1, 2])
+    for (const mode of ["standard", "hardcore"] as const) {
+      const run = complete(
+        false,
+        false,
+        1.9,
+        mode,
+        undefined,
+        kilnCoast,
+        sector,
+      );
+      assert.equal(
+        run.phase,
+        "finished",
+        `${mode} sector ${sector} at ${run.x}`,
+      );
+      assert.equal(run.recoveries, 0, `${mode} sector ${sector}`);
+      assert.equal(run.eligible, false);
+    }
 });

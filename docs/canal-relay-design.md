@@ -74,6 +74,15 @@ Amber edges identify contacts and cyan accents identify optional routes. Keep de
 
 - Wall kick: Up plants against the marked wall; a second Up during 28–85% of the 0.65-second contact launches upward. Timeout drops the contact. This is separate from existing automatic tic-tac/rebound moves.
 - Rope swing: jump to catch a hanging grip, Right releases from 35% of the 0.9-second swing onward, and Down drops after 25%. Launch velocity varies with release phase. Timeout drops instead of auto-launching. The rendered rope follows the simulation's grip position.
-- Both lower and upper full-course routes complete in Standard and Hardcore without recovery penalties in scripted tests. Approximate scripted times are 3:44.48 lower and 3:43.56 upper; these are simulation results, not player records or a difficulty-parity claim.
+- Both lower and upper full-course routes complete in Standard and Hardcore without recovery penalties in scripted tests. The v2 layout is denser than the original release; earlier v1 timings are no longer comparable.
 - Sector starts, versioned records, deterministic replay and contact poses are covered by automated checks. The level has brief prompts for the new moves but no full tutorial panel.
 - Human playtesting remains useful for difficulty and input feel. Browser verification could not be completed because the browser tool blocked local-page access; the actual meshes are inspected through the [offline preview](kiln-implemented-objects.png).
+
+
+## V2 difficulty and geometry revision
+
+The playable course now has 50 named combos and 187 contacts (v1: 30 and 105). New connecting phrases progress from roughly 10 m action switches to 8–9 m in later sectors. All six elevated routes have distinct five-contact sequences, while practice approaches, drop landings and route entrances remain clear. Three lower rope crossings move beyond the elevated exits to remove hoist/deck intersections.
+
+Precision plinths now provide persistent top support and solid side collision. Glaze blocks use solid collision instead of thin-deck behavior. Elevated edge markers are derived from real surfaces; sliced ramps preserve their original heights. Retaining trim is recessed outside the roof, portal accents attach to their frame, and the coastal background arches use connected segments.
+
+Records use `kiln-coast-v2`; the revised obstacle positions cannot replay old-layout ghosts.

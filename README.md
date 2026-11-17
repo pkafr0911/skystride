@@ -28,19 +28,15 @@ CI runs these checks on main pushes and pull requests.
 
 ## Docker
 
-Build and run the production image locally:
-
-```sh
-docker compose up --build
-```
-
-Open http://localhost:8080. The container serves the production build and falls back to the app entry point for client-side routes such as `/movement-lab`. To change the host port, set `PORT` (for example, `PORT=80 docker compose up --build`).
-
-For deployment, build and start the same Compose service on a Docker host:
+On the machine running the app, clone or copy the repository and run:
 
 ```sh
 docker compose up --build -d
 ```
+
+Compose builds the Dockerfile locally as the `skystride:latest` image, then starts the `skystride` service. Docker and Docker Compose are required; building also needs access to the base images and npm registry. Run the same command after updating the source to rebuild and deploy it.
+
+Open http://localhost:8080 (or the deployment host's address on port 8080). The container serves the production build and falls back to the app entry point for client-side routes such as `/movement-lab`. To change the host port, set `PORT` (for example, `PORT=80 docker compose up --build -d`).
 
 The service restarts automatically unless explicitly stopped. Put a TLS-terminating reverse proxy in front of it when exposing it publicly.
 
@@ -139,7 +135,7 @@ Street Level v3 triples the course length to 2.1 km. District speed caps rise fr
 
 ## Kiln Coast — Level 5
 
-A new 3 km Vietnamese coastal ceramics course: Clayworks, Kiln Terraces, and Ceramic Coast. It has independently authored contact phrases, six elevated routes, three lower courtyard descents, and ten original obstacle families. Select **Kiln Coast** in the course menu; practice can start at any sector. Records and ghosts use `skystride.kiln-coast-v1.<mode>.best`.
+A new 3 km Vietnamese coastal ceramics course: Clayworks, Kiln Terraces, and Ceramic Coast. It has independently authored contact phrases, six elevated routes, three lower courtyard descents, and ten original obstacle families. Select **Kiln Coast** in the course menu; practice can start at any sector. Records and ghosts use `skystride.kiln-coast-v2.<mode>.best`.
 
 - **Wall kick:** press Up (or swipe up) near a marked kiln buttress to plant, then press Up again during the displayed kick window. The second input launches the runner upward and across the gap. Missing the window drops the contact instead of automatically completing the crossing.
 - **Rope swing:** jump to catch the hanging rope, then press Right (or swipe right) to release after the initial catch. Release timing changes forward and upward velocity. Down deliberately drops; holding through the full swing also lets go without a launch.
@@ -147,3 +143,8 @@ A new 3 km Vietnamese coastal ceramics course: Clayworks, Kiln Terraces, and Cer
 Contextual cues explain these two moves without enabling the full tutorial panel. Existing jump, vault, slide, dive, climb and roll rules remain shared with Sunset and Saigon. Automated full-course runs finish both routes in Standard and Hardcore without recovery penalties; balance is still subject to human playtesting.
 
 [Implemented obstacle mesh preview](docs/kiln-implemented-objects.png). Generate it with `node scripts/obstacle-study.cjs --kiln`, then `node scripts/render-obstacle-study.cjs docs/kiln-implemented-objects.png --kiln` with `sharp` available on the Node module path. The preview is rendered from procedural meshes, not concept art. Wall kicks and rope swings are currently taught and practiced in the level; the Sunset-based Movement Lab retains its existing move list.
+
+
+Kiln Coast v2 increases the course from 30 combos / 105 contacts to **50 combos / 187 contacts**. Twenty new connecting phrases reduce empty stretches, later-sector switches tighten to 8–9 m, and all six elevated routes now have distinct five-contact chains. The three lower rope hoists formerly beneath descending decks move beyond the exits, preserving clear swing and landing space.
+
+Platform fixes add persistent landing support to precision plinths, give solid glaze blocks and plinths matching side collisions, and place elevated markers only on real support surfaces. Retaining trim sits outside the roof edge, portal accents attach to the frame, and coastal sculpture ribs connect continuously. The revised course version keeps old-layout records and ghosts separate.

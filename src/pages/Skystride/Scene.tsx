@@ -1,3 +1,4 @@
+import { elevatedMarkers, sliceSurface } from "./courses/surface-layout";
 import { ropeAnchor, ropeContact } from "./game/kiln-movement";
 import { swingGripOffset } from "./game/combos";
 import { streetProp } from "./obstacles/street-props";
@@ -51,7 +52,6 @@ export default function Scene({
       obstacles,
       surfaces,
       lowerRoofDrops,
-      skybridges,
     } = game.level;
     const kiln = game.level.atmosphere === "kiln";
     const harbor = game.level.atmosphere === "harbor";
@@ -344,20 +344,9 @@ export default function Scene({
       [skyStart, skyEnd],
       [craneBank, craneBank + 5],
     ];
-    // Full-width rooftop edge markings identify the real building-to-building gaps.
-    for (const bridge of skybridges) {
-      for (const offset of [28.5, 29.3, 38, 39])
-        box(
-          scene,
-          bridge.start + offset,
-          bridge.height + 0.025,
-          -1.6,
-          0.18,
-          0.05,
-          6.6,
-          edge,
-        );
-    }
+    // Mark actual supports so route-specific gaps cannot acquire floating bars.
+    for (const marker of elevatedMarkers(surfaces))
+      box(scene, marker.x, marker.y, -1.6, 0.18, 0.05, 6.6, edge);
     // Bright takeoff bars and a clear landing strip mark the deep lower-route transfers.
     for (const drop of lowerRoofDrops) {
       for (const offset of [0.5, 1.1, 1.7])
@@ -396,7 +385,7 @@ export default function Scene({
           ].sort((a, b) => a - b);
           return boundaries
             .slice(0, -1)
-            .map((start, i) => ({ ...slab, start, end: boundaries[i + 1] }));
+            .map((start, i) => sliceSurface(slab, start, boundaries[i + 1]));
         });
     // Physical roof heights and connecting ramps come from the collision surfaces.
     for (const slab of renderSurfaces) {
@@ -1205,17 +1194,22 @@ export default function Scene({
             box(scene, x, y, -5.9, 5, 0.12, 0.12, chalk);
         } else if (sector === 2) {
           for (let i = 0; i < 8; i++) {
-            const a = (i / 7) * Math.PI;
+            const a = (i / 8) * Math.PI,
+              b = ((i + 1) / 8) * Math.PI;
+            const ax = x + Math.cos(a) * 3,
+              ay = 1 + Math.sin(a) * 5;
+            const bx = x + Math.cos(b) * 3,
+              by = 1 + Math.sin(b) * 5;
             box(
               scene,
-              x + Math.cos(a) * 3,
-              1 + Math.sin(a) * 5,
+              (ax + bx) / 2,
+              (ay + by) / 2,
               -7,
+              Math.hypot(bx - ax, by - ay) + 0.1,
               0.6,
-              1.3,
               0.7,
               indigo,
-            ).rotation.z = -a;
+            ).rotation.z = Math.atan2(by - ay, bx - ax);
           }
         } else {
           for (let offset = -6; offset <= 6; offset += 3) {

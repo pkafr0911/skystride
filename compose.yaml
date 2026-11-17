@@ -1,7 +1,10 @@
 services:
   skystride:
+    image: skystride:latest
+    # Build the image: docker compose build
     build:
       context: .
+      dockerfile: Dockerfile
     ports:
       - "${PORT:-8080}:80"
     restart: unless-stopped
